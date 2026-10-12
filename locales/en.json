@@ -101,5 +101,21 @@
   "Its {n} tags go with it.": {
     "one": "Its one tag goes with it.",
     "other": "Its {n} tags go with it."
+  },
+  "Written on {n} days between {first} and {last}.": {
+    "one": "Written on one day, {first}.",
+    "other": "Written on {n} days between {first} and {last}."
+  },
+  "{n} sessions, {hours} of writing, leaving out pauses of a minute or more.": {
+    "one": "One session, {hours} of writing, leaving out pauses of a minute or more.",
+    "other": "{n} sessions, {hours} of writing, leaving out pauses of a minute or more."
+  },
+  "{n} keys pressed, {typed} characters typed.": {
+    "one": "{n} key pressed, {typed} characters typed.",
+    "other": "{n} keys pressed, {typed} characters typed."
+  },
+  "{n} characters typed": {
+    "one": "{n} character typed",
+    "other": "{n} characters typed"
   }
 }

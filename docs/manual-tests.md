@@ -118,6 +118,23 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] **(2 computers)** Proof on (it's a library setting, so on for both): each computer seals its own folder with its own key, and verify-recording checks both.
 - [ ] **(phone)** The phone doesn't offer proof and writes no seals; its sessions are checked as unsealed.
 
+## Evidence report and exported replay (phase 6)
+
+- [ ] History's footer has **Evidence…** and **Export replay…** beside Snapshots, and the footer still fits at the window's smallest width (nothing overlaps the proof line).
+- [ ] **Evidence…** on a book written for a few days: "Reading every session…", then How "…" was written: Facts (time, keys, rhythm, pauses, revision, going back, pasted, without a key, not recorded, timestamps), then Judgement, then "These are judgements, not proof." Numbers look right for what you did (paste a paragraph from a web page: it shows under Pasted).
+- [ ] Paste a long passage from another app within a few seconds of switching back to NEO: the report counts it as "within ten seconds of coming back to NEO".
+- [ ] Dictate a sentence (Windows: Win+H; macOS: Fn Fn): it's counted under **Without a key**.
+- [ ] The chapter table: click a row, see that chapter's report; **← The whole book** goes back; Esc or Done closes the report and leaves History open.
+- [ ] On a book with a year of writing, the report takes no more than half a minute, and NEO stays responsive meanwhile (you can type in another book's window, scroll History).
+- [ ] With proof on for a while: the report's Timestamps row names DigiCert and Sectigo and lists sessions written before proof was on as "timestamped later, on …". With proof never on: "Not sealed…".
+- [ ] **Export replay…**, the whole book: the save dialog opens in the last export folder, named "<title> — Writing History.html". Open the file in Chrome, Firefox, Safari and Edge, with the network off: it opens on the book as it is now, plays (Play, speeds, Skip pauses, the slider, the days, ‹ ›), and "What this page checks" ends with green ticks and "The figures below … match."
+- [ ] In the exported page, with proof on: each seal's files download from **Every seal**, and `openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem` (with the page's own proof-roots.pem) says `Verification: OK`.
+- [ ] **Export replay…**, only some chapters: the page shows and plays only them; searching the file (open it in a text editor and look for a phrase from a chapter left out) finds nothing; the page says nothing on it fixes them in time.
+- [ ] Edit one character in an exported page's data with a text editor (inside a session's base64 is hard; change a seal's `"seq"` instead): the page shows a red ✗.
+- [ ] The exported page in your interface language (Language menu, then export): its buttons and checks are translated where the language has them.
+- [ ] The exported page on a phone's browser (email it to yourself): readable, plays, no sideways scrolling.
+- [ ] **(phone)** Pocket's History has neither button.
+
 ## Upstream 1.5.0's features, recorded
 
 Each of these changes chapters in code that came in with the rebase onto 1.5.0. After each, the session shows no "A change the recorder didn't see", and History plays it.

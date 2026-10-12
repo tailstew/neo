@@ -3369,6 +3369,232 @@ function historySpent(ms) {
 }
 const historyWords = (added, removed) => t('+{added} −{removed} words', { added: added.toLocaleString(NeoI18n.getLocale()), removed: removed.toLocaleString(NeoI18n.getLocale()) });
 
+/* ---------- the evidence report (plan, part 2) ---------- */
+
+// Export replay…: which chapters go. { chapters: null } for the whole book
+// (with its seals), { chapters: [ids] } for some, null on cancel.
+function exportReplayAsk(meta, name) {
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop confirm-modal';
+    bd.innerHTML = `
+      <div class="modal ex-modal" role="dialog" aria-modal="true" style="width:480px">
+        <h2 style="font-size:16px"></h2>
+        <p class="ex-what"></p>
+        <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
+        <label class="ex-pick"><input type="radio" name="ex-scope" value="some"> <span class="ex-some"></span></label>
+        <div class="ex-chapters" hidden></div>
+        <p class="ex-note" hidden></p>
+        <div style="text-align:right;margin-top:16px">
+          <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
+          <button class="m-ok btn-gold"></button>
+        </div>
+      </div>`;
+    const title = t('Export a replay of “{title}”', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
+    bd.querySelector('h2').textContent = title;
+    bd.querySelector('.modal').setAttribute('aria-label', title);
+    bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
+    bd.querySelector('.ex-book').textContent = t('The whole book, with its seals, so its timestamps can be checked');
+    bd.querySelector('.ex-some').textContent = t('Only these chapters:');
+    const note = bd.querySelector('.ex-note');
+    note.textContent = t('A page of some chapters replays them exactly, but can’t show they belong to a sealed whole, so nothing on it fixes them in time.');
+    const box = bd.querySelector('.ex-chapters');
+    for (const ch of meta.chapterOrder) {
+      const l = document.createElement('label');
+      const c = document.createElement('input');
+      c.type = 'checkbox';
+      c.value = ch;
+      l.append(c, ' ', name(ch));
+      box.append(l);
+    }
+    const ok = bd.querySelector('.m-ok');
+    ok.textContent = t('Export…');
+    bd.querySelector('.m-cancel').textContent = t('Cancel');
+    const some = () => bd.querySelector('input[value="some"]').checked;
+    const picked = () => [...box.querySelectorAll('input:checked')].map((c) => c.value);
+    const update = () => {
+      box.hidden = !some();
+      note.hidden = !some();
+      ok.disabled = some() && !picked().length;
+    };
+    bd.addEventListener('change', update);
+    update();
+    const done = (v) => { bd.remove(); resolve(v); };
+    ok.onclick = () => { if (!ok.disabled) done({ chapters: some() ? picked() : null }); };
+    bd.querySelector('.m-cancel').onclick = () => done(null);
+    bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
+    bd.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(null); } });
+    document.body.appendChild(bd);
+    ok.focus();
+  });
+}
+
+// The exported replay page's words (replay-page.js, replay-export.js), by
+// their English: every T('…') there is here (scripts/replay-page.test.js
+// checks it), and goes into the page in the writer's language
+const REPLAY_PAGE_WORDS = [
+  tk('it can’t be read'),
+  tk('seals before it are missing'),
+  tk('it is signed with another key than the first seal'),
+  tk('its signature doesn’t verify'),
+  tk('it doesn’t name the seal before it'),
+  tk('a session it seals isn’t on this page'),
+  tk('a session it seals isn’t what it sealed'),
+  tk('a stamp it covers isn’t what it covered'),
+  tk('its drand round isn’t drand’s'),
+  tk('its drand round is later than the seal says it was made'),
+  tk('a timestamp token stamps something else'),
+  tk('This page couldn’t read its recording: {why}'),
+  tk('this browser is too old to read it'),
+  tk('Nothing was recorded.'),
+  tk('Chapter'),
+  tk('The whole book'),
+  tk('Untitled chapter'),
+  tk('The day before'),
+  tk('Day'),
+  tk('1 character typed'),
+  tk('{n} characters typed'),
+  tk('The day after'),
+  tk('Play'),
+  tk('Skip pauses'),
+  tk('Timeline'),
+  tk('Loading {day}…'),
+  tk('Chapter {n}'),
+  tk('This chapter isn’t on the page at this moment.'),
+  tk('Pause'),
+  tk('What this page checks'),
+  tk('Checking…'),
+  tk('Checking… {pct}'),
+  tk('{n} sessions, each hash chain whole and each following the one before it.'),
+  tk('{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between).'),
+  tk('Replayed: {bad} of {n} chapter writes don’t come out as recorded.'),
+  tk('Replayed: all {n} chapter writes come out exactly as recorded.'),
+  tk('This page holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
+  tk('Proof of when it was written wasn’t turned on, so nothing on this page fixes the recording in time. It shows how the book was written, not when.'),
+  tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
+  tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),
+  tk('This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.'),
+  tk('Seal {n}: {why}'),
+  tk('The figures below were worked out again from the recording on this page, and match.'),
+  tk('The figures below don’t match the recording on this page.'),
+  tk('Seals of {device}'),
+  tk('Every seal'),
+  tk('Seal'),
+  tk('Made'),
+  tk('After (drand)'),
+  tk('Timestamped'),
+  tk('Files'),
+  tk('by {when} (a later seal)'),
+  tk('not stamped'),
+  tk('Check it without this page'),
+  tk('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:'),
+  tk('A seal’s .ots file, where there is one, is checked against Bitcoin with the OpenTimestamps client: ots verify 000001.ots'),
+  tk('A timestamp shows the recording existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the replay and the report speak to that, and they are evidence, not proof.'),
+  tk('Writing History'),
+  tk('This is a timelapse of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'),
+  tk('This page holds only some chapters. It replays them exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'),
+  tk('Turn on JavaScript to play the replay and check it. The report below is as NEO wrote it.'),
+  tk('Made with NEO {version} on {date}.')
+];
+const replayPageStrings = () => Object.fromEntries(REPLAY_PAGE_WORDS.map((en) => [en, t(en)]));
+
+// The evidence of how a book, or a chapter, was written, as HTML: facts
+// first, then the judgements they support, labelled as judgements. From
+// Rec.evidence's figures (`ev`), the time cover from the seals (`cover`,
+// null when nothing was sealed), `scope` (null: the book; else a chapter
+// id), `title`, and `name(ch)` for the chapter table. The History dialog
+// shows it, and Export replay… puts it in the page.
+function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, order = [], partial = false } = {}) {
+  const e = escHtml;
+  const n = (x) => fmtNum(Math.round(x || 0));
+  const pct = (x) => (x === null || x === undefined ? '—' : (x > 0 && x < 0.01 ? '<1' : Math.round(x * 100)) + '%');
+  const ms = (x) => (x === null || x === undefined ? '—' : t('{n} ms', { n: n(x) }));
+  const date = (x) => historyWhen(x, HISTORY_DATE);
+  const sc = scope ? ev.chapters[scope] : ev.book;
+  const chars = scope ? ev.chars[scope] || 0 : Object.values(ev.chars).reduce((a, b) => a + b, 0);
+  if (!sc) return `<h2 class="ev-h">${e(title)}</h2><p>${e(t('Nothing in this chapter was written while NEO was recording.'))}</p>`;
+  const r = Rec.evidenceRead(sc, chars);
+  const rows = [];
+  const row = (head, text) => rows.push(`<tr><th>${e(head)}</th><td>${e(text)}</td></tr>`);
+  const one = r.days && date(r.first) === date(r.last);
+  row(t('Time'), !r.days ? t('Nothing was written while NEO was recording.')
+    : (one ? t('Written on {date}.', { date: date(r.first) }) : t('Written on {n} days between {first} and {last}.', { n: r.days, first: date(r.first), last: date(r.last) })) +
+      ' ' + t('{n} sessions, {hours} of writing, leaving out pauses of a minute or more.', { n: r.sessions, hours: historySpent(r.ms) }));
+  row(t('Keys'), t('{n} keys pressed, {typed} characters typed.', { n: r.keys, typed: n(r.typed) }));
+  if (r.gap !== null) row(t('Rhythm'), t('Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.', { low: ms(r.gapLow), high: ms(r.gapHigh), mid: ms(r.gap) }));
+  if (r.pauseN.inside) {
+    row(t('Pauses'), t('The middle pause before a letter inside a word: {inside}. After a space: {word}. At the start of a sentence: {sentence}. At the start of a paragraph: {para}.', {
+      inside: ms(r.pause.inside), word: ms(r.pause.word), sentence: ms(r.pause.sentence), para: ms(r.pause.para)
+    }));
+  }
+  row(t('Revision'), t('{deleted} characters deleted with keys, {share} of those typed.', { deleted: n(r.deleted), share: pct(r.revised) }) + ' ' +
+    t('Quick fixes (a deletion within a second of typing): {fixes}. Runs of three or more deletions: {bursts}.', { fixes: n(r.fixes), bursts: n(r.bursts) }));
+  row(t('Going back'), t('Times typing went back into earlier text: {n}. Characters typed with more of the chapter after them: {share}.', { n: n(r.returns), share: pct(r.insideShare) }));
+  row(t('Pasted'), (r.pastes
+    ? t('Pastes from outside NEO: {n}, {chars} characters, {share} of the text now.', { n: n(r.pastes), chars: n(r.pasted), share: pct(r.pastedShare) }) +
+      (r.soon ? ' ' + t('Of those, within ten seconds of coming back to NEO from another app: {n}, {chars} characters.', { n: n(r.soon), chars: n(r.soonPasted) }) : '')
+    : t('Nothing was pasted from outside NEO.')) +
+    (r.own ? ' ' + t('Pastes of text copied inside NEO: {n}.', { n: n(r.own) }) : ''));
+  const kinds = Object.entries(r.nokeyKinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + n(v)).join(', ');
+  row(t('Without a key'), (r.nokey
+    ? t('Changes with no key pressed: {n}, {chars} characters ({kinds}). Dictation, the system’s autocorrect and other tools make these.', { n: n(r.nokey), chars: n(r.nokeyChars), kinds })
+    : t('Every change to the text was made with a key, a paste, or one of NEO’s own commands.')) +
+    (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : ''));
+  row(t('Not recorded'), t('Words there before the recording began: {before}. Words that came while nothing was recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
+  // the time cover: how much of the writing is fixed in time
+  if (!cover || !cover.length) {
+    row(t('Timestamps'), t('Not sealed: proof of when it was written wasn’t turned on, so nothing fixes this recording in time.'));
+  } else {
+    const typedIn = new Map(ev.sessions.map((s) => [s.device + '/' + s.id, s]));
+    const all = cover.flatMap((d) => d.cover.map((c) => ({ ...c, device: d.device })));
+    const gaps = all.filter((c) => c.gap && (typedIn.get(c.device + '/' + c.session) || {}).typed);
+    const stamps = [...new Set(cover.flatMap((d) => d.stamps))];
+    let text = t('Seals: {seals}, from {first} to {last}, timestamped by {stamps}.', {
+      seals: n(cover.reduce((a, d) => a + d.seals, 0)), first: date(Math.min(...cover.map((d) => Date.parse(d.first)))),
+      last: date(Math.max(...cover.map((d) => Date.parse(d.last)))), stamps: stamps.join(', ') || '—'
+    }) + ' ' + (gaps.length
+      ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(gaps.length), all: n(all.length) })
+      : t('Every session was timestamped within a day of ending.'));
+    if (cover.some((d) => d.bad)) text += ' ' + t('Some seals don’t check: run verify-recording on the book to see why.');
+    if (partial) text += ' ' + t('NEO checked the seals against the whole recording when it made this page. The page holds only some chapters, so it can’t check them itself.');
+    let list = '';
+    if (gaps.length) {
+      list = '<ul>' + gaps.slice(0, 50).map((c) => {
+        const s = typedIn.get(c.device + '/' + c.session);
+        return `<li>${e(date(c.from) + ': ' + t('{n} characters typed', { n: n(s.typed) }) + '; ' + (c.gap === 'never' ? t('never timestamped') : t('timestamped later, on {date}: written by then, nothing earlier proven', { date: date(c.wholeBy) })))}</li>`;
+      }).join('') + (gaps.length > 50 ? `<li>${e(t('and {n} more', { n: n(gaps.length - 50) }))}</li>` : '') + '</ul>';
+    }
+    rows.push(`<tr><th>${e(t('Timestamps'))}</th><td>${e(text)}${list}</td></tr>`);
+  }
+  const J = {
+    rhythm: { uneven: t('The gaps between keys vary as a person’s do.'), even: t('The gaps between keys are unusually even, as scripted typing tends to be.') },
+    pauses: { boundaries: t('Pauses are longer where sentences and paragraphs begin: thinking happens at boundaries.'), flat: t('Pauses aren’t longer where sentences and paragraphs begin, as in copying.') },
+    revision: { much: t('Much was revised as it was typed, as composing is.'), some: t('Some was revised as it was typed.'), little: t('Little was revised as it was typed, which is what copying looks like.') },
+    order: { back: t('The writer often went back into earlier text and changed it, the strongest sign of composing.'), straight: t('The text was typed almost straight through, top to bottom, as retyping is.') },
+    pasted: { much: t('A large share of the text was pasted from outside NEO.'), some: t('Some of the text was pasted from outside NEO.'), little: t('Very little was pasted from outside NEO.') }
+  };
+  const judged = Object.entries(r.judge).filter(([, v]) => v).map(([k, v]) => `<li>${e(J[k][v])}</li>`);
+  let html = `<h2 class="ev-h">${e(title)}</h2>
+    <p class="ev-small">${e(t('From the Writing History NEO kept as it was written. Facts first; the judgements after them are labelled as judgements.'))}</p>
+    <h3>${e(t('Facts'))}</h3><table class="ev-facts">${rows.join('')}</table>
+    <h3>${e(t('Judgement'))}</h3>
+    <ul class="ev-judge">${judged.join('') || `<li>${e(t('Too little was written here for a judgement.'))}</li>`}</ul>
+    <p class="ev-small">${e(t('These are judgements, not proof. A recording shows how the words were typed and when; it can’t show whose ideas they were.'))}</p>`;
+  if (!scope) {
+    const ids = [...order.filter((ch) => ev.chapters[ch] || ev.words[ch] !== undefined), ...Object.keys(ev.chapters).filter((ch) => !order.includes(ch))];
+    if (ids.length > 1) {
+      html += `<h3>${e(t('Chapter by chapter'))}</h3><table class="ev-chapters"><tr><th>${e(t('Chapter'))}</th><th>${e(t('Words now'))}</th><th>${e(t('Days'))}</th><th>${e(t('Typed'))}</th><th>${e(t('Revised'))}</th><th>${e(t('Pasted'))}</th></tr>` +
+        ids.map((ch) => {
+          const c = ev.chapters[ch];
+          const cr = c ? Rec.evidenceRead(c, ev.chars[ch] || 0) : null;
+          const label = ev.words[ch] === undefined ? t('{name} (deleted)', { name: name(ch) }) : name(ch);
+          return `<tr data-ch="${e(ch)}"><td>${e(label)}</td><td>${ev.words[ch] === undefined ? '—' : n(ev.words[ch])}</td><td>${cr ? n(cr.days) : '—'}</td><td>${cr ? n(cr.typed) : '—'}</td><td>${cr ? pct(cr.revised) : '—'}</td><td>${cr ? pct(cr.pastedShare) : '—'}</td></tr>`;
+        }).join('') + '</table>';
+    }
+  }
+  return html;
+}
+
 // a canvas sized to its box, for drawing in CSS pixels
 function historyCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
@@ -3611,6 +3837,8 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       <label class="hs-keep hs-prove" hidden><input type="checkbox"> <span></span></label>
       <label class="hs-keep hs-btc" hidden><input type="checkbox"> <span></span></label>
       <span class="hs-proof" hidden></span>
+      <button class="hs-evidence" type="button" hidden></button>
+      <button class="hs-export" type="button" hidden></button>
       <button class="hs-snaps" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
@@ -4878,6 +5106,95 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       toast(t('That couldn’t be restored. The book is as it was.'));
     });
   }
+
+  // The evidence report: how the book was written, in figures and the
+  // judgements they support, from every device's sessions (plan, part 2)
+  const evBtn = $h('.hs-evidence');
+  const exBtn = $h('.hs-export');
+  evBtn.hidden = !window.neo.recEvidence;
+  evBtn.textContent = t('Evidence…');
+  evBtn.title = t('How this book was written, in figures: the rhythm of the keys, the revising, what was pasted, and when it was timestamped');
+  exBtn.hidden = !window.neo.recExport;
+  exBtn.textContent = t('Export replay…');
+  exBtn.title = t('One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize');
+  const evName = (ch) => (meta.chapterOrder.includes(ch) ? chapterLabel(ch, meta.chapterOrder) : goneLead(ch) || t('Untitled'));
+  const evTitle = () => t('How “{title}” was written', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
+  // what's typed now reaches the files first
+  async function evFlush() {
+    if (!rec.on || rec.bookId !== bookId) return;
+    const c = rec.flush();
+    if (c) await c.saved;
+  }
+  evBtn.addEventListener('click', async () => {
+    setPlaying(false);
+    const sh = document.createElement('div');
+    sh.className = 'modal-backdrop ev-backdrop';
+    sh.innerHTML = `<div class="modal ev-modal" role="dialog" aria-modal="true">
+      <div class="ev-bar"><button class="ev-back btn-quiet" hidden></button><span class="ev-gap"></span><button class="m-ok btn-gold ev-done"></button></div>
+      <div class="ev-body" tabindex="-1"><p class="ev-small"></p></div></div>`;
+    const body = sh.querySelector('.ev-body');
+    const back = sh.querySelector('.ev-back');
+    sh.querySelector('.ev-modal').setAttribute('aria-label', evTitle());
+    sh.querySelector('.ev-done').textContent = t('Done');
+    back.textContent = '← ' + t('The whole book');
+    body.firstElementChild.textContent = t('Reading every session…');
+    const done = () => { sh.remove(); bd.focus(); };
+    sh.querySelector('.ev-done').onclick = done;
+    sh.addEventListener('mousedown', (e) => { if (e.target === sh) done(); });
+    sh.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(); } });
+    document.body.appendChild(sh);
+    body.focus();
+    let res;
+    try {
+      await evFlush();
+      res = await window.neo.recEvidence(bookId, null);
+    } catch (err) {
+      window.neo.logError('history evidence: ' + (err && err.stack || err));
+      if (sh.isConnected) body.firstElementChild.textContent = t('The evidence couldn’t be worked out from this history.');
+      return;
+    }
+    if (!sh.isConnected) return;
+    const show = (scope) => {
+      body.innerHTML = evidenceHtml(res.evidence, res.cover, { scope, title: scope ? evName(scope) : evTitle(), name: evName, order: meta.chapterOrder });
+      back.hidden = !scope;
+      for (const tr of body.querySelectorAll('.ev-chapters tr[data-ch]')) {
+        tr.tabIndex = 0;
+        tr.title = t('This chapter’s evidence');
+        tr.addEventListener('click', () => show(tr.dataset.ch));
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') show(tr.dataset.ch); });
+      }
+      body.scrollTop = 0;
+      body.focus();
+    };
+    back.onclick = () => show(null);
+    show(null);
+  });
+
+  // Export replay…: the history as one web page anyone can open, that plays
+  // and checks itself. The whole book carries its seals; chosen chapters
+  // only their lines.
+  exBtn.addEventListener('click', async () => {
+    setPlaying(false);
+    const picked = await exportReplayAsk(meta, evName);
+    bd.focus();
+    if (!picked) return;
+    toast(t('Making the replay page…'));
+    try {
+      await evFlush();
+      const res = await window.neo.recEvidence(bookId, picked.chapters);
+      const report = evidenceHtml(res.evidence, res.cover, { title: evTitle(), name: evName, order: meta.chapterOrder, partial: !!picked.chapters });
+      const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: evName(ch) }));
+      const title = isUntitled(meta.title) ? t('Untitled') : meta.title;
+      const saved = await window.neo.recExport(bookId, {
+        chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
+        strings: replayPageStrings(), report, order, fileName: t('{title} — Writing History', { title })
+      });
+      if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
+    } catch (err) {
+      window.neo.logError('export replay: ' + (err && err.stack || err));
+      toast(t('The replay couldn’t be exported.'));
+    }
+  });
 
   // Snapshots: the other way back, kept as plain files, listed on the
   // Darlings tab of the open book

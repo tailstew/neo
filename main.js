@@ -838,6 +838,7 @@ ipcMain.handle('book:delete', async (_e, bookId, title) => {
 // ---------------------------------------------------------------------------
 const zlib = require('zlib');
 const RecFiles = require('./recording-files.js');
+const ReplayExport = require('./replay-export.js');
 
 const recIO = RecFiles.nodeIO({ fs, path, zlib, write: writeFileDurable, log: (source, err) => logError(source, err) });
 
@@ -1019,6 +1020,53 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
   historyCleaned.delete(cache);
   fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
   return true;
+});
+
+// The evidence report (docs/neo-recording-plan.md, part 2): its figures over
+// every session (or only some chapters' lines), worked out in the history
+// process, and the time cover from each device's seals
+const recChapters = (chapters) => (Array.isArray(chapters) ? chapters.slice(0, 5000).map(String) : null);
+ipcMain.handle('rec:evidence', (_e, bookId, chapters) =>
+  historyRequest({ type: 'evidence', chapters: recChapters(chapters), ...historyTarget(bookId) }));
+
+// Export replay…: the history as one HTML page anyone can open
+// (replay-export.js). The window sends the report as it showed it and the
+// page's words in the writer's language; the sessions, the seals and the
+// player are read here. The whole book carries its seals; chosen chapters
+// carry only their lines, and no seals (they covered the rest too).
+ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
+  const chapters = recChapters(opts.chapters);
+  const r = await historyRequest({ type: 'evidence', chapters, texts: true, ...historyTarget(bookId) });
+  if (!r.texts.length) throw new Error('Nothing recorded');
+  let seals = null;
+  if (!chapters) {
+    seals = {};
+    for (const d of new Set(r.texts.map((s) => s.device))) seals[d] = ReplayExport.sealFiles(path.join(recRoot(bookId), libName(d), 'seals'));
+  }
+  const str = (v, n) => String(v || '').slice(0, n);
+  const strings = {};
+  for (const [k, v] of Object.entries(opts.strings || {})) if (typeof v === 'string') strings[k.slice(0, 2000)] = v.slice(0, 2000);
+  const html = ReplayExport.build({
+    title: str(opts.title, 500), author: str(opts.author, 500), lang: str(opts.lang, 20) || 'en', strings,
+    report: str(opts.report, 2000000), evidence: r.evidence, sessions: r.texts, seals,
+    chapters: (Array.isArray(opts.order) ? opts.order : []).slice(0, 5000).map((c) => ({ id: str(c && c.id, 200), title: str(c && c.title, 500) })),
+    partial: !!chapters, version: app.getVersion()
+  });
+  const win = BrowserWindow.getFocusedWindow();
+  const name = str(opts.fileName, 200).replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Writing History';
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: path.join(exportFolder(), name + '.html'),
+    filters: [{ name: 'HTML', extensions: ['html'] }]
+  });
+  if (canceled || !filePath) return null;
+  rememberExportFolder(filePath);
+  try {
+    fs.writeFileSync(filePath, html, 'utf8');
+  } catch (err) {
+    logError('export replay', err);
+    throw new Error('Could not write the file (' + ((err && err.message) || err) + ')');
+  }
+  return filePath;
 });
 
 // ---------------------------------------------------------------------------

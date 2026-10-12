@@ -624,6 +624,35 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-snaps:hover, .hs-snaps:focus-visible { color: var(--accent); }
 .hs-snaps:not([hidden]) + .hs-delete { margin-left: 0; }
 .hs-foot .hs-snaps { margin-left: auto; }
+/* the evidence report and Export replay…, beside Snapshots */
+.hs-evidence, .hs-export {
+  flex: none; background: transparent; border: none; color: #a9a294; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
+}
+.hs-evidence:hover, .hs-evidence:focus-visible, .hs-export:hover, .hs-export:focus-visible { color: var(--accent); }
+.hs-foot .hs-evidence { margin-left: auto; }
+.hs-foot .hs-evidence:not([hidden]) ~ .hs-snaps, .hs-foot .hs-evidence:not([hidden]) ~ .hs-delete { margin-left: 0; }
+.ev-backdrop { z-index: 950; }
+.modal.ev-modal { width: min(760px, calc(100vw - 48px)); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ev-bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid #2a2a2a; }
+.ev-gap { flex: 1; }
+.ev-body { overflow-y: auto; padding: 22px 30px 30px; font-size: 14px; line-height: 1.5; color: #d6d2c6; }
+.ev-body:focus { outline: none; }
+.ev-body h2 { font-size: 18px; }
+.ev-body h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #a9a294; margin: 20px 0 8px; font-weight: 600; }
+.ev-body table { border-collapse: collapse; width: 100%; }
+.ev-body th, .ev-body td { text-align: left; vertical-align: top; padding: 6px 12px 6px 0; border-bottom: 1px solid #2a2a2a; }
+.ev-facts th { width: 110px; color: #a9a294; font-weight: 500; }
+.ev-body td ul { margin: 6px 0 0 18px; }
+.ev-judge { margin: 0 0 0 2px; padding-left: 14px; border-left: 3px solid var(--accent); list-style: none; }
+.ev-judge li { margin-bottom: 6px; }
+.ev-small { font-size: 12px; color: #8f8a80; }
+.ev-chapters tr[data-ch] { cursor: pointer; }
+.ev-chapters tr[data-ch]:hover td, .ev-chapters tr[data-ch]:focus-visible td { color: var(--accent); }
+.ex-modal .ex-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+.ex-modal input[type="radio"], .ex-modal input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
+.ex-chapters { max-height: 220px; overflow-y: auto; margin: 0 0 12px 26px; }
+.ex-chapters label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ex-note { color: #8f8a80; }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
   .hs-side { display: none; }

@@ -666,6 +666,7 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
     let body;
     try { bytes = fs.readFileSync(path.join(sealsDir, f)); body = JSON.parse(bytes); } catch { bad('it can’t be read'); prevHash = null; continue; }
     s.at = Date.parse(body.at);
+    s.heads = body.heads || {};
     if (body.neoSeal !== 1) bad('it is in a format this NEO doesn’t know');
     if (body.seq !== s.seq) bad('its number isn’t its file’s');
     if (body.seq !== out.seals.length) bad('seals before it are missing');
@@ -752,8 +753,35 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
   return out;
 }
 
+// The time cover of one device's sessions: when each was first timestamped
+// in part (a seal over the session while it was open) and when as a whole
+// (a seal naming its last `h`), from the seals verifyDevice checked.
+// Sessions are { id, open, last (its last h), from, to }. A closed session
+// with no whole stamp, or one stamped more than a day after it ended, is a
+// gap: [{ session, from, to, firstStamped, wholeBy, gap: 'never' | 'late' }]
+const DAY_MS = 24 * 3600 * 1000;
+function timeCover(sessions, seals) {
+  const bySession = new Map();
+  for (const s of seals) {
+    const when = s.by !== null ? s.by : s.byLater || null;
+    for (const [id, h] of Object.entries(s.heads || {})) {
+      const was = bySession.get(id) || { first: null, whole: null };
+      if (was.first === null && when) was.first = when;
+      if (was.whole === null && s.ok && when && h === (sessions.find((x) => x.id === id) || {}).last) was.whole = when;
+      bySession.set(id, was);
+    }
+  }
+  return sessions.map((s) => {
+    const b = bySession.get(s.id) || { first: null, whole: null };
+    const c = { session: s.id, from: s.from, to: s.to, firstStamped: b.first, wholeBy: b.whole };
+    if (!b.whole && !s.open) c.gap = 'never';
+    else if (b.whole && s.to !== null && b.whole - s.to > DAY_MS) c.gap = 'late';
+    return c;
+  });
+}
+
 module.exports = {
-  TSAS, DRAND, STAMPS_WANTED,
+  TSAS, DRAND, STAMPS_WANTED, timeCover,
   der, kids, oidOf, tsaRequest, checkToken, roots,
   newKey, keyOf, canonical, sign, verifySignature,
   drandRound, roundTime, bitcoinTip, chainHashes,

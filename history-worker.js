@@ -33,6 +33,12 @@
 // of a chapter, as `day` ended (`from`, the chapter's HTML then), on to the
 // last day built, a day's end to the next (Rec.partDays), for a restore.
 //
+// { id, type: 'evidence', key, chapters, texts } answers with the evidence
+// report's figures (Rec.evidence) over every session, or only the lines of
+// `chapters`, the devices' names, the time cover from each device's seals
+// (desktop only), and with `texts` the sessions themselves, for an
+// exported replay page.
+//
 // Each message names the book's recording/ folder (`root`), its cache
 // (`cache`), and its backup mirror (`mirror`, Backups/recordings/<book
 // folder>/), where a closed session the book has lost, or holds broken, is
@@ -415,6 +421,67 @@
       for (const [d, doc] of Object.entries(page.docs)) devices[d] = html(doc);
       return { page: html(page.doc), devices, links: page.links() };
     }
+
+    // Every session, every device's, oldest first ({ id, device, name, open,
+    // text }); with `chapters`, only those chapters' lines (Rec.keepChapters),
+    // as an exported replay page holds them
+    async allTexts(chapters = null) {
+      const out = [];
+      for (const d of await Files.list(this.io, this.root, null, this.mirror)) {
+        for (const s of d.sessions) {
+          const r = await Files.read(this.io, this.dir(d.device), s.id, this.copy(d.device)).catch(() => null);
+          if (!r || !r.text) continue;
+          out.push({ id: s.id, device: d.device, name: d.name, open: r.open, text: chapters ? R.keepChapters(r.text, chapters) : r.text });
+        }
+      }
+      return out.sort(R.sessionOrder);
+    }
+
+    // The evidence report: Rec.evidence over every session (with `chapters`,
+    // over only their lines), and on the desktop the time cover, each
+    // device's seals checked (proof.js) against its sessions, whole. The
+    // same book and chapters give the same answer, so it's kept.
+    // { evidence, names, cover: [{ device, seals, stamped, key, cover, problems }] | null }
+    async evidence({ chapters = null, texts = false } = {}) {
+      const list = await this.allTexts(chapters);
+      const sig = JSON.stringify([chapters, list.map((s) => [s.device, s.id, s.open, s.text.length])]);
+      if (!this.evMemo || this.evMemo.sig !== sig) {
+        const names = {};
+        for (const s of list) names[s.device] = s.name;
+        const evidence = R.evidence(list);
+        this.evMemo = { sig, result: { evidence, names, cover: node ? await this.cover(evidence, chapters ? null : list) : null } };
+      }
+      return texts ? { ...this.evMemo.result, texts: list } : this.evMemo.result;
+    }
+
+    // Each device's seals and the time cover of its sessions, or null when
+    // no device has sealed. `list`: the sessions whole (a cut-down list is
+    // read again, since a seal covers whole sessions).
+    async cover(evidence, list) {
+      const fs = require('fs');
+      const P = require('./proof.js');
+      const devices = fs.existsSync(this.root) ? fs.readdirSync(this.root).filter((d) => Files.DEVICE.test(d)) : [];
+      if (!devices.some((d) => fs.existsSync(this.io.join(this.dir(d), 'seals')))) return null;
+      if (!list) list = await this.allTexts();
+      const out = [];
+      for (const device of devices) {
+        const mine = list.filter((s) => s.device === device);
+        const hashes = new Map(mine.map((s) => [s.id, P.chainHashes(s.text)]));
+        const v = await P.verifyDevice(this.dir(device), { sessions: hashes });
+        if (!v.seals.length) continue;
+        const spans = new Map(evidence.sessions.filter((s) => s.device === device).map((s) => [s.id, s]));
+        const sessions = mine.map((s) => ({ id: s.id, open: s.open, last: R.verifyChain(s.text).last, from: (spans.get(s.id) || {}).from || null, to: (spans.get(s.id) || {}).to || null }));
+        out.push({
+          device, key: v.publicKey, seals: v.seals.length,
+          stamped: v.seals.filter((s) => s.by !== null).length,
+          first: v.seals[0].at, last: v.seals[v.seals.length - 1].at,
+          bad: v.seals.filter((s) => !s.ok).length,
+          stamps: [...new Set(v.seals.flatMap((s) => s.stamps.filter((x) => x.ok && x.trusted).map((x) => (P.TSAS.find((a) => a.id === x.tsa) || { name: x.tsa }).name)))],
+          cover: P.timeCover(sessions, v.seals)
+        });
+      }
+      return out;
+    }
   }
 
   /* ---------- messages ---------- */
@@ -468,6 +535,7 @@
       while (d.building) await d.building.catch(() => {});
       return d.track(msg.day, msg.part, msg.from);
     }
+    if (msg.type === 'evidence') return d.evidence({ chapters: Array.isArray(msg.chapters) ? msg.chapters.map(String) : null, texts: !!msg.texts });
     if (msg.type === 'dayStart') {
       // a day can start once every day before it is built
       while (d.building && !(d.entries.length && d.entries[d.entries.length - 1].day >= msg.day)) {

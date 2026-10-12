@@ -23,7 +23,6 @@ const R = require('../recording.js');
 const Files = require('../recording-files.js');
 const P = require('../proof.js');
 
-const DAY = 24 * 3600 * 1000;
 const iso = (ms) => (ms === null || ms === undefined ? '—' : new Date(ms).toISOString().replace('.000Z', 'Z'));
 
 // A session's span: when it began, and its last wall-clock line (or the start)
@@ -77,25 +76,8 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
       d.seals = await P.verifyDevice(dir, { sessions: hashes, online });
       for (const s of d.seals.seals) if (!s.ok) d.problems.push(`seal ${s.seq}: ${s.problems.join('; ')}`);
       // time cover: the first seal over each session's last line
-      const bySession = new Map();
-      for (const s of d.seals.seals) {
-        let body;
-        try { body = JSON.parse(fs.readFileSync(path.join(sealsDir, s.file))); } catch { continue; }
-        for (const [id, h] of Object.entries(body.heads || {})) {
-          const when = s.by !== null ? s.by : s.byLater;
-          const was = bySession.get(id) || { first: null, whole: null };
-          if (was.first === null && when) was.first = when;
-          if (was.whole === null && h === (d.sessions.find((x) => x.id === id) || {}).last) was.whole = s.ok ? (when || null) : null;
-          bySession.set(id, was);
-        }
-      }
-      for (const s of d.sessions) {
-        const b = bySession.get(s.id) || { first: null, whole: null };
-        const c = { session: s.id, from: s.from, to: s.to, firstStamped: b.first, wholeBy: b.whole };
-        if (!b.whole && !s.open) c.gap = 'never timestamped';
-        else if (b.whole && b.whole - s.to > DAY) c.gap = 'timestamped later, on ' + iso(b.whole).slice(0, 10);
-        d.cover.push(c);
-      }
+      d.cover = P.timeCover(d.sessions, d.seals.seals).map((c) => (c.gap
+        ? { ...c, gap: c.gap === 'never' ? 'never timestamped' : 'timestamped later, on ' + iso(c.wholeBy).slice(0, 10) } : c));
     }
     if (d.problems.length) report.ok = false;
   }

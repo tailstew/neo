@@ -496,6 +496,16 @@
       c.s = this.s;
       return c;
     }
+
+    // up to n characters of the HTML just before offset `at`
+    before(at, n) {
+      if (this.s !== null) return this.s.slice(Math.max(0, at - n), at);
+      if (!this.parts.length || at <= 0) return '';
+      let i = this.find(at - 1);
+      let out = this.parts[i].slice(Math.max(0, at - n - this.startOf(i)), at - this.startOf(i));
+      while (out.length < n && i > 0) out = this.parts[--i].slice(-(n - out.length)) + out;
+      return out;
+    }
   }
 
   // chapters by id, as ChapterTexts of their own (from HTML or ChapterTexts)
@@ -2793,6 +2803,334 @@
     return best && { ch: best.ch, a: best.a, b: best.b, likeness: best.likeness };
   }
 
+  /* ---------- evidence: how the words came (plan, part 2) ---------- */
+
+  // Gaps between keys are kept as histograms: EV_BINS bins to each doubling
+  // of the gap, from 1 ms to a minute. A gap of a minute or more is time
+  // away, not rhythm.
+  const EV_BINS = 8;
+  const EV_AWAY = 60000;
+  const evBin = (ms) => Math.max(0, Math.floor(Math.log2(Math.max(1, ms)) * EV_BINS));
+  const EV_SIZE = evBin(EV_AWAY - 1) + 1;
+  const EV_RETURN = 200;  // typing this far (HTML characters) before where typing last was is going back
+  const EV_INSIDE = 500;  // …and with this much of the chapter after it, it went in before the end
+  const EV_FIX = 1000;    // a delete this soon after a typed character is a quick fix
+  const EV_SOON = 10000;  // a paste this soon after coming back to NEO…
+  const EV_BIG = 200;     // …this long, is counted on its own
+
+  function evScope() {
+    return {
+      keys: 0, typed: 0, deleted: 0, fixes: 0, bursts: 0, untrusted: 0, returns: 0, inside: 0, ms: 0,
+      gaps: new Array(EV_SIZE).fill(0),
+      pause: { inside: new Array(EV_SIZE).fill(0), word: new Array(EV_SIZE).fill(0), sentence: new Array(EV_SIZE).fill(0), para: new Array(EV_SIZE).fill(0) },
+      pastes: 0, pasted: 0, soon: 0, soonPasted: 0, own: 0, ownPasted: 0,
+      nokey: 0, nokeyChars: 0, nokeyKinds: {},
+      before: 0, outside: 0, days: new Set(), sessions: new Set(), first: null, last: null
+    };
+  }
+
+  // What the characters before a typed letter say about where it went: the
+  // start of a paragraph, of a sentence, of a word, or inside a word. Null
+  // for anything else (punctuation, a space, a letter after a dash).
+  function evPlace(before, c) {
+    if (!WORDCH.test(c)) return null;
+    let s = before.replace(/^[^<]*>/, '').replace(/&nbsp;|&#160;|&#xa0;/gi, ' ');
+    if (before === '' || /<(p|div|li|h\d|br)\b[^>]*>(?:<[^>]*>)*$/i.test(s)) return 'para';
+    s = s.replace(/<[^>]*>/g, '').replace(/&[a-z0-9#]+;/gi, 'x');
+    if (!s) return null;
+    if (/\s$/.test(s)) return /[.!?…][)"'”’»\]]*\s+$/.test(s) ? 'sentence' : 'word';
+    return WORDCH.test(s[s.length - 1]) ? 'inside' : null;
+  }
+
+  // A book's sessions (every device's, in sessionOrder: { id, device, text })
+  // read for what they show of how the words came, for the evidence report:
+  // the rhythm of the keys, where the pauses fall, how much was revised,
+  // how often the writer went back into earlier text, what was pasted from
+  // outside NEO, what came with no key, and what was never recorded. For
+  // the book and for each chapter (streams aren't chapters, and aren't
+  // counted). Plays them as one page (Page), so text from another device
+  // that was recorded there counts once, as that device's.
+  //   { v, book, chapters: { ch: scope }, words: { ch: n } (now), chars,
+  //     order, sessions: [{ id, device, day, from, to, typed }] }
+  // A scope's numbers are counts; gaps and pauses are histograms (evBin).
+  // `chapters`: count only these.
+  function evidence(sessions, { chapters = null } = {}) {
+    const want = chapters ? new Set(chapters) : null;
+    const counted = (ch) => typeof ch === 'string' && !isStream(ch) && (!want || want.has(ch));
+    const book = evScope();
+    const scopes = {};
+    const scopeOf = (ch) => scopes[ch] || (scopes[ch] = evScope());
+    const both = (ch, f) => { f(book); f(scopeOf(ch)); };
+    const list = [];
+    const page = new Page();
+    let order = null;
+    // words that reach the page while nothing recorded them being written
+    const settle = page.settle.bind(page);
+    page.settle = (d, ch) => {
+      const was = page.doc[ch] ? page.doc[ch].toString() : '';
+      const html = settle(d, ch);
+      if (html !== undefined && counted(ch)) {
+        const n = wordChange(was, html).added;
+        both(ch, (s) => { s.outside += n; });
+      }
+      return html;
+    };
+    const based = new Set(); // chapters whose words before the recording are counted
+
+    const players = sessions.map((sess, si) => {
+      const parsed = parseSession(sess.text || '');
+      const d = sess.device || '';
+      const info = { id: sess.id, device: d, day: sessionDay(parsed.header), from: null, to: null, typed: 0 };
+      list.push(info);
+      if (!parsed.known) return { walls: [], play() {} };
+      const lines = parsed.lines;
+      const { walls } = lineWalls(parsed.header, lines);
+      let li = 0;           // the line playing
+      let cur = null;       // the chapter its lines apply to
+      let keyT = null;      // the last key's moment
+      let gap = null;       // …and the gap before it
+      let used = true;      // whether an edit has taken that key yet
+      let typedT = null;    // the last typed character's moment
+      let dels = 0;         // deleting keys in a row
+      let away = false;
+      let backT = null;     // when the writer last came back to NEO
+      const lastAt = {};    // ch -> where typing last left off
+      const quiet = {};     // ch -> the chapter as a quiet run on the page began
+      const doc = page.device(d);
+      const seen = (ch, s) => {
+        s.days.add(info.day);
+        s.sessions.add(d + '/' + sess.id);
+        const w = walls[li];
+        if (Number.isFinite(w)) {
+          if (s.first === null || w < s.first) s.first = w;
+          if (s.last === null || w > s.last) s.last = w;
+        }
+      };
+      const unquiet = (ch) => {
+        if (quiet[ch] === undefined) return;
+        const n = wordChange(quiet[ch], doc[ch] ? doc[ch].toString() : '').added;
+        delete quiet[ch];
+        if (counted(ch)) both(ch, (s) => { s.outside += n; });
+      };
+      const endRun = () => {
+        if (dels >= 3 && counted(cur)) both(cur, (s) => { s.bursts++; });
+        dels = 0;
+      };
+      const on = {
+        key(t) {
+          gap = keyT === null ? null : t - keyT;
+          keyT = t;
+          used = false;
+          if (!counted(cur)) return;
+          both(cur, (s) => {
+            s.keys++;
+            if (gap !== null && gap < EV_AWAY) { s.gaps[evBin(gap)]++; s.ms += gap; }
+          });
+          const line = lines[li];
+          if (line[1] === 'k' && (line[3] & MOD.untrusted)) both(cur, (s) => { s.untrusted++; });
+        },
+        edit(ch, at, del, ins, why, t) {
+          const line = lines[li];
+          if (QUIET.has(why)) {
+            // on the page already, it changes the page without anyone writing
+            if (page.doc[ch] !== undefined && page.doc[ch] === doc[ch] && quiet[ch] === undefined) quiet[ch] = doc[ch].toString();
+            return;
+          }
+          unquiet(ch);
+          if (!counted(ch)) return;
+          const kind = line[1];
+          const run = kind === 'r' || kind === 'rd';
+          const input = kind === 'e' ? line[5] : null;
+          if (input && line[6] === 0) {
+            if (input === 'iFP' || input === 'iFD') return; // a paste: counted from its `c` line
+            const n = textOf(ins).length;
+            both(ch, (s) => { s.nokey++; s.nokeyChars += n; s.nokeyKinds[inputName(input)] = (s.nokeyKinds[inputName(input)] || 0) + 1; seen(ch, s); });
+            return;
+          }
+          if (!run && !input) return; // NEO's own move: Replace All, a merge, the Outline…
+          if (input === 'iFP' || input === 'iFD') return;
+          const c = doc[ch];
+          const first = !used && t === keyT;
+          used = true;
+          if (ins && !del) {
+            const n = run ? 1 : textOf(ins).length;
+            if (!n) return; // Enter: a paragraph, no letters
+            endRun();
+            const where = first && gap !== null && gap < EV_AWAY && [...ins].length === 1 ? evPlace(c.before(at, 40), ins) : null;
+            const back = lastAt[ch] !== undefined && at < lastAt[ch] - EV_RETURN;
+            const inside = c.length - at >= EV_INSIDE ? n : 0;
+            info.typed += n;
+            both(ch, (s) => {
+              s.typed += n;
+              s.inside += inside;
+              if (back) s.returns++;
+              if (where) s.pause[where][evBin(gap)]++;
+              seen(ch, s);
+            });
+            lastAt[ch] = at + ins.length;
+            typedT = t;
+          } else if (del) {
+            const n = run ? 1 : Math.max(1, textOf(c.toString().slice(at, at + del)).length);
+            const fix = first && typedT !== null && t - typedT <= EV_FIX && dels === 0;
+            if (first) dels++;
+            both(ch, (s) => {
+              s.deleted += n;
+              if (fix) s.fixes++;
+              seen(ch, s);
+            });
+            if (ins) {
+              const m = textOf(ins).length;
+              info.typed += m;
+              both(ch, (s) => { s.typed += m; });
+            }
+            lastAt[ch] = at + ins.length;
+          }
+        },
+        base(ch, html, why) {
+          unquiet(ch);
+          if (!QUIET.has(why) || page.doc[ch] !== undefined || !counted(ch)) return;
+          // not on the page: words written before the recording began, or
+          // ones that came while nothing was recording
+          const n = countWords(html);
+          if (why === 'baseline' && !based.has(ch)) { based.add(ch); both(ch, (s) => { s.before += n; }); } else if (why !== 'baseline') both(ch, (s) => { s.outside += n; });
+        },
+        drop(ch) { unquiet(ch); }
+      };
+      const lp = linePlayer(lines, null, { si, on, page, device: d });
+      return {
+        walls,
+        play(i) {
+          li = i;
+          const line = lines[i];
+          if (!Array.isArray(line)) return;
+          const kind = line[1];
+          if (kind === 'b' || kind === 'ch') { endRun(); cur = line[2]; }
+          if (kind === 'n' || (kind === 'k' && !/^(Backspace|Delete)$/.test(line[2]))) endRun();
+          lp.play(i);
+          const w = walls[i];
+          if (Number.isFinite(w)) { if (info.from === null) info.from = w; info.to = w; }
+          const t = lp.time();
+          if (kind === 'o') order = line[2].filter((ch) => !want || want.has(ch));
+          else if (kind === 'f') {
+            if (line[2] === 'blur' || line[2] === 'hidden') away = true;
+            else if ((line[2] === 'focus' || line[2] === 'visible') && away) { away = false; backT = t; }
+          } else if (kind === 'c' && line[2] === 'paste' && counted(cur)) {
+            const n = Number(line[3]) || 0;
+            const own = line[6] === true;
+            const soon = !own && backT !== null && t - backT <= EV_SOON && n >= EV_BIG;
+            both(cur, (s) => {
+              if (own) { s.own++; s.ownPasted += n; } else { s.pastes++; s.pasted += n; }
+              if (soon) { s.soon++; s.soonPasted += n; }
+              seen(cur, s);
+            });
+          }
+        },
+        end() { for (const ch of Object.keys(quiet)) unquiet(ch); endRun(); }
+      };
+    });
+    playInterleaved(players, (si) => { if (players[si].end) players[si].end(); });
+
+    const flat = (s) => ({ ...s, days: s.days.size, sessions: s.sessions.size });
+    const out = { v: 1, book: flat(book), chapters: {}, words: {}, chars: {}, order, sessions: list };
+    for (const [ch, s] of Object.entries(scopes)) out.chapters[ch] = flat(s);
+    for (const [ch, c] of Object.entries(page.doc)) {
+      if (!counted(ch)) continue;
+      const text = textOf(c.toString());
+      out.words[ch] = (text.match(WORD) || []).length;
+      out.chars[ch] = text.replace(/\s+/g, ' ').trim().length;
+    }
+    return out;
+  }
+
+  // the gap (ms) at quantile q of a histogram, or null when it's empty
+  function evQuantile(hist, q) {
+    const total = hist.reduce((a, b) => a + b, 0);
+    if (!total) return null;
+    let cum = 0;
+    for (let b = 0; b < hist.length; b++) {
+      cum += hist[b];
+      if (cum >= q * total) return Math.round(2 ** ((b + 0.5) / EV_BINS));
+    }
+    return null;
+  }
+  const evCount = (hist) => hist.reduce((a, b) => a + b, 0);
+
+  // A scope's numbers as the report says them, and the judgements they
+  // support, each null where there's too little to judge. `chars`: the
+  // scope's text now, for the share pasted. The thresholds are rough by
+  // design: the report shows the figures, and says the judgement is one.
+  //   rhythm    'uneven' (a person's) | 'even' (a script's)
+  //   pauses    'boundaries' (longer before sentences and paragraphs) | 'flat'
+  //   revision  'much' | 'some' | 'little'
+  //   order     'back' (went back into earlier text) | 'straight'
+  //   pasted    'much' | 'some' | 'little'
+  function evidenceRead(s, chars = 0) {
+    const med = (h) => evQuantile(h, 0.5);
+    const out = {
+      keys: s.keys, typed: s.typed, deleted: s.deleted, fixes: s.fixes, bursts: s.bursts, untrusted: s.untrusted,
+      days: s.days, sessions: s.sessions, ms: s.ms, first: s.first, last: s.last,
+      gap: med(s.gaps), gapLow: evQuantile(s.gaps, 0.25), gapHigh: evQuantile(s.gaps, 0.75),
+      pause: {}, pauseN: {},
+      revised: s.typed ? s.deleted / s.typed : null,
+      returns: s.returns, returnsPer: s.typed ? s.returns / (s.typed / 10000) : null, insideShare: s.typed ? s.inside / s.typed : null,
+      pastes: s.pastes, pasted: s.pasted, pastedShare: chars ? Math.min(1, s.pasted / chars) : null, soon: s.soon, soonPasted: s.soonPasted,
+      own: s.own, ownPasted: s.ownPasted, nokey: s.nokey, nokeyChars: s.nokeyChars, nokeyKinds: s.nokeyKinds,
+      before: s.before, outside: s.outside, judge: {}
+    };
+    for (const k of Object.keys(s.pause)) { out.pause[k] = med(s.pause[k]); out.pauseN[k] = evCount(s.pause[k]); }
+    const j = out.judge;
+    const enough = evCount(s.gaps) >= 500;
+    j.rhythm = enough && out.gapLow ? (out.gapHigh / out.gapLow >= 1.6 ? 'uneven' : out.gapHigh / out.gapLow < 1.3 ? 'even' : null) : null;
+    const bound = Math.max(out.pause.sentence || 0, out.pause.para || 0);
+    j.pauses = out.pauseN.inside >= 200 && (out.pauseN.sentence + out.pauseN.para) >= 20 && out.pause.inside
+      ? (bound >= 1.5 * out.pause.inside ? 'boundaries' : bound < 1.15 * out.pause.inside ? 'flat' : null) : null;
+    j.revision = s.typed >= 2000 ? (out.revised >= 0.1 ? 'much' : out.revised >= 0.03 ? 'some' : 'little') : null;
+    j.order = s.typed >= 5000 ? (out.returnsPer >= 2 || out.insideShare >= 0.1 ? 'back' : out.returnsPer < 0.5 && out.insideShare < 0.02 ? 'straight' : null) : null;
+    j.pasted = chars >= 2000 && out.pastedShare !== null ? (out.pastedShare >= 0.2 ? 'much' : out.pastedShare >= 0.05 ? 'some' : 'little') : null;
+    return out;
+  }
+
+  // A session with only some chapters' lines in it, for a replay page that
+  // shows only those (Export replay…): every line about another chapter or
+  // a stream goes, its time carried on to the next line kept, and so do the
+  // `h` lines, since the chain covered lines that are gone. The header says
+  // which chapters it keeps (`kept`). It still replays: every `w` of a
+  // chapter kept hashes as it did.
+  function keepChapters(text, ids) {
+    const keep = new Set(ids);
+    const { header, known, lines } = parseSession(text);
+    if (!header || !known) return '';
+    const out = [JSON.stringify({ ...header, kept: [...keep] })];
+    const spanOf = (line) => {
+      let n = line[0] || 0;
+      if (line[1] === 'r' || line[1] === 'rd' || line[1] === 'n') for (const dt of line[3] || []) n += dt || 0;
+      return n;
+    };
+    const PER = new Set(['r', 'rd', 'n', 'e', 's', 'c', 'k']); // lines about the chapter the caret is in
+    let cur = null;
+    let carry = 0;
+    for (const line of lines) {
+      if (!Array.isArray(line)) continue;
+      const kind = line[1];
+      if (kind === 'b' || kind === 'ch') cur = line[2];
+      let ok;
+      if (kind === 'h') ok = false;
+      else if (kind === 'b' || kind === 'ch' || kind === 'd') ok = keep.has(line[2]);
+      else if (kind === 'w') ok = keep.has(line.length > 3 ? line[3] : cur);
+      else ok = !PER.has(kind) || keep.has(cur);
+      if (!ok) { carry += spanOf(line); continue; }
+      let l = line;
+      if (kind === 'o') l = [line[0], 'o', line[2].filter((ch) => keep.has(ch))];
+      if (carry && !(kind === 'K' || kind === 'ch' || kind === 'o')) {
+        l = l.slice();
+        l[0] = (l[0] || 0) + carry;
+        carry = 0;
+      }
+      out.push(JSON.stringify(l));
+    }
+    return out.join('\n') + '\n';
+  }
+
   return {
     FORMAT, READS, PLAYER, CARET_BLOCK, INPUT_TYPES, MOD, inputCode, inputName,
     STREAMS, isStream, streamTexts,
@@ -2807,6 +3145,8 @@
     sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
     textOffset, compileSession, History,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
-    partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs
+    partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
+    linePlayer, playInterleaved, lineWalls, htmlOf,
+    EV_BINS, evidence, evidenceRead, evQuantile, keepChapters
   };
 });

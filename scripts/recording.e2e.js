@@ -1660,6 +1660,76 @@ test('proof turned on seals the session being written; a named tag seals it agai
   assert.equal(await js('library.proveWriting'), false);
 });
 
+/* ---------- the evidence report and the exported replay page ---------- */
+
+test('the evidence report shows how the book was written; Export replay… writes a page that plays and checks itself', async () => {
+  if (await js('!book || book.id !== ' + JSON.stringify(BOOK))) {
+    await js(`openBook(${JSON.stringify(BOOK)})`);
+    await tick(500);
+  }
+  await caretAt(0, 0, -1);
+  await type(' Evidence, typed.');
+  await flush();
+  await js('openHistory()');
+  await daysReady();
+  // the report, from every session
+  await js('document.querySelector(".hs-evidence").click()');
+  await waitFor('!!document.querySelector(".ev-body .ev-facts")', 30000);
+  const facts = await js('document.querySelector(".ev-body").innerText');
+  assert.match(facts, /keys pressed/);
+  assert.match(facts, /Judgement/i);
+  assert.match(facts, /not proof/);
+  // a chapter's own, and back
+  if (await js('!!document.querySelector(".ev-chapters tr[data-ch]")')) {
+    await js('document.querySelector(".ev-chapters tr[data-ch]").click()');
+    assert.equal(await js('document.querySelector(".ev-back").hidden'), false);
+    await js('document.querySelector(".ev-back").click()');
+  }
+  await js('document.querySelector(".ev-done").click()');
+  assert.equal(await js('!!document.querySelector(".ev-backdrop")'), false);
+  assert.equal(await js('!!historyShown'), true, 'History still open behind it');
+
+  // the page, the whole book
+  const { dialog } = require('electron');
+  const real = dialog.showSaveDialog;
+  const file = path.join(tmp, 'replay.html');
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
+  try {
+    await js('document.querySelector(".hs-export").click()');
+    await waitFor('!!document.querySelector(".ex-modal")');
+    await js('document.querySelector(".ex-modal .m-ok").click()');
+    for (let i = 0; i < 300 && !fs.existsSync(file); i++) await tick(100);
+  } finally {
+    dialog.showSaveDialog = real;
+  }
+  const html = fs.readFileSync(file, 'utf8');
+  const data = JSON.parse(/<script type="application\/json" id="rx-data">([^]*?)<\/script>/.exec(html)[1]);
+  assert.equal(data.partial, false);
+  assert.equal(data.title, 'Harbor');
+  assert.ok(data.sessions.length >= 2);
+  assert.ok(data.sessions.some((s) => s.open), 'the session being written, as far as it’s on disk');
+  assert.match(html, /keys pressed/, 'the report as History showed it');
+  key('Escape');
+  await tick(300);
+  // opened in a browser window of its own, it checks out
+  const w = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+  try {
+    await w.loadFile(file);
+    const page = (code) => w.webContents.executeJavaScript(code, true);
+    for (let i = 0; i < 300 && !(await page('!!document.querySelector(".rx-same")')); i++) await tick(100);
+    const checks = await page('[...document.querySelectorAll("#rx-checks li")].map((li) => li.className + " " + li.textContent)');
+    assert.ok(checks.length >= 2, checks.join('\n'));
+    assert.ok(checks.every((c) => !c.startsWith('bad')), checks.join('\n'));
+    assert.equal(await page('document.querySelector(".rx-same").className'), 'rx-same ok');
+    // (the book's opening words: an earlier test dates a session the next
+    // day, ahead of sessions written after it, so the days can't be played
+    // through to now here; scripts/replay-page.test.js checks the last day's end)
+    assert.match(await page('document.querySelector(".rx-sheet").innerText'), /Rain fell on the quay/);
+  } finally {
+    w.destroy();
+  }
+});
+
 test('a book’s history deleted goes to the trash with its backup; the book is untouched and records afresh', async () => {
   if (await js('!book || book.id !== ' + JSON.stringify(BOOK))) {
     await js(`openBook(${JSON.stringify(BOOK)})`);
