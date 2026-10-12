@@ -1,2 +1,4 @@
 # Frozen Writing History sessions: their hash chains cover the exact bytes
 scripts/fixtures/*/*.jsonl -text
+# Proof fixtures: real timestamp tokens over these exact bytes
+scripts/fixtures/proof/** -text

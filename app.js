@@ -2625,7 +2625,7 @@ const rec = {
     this.wrote = {};
     if (!recordingWanted()) return;
     let info;
-    try { info = await window.neo.recStart(bookId); } catch (err) {
+    try { info = await window.neo.recStart(bookId, proofFlags()); } catch (err) {
       window.neo.logError('recording start: ' + (err && err.message || err));
       return;
     }
@@ -2964,6 +2964,10 @@ const rec = {
     if (!c) return null;
     // the tag's own line, counted as History counts lines (the header is 1)
     const k = c.chunk.text.split('\n').findIndex((s) => s.includes('"tag"') && s.includes(JSON.stringify(id)));
+    // with proof on, a tag the writer named is sealed at once, not at the
+    // next hour, so "Sent to my agent" is timestamped minutes after it's said
+    const bookId = this.bookId;
+    if (typeof label === 'string' && proofFlags().on) c.saved.then((ok) => ok && window.neo.proofSeal(bookId)).catch(() => {});
     return { id, ref: [this.session.id, c.chunk.first + k, this.device], saved: c.saved };
   },
 
@@ -3133,6 +3137,7 @@ setInterval(() => rec.rollup(), REC_ROLLUP);
 async function setRecordWriting(on) {
   library.recordWriting = !!on;
   writeLibrary(library);
+  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   if (!on) {
     rec.end();
     toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
@@ -3140,6 +3145,44 @@ async function setRecordWriting(on) {
   }
   toast(t('Like a painter’s timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
   if (book) await recRestart(book.id);
+}
+
+// Proof of when I wrote (docs/neo-recording-plan.md, part 2): off unless
+// the writer turns it on in Writing History. The main process seals and
+// stamps (proof.js); the window only says whether it's wanted. Pocket has
+// no proofSet, so it never offers it.
+const proofFlags = () => ({
+  on: !!(window.neo.proofSet && library && library.proveWriting === true && recordingWanted()),
+  bitcoin: !!(library && library.proveBitcoin === true)
+});
+
+// Prove when I wrote: asked once, in plain words, before anything is sent.
+// Returns whether it's now on.
+async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } = {}) {
+  if (on && library.proveWriting !== true) {
+    const sure = await confirmModal({
+      title: t('Prove when you wrote?'),
+      points: [
+        t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
+        t('The fingerprint goes to DigiCert and Sectigo, the companies that timestamp signed software, and each seal carries a public random number from drand, so it can’t have been made before then.'),
+        t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
+        t('A timestamp shows when your writing existed, not who wrote it. The replay of how you wrote it is what speaks to that.')
+      ],
+      ok: t('Turn on proof')
+    });
+    if (!sure) return false;
+  }
+  library.proveWriting = !!on;
+  library.proveBitcoin = !!bitcoin;
+  writeLibrary(library);
+  await window.neo.proofSet(proofFlags());
+  // the book open is sealed now, rather than at the next hour
+  if (on && book && rec.on && rec.bookId === book.id) {
+    const c = rec.flush();
+    if (c) await c.saved;
+    window.neo.proofSeal(book.id).catch(() => {});
+  }
+  return !!on;
 }
 
 // Recording the open book from now, as it is now
@@ -3198,6 +3241,9 @@ function historyStreamName(id) {
 // The worker's progress (rec:progress), to the dialog that's waiting on it
 const historyListeners = new Set();
 if (window.neo.onRecProgress) window.neo.onRecProgress((m) => { for (const f of historyListeners) f(m); });
+// a book sealed or stamped (proof.js, in the main process)
+const proofListeners = new Set();
+if (window.neo.onProofChanged) window.neo.onProofChanged((bookId) => { for (const f of proofListeners) f(bookId); });
 
 // One day's sessions, every device's ({ id, device }, in the order they
 // play), read and played from the page and each device's chapters as the
@@ -3562,6 +3608,9 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     <div class="hs-foot">
       <label class="hs-keep"><input type="checkbox"> <span></span></label>
       <span class="hs-desc"></span>
+      <label class="hs-keep hs-prove" hidden><input type="checkbox"> <span></span></label>
+      <label class="hs-keep hs-btc" hidden><input type="checkbox"> <span></span></label>
+      <span class="hs-proof" hidden></span>
       <button class="hs-snaps" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
@@ -3617,7 +3666,54 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   keep.addEventListener('change', async () => {
     await setRecordWriting(keep.checked);
     if (window.neo.recState) window.neo.recState({ book: !!book && !$('#editor-view').hidden, menu: true });
+    renderProof();
   });
+
+  // Prove when I wrote, beside it: off until the writer turns it on, and
+  // then a line saying when the book was last sealed and who stamped it
+  const prove = $h('.hs-prove input');
+  const btc = $h('.hs-btc input');
+  const proofLine = $h('.hs-proof');
+  $h('.hs-prove span').textContent = t('Prove when I wrote');
+  $h('.hs-prove').title = t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.');
+  $h('.hs-btc span').textContent = t('Also anchor in Bitcoin');
+  $h('.hs-btc').title = t('Also sends the fingerprint to the OpenTimestamps calendars, which fix it in Bitcoin within a few hours: proof that trusts no company. NEO holds no Bitcoin and pays nothing.');
+  async function renderProof() {
+    const can = !!window.neo.proofSet && library.recordWriting !== false;
+    $h('.hs-prove').hidden = !can;
+    prove.checked = library.proveWriting === true;
+    $h('.hs-btc').hidden = !can || !prove.checked;
+    btc.checked = library.proveBitcoin === true;
+    proofLine.hidden = !can || !prove.checked;
+    if (proofLine.hidden) return;
+    let st = null;
+    try { st = await window.neo.proofStatus(bookId); } catch { /* said below */ }
+    if (!bd.isConnected) return;
+    proofLine.textContent = proofSays(st);
+  }
+  function proofSays(st) {
+    if (!st || !st.seals) return t('Nothing sealed yet. The first seal comes with your next words.');
+    const when = snapWhen(Date.parse(st.at));
+    let say = st.stamps.length >= 2
+      ? t('Sealed {when}, timestamped by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
+      : st.stampedAt
+        ? t('Sealed {when}. Last timestamped {then}; waiting for the network for the rest.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
+        : t('Sealed {when}. Waiting for the network to timestamp it.', { when });
+    if (library.proveBitcoin === true) say += ' ' + (st.bitcoin ? t('Anchored in Bitcoin.') : st.pendingBitcoin ? t('Waiting for Bitcoin.') : '');
+    return say.trim();
+  }
+  prove.addEventListener('change', async () => {
+    await setProveWriting(prove.checked);
+    bd.focus();
+    renderProof(); // (unticked again if the writer said no)
+  });
+  btc.addEventListener('change', async () => {
+    await setProveWriting(true, { bitcoin: btc.checked });
+    renderProof();
+  });
+  renderProof();
+  const proofChanged = (changed) => { if (changed === bookId && bd.isConnected) renderProof(); };
+  proofListeners.add(proofChanged);
   document.body.appendChild(bd);
   bd.tabIndex = -1;
   bd.focus();
@@ -3707,6 +3803,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     cancelAnimationFrame(raf);
     resize.disconnect();
     historyListeners.delete(progress);
+    proofListeners.delete(proofChanged);
     CSS.highlights.delete('neo-replay-sel');
     CSS.highlights.delete('neo-replay-find');
     CSS.highlights.delete('neo-replay-part');
@@ -4802,12 +4899,15 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   deleteBtn.addEventListener('click', async () => {
     setPlaying(false);
     const bin = navigator.platform.toLowerCase().includes('win');
+    let sealed = 0;
+    if (window.neo.proofStatus) try { sealed = (await window.neo.proofStatus(bookId)).seals || 0; } catch { /* none, then */ }
     const sure = await confirmModal({
       title: t('Delete the Writing History of “{title}”?', { title: isUntitled(meta.title) ? t('Untitled') : meta.title }),
       points: [
         t('Every replay of how this book was written goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
         t('The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.'),
         ...(tags.length ? [t('Its {n} tags go with it.', { n: tags.length })] : []),
+        ...(sealed ? [t('Its seals and timestamps go with it, so nothing will show when the book was written up to now.')] : []),
         bin ? t('The history, and its copy in the Backups folder, go to the Recycle Bin. You can get them back from there until it is emptied, but not from inside NEO.')
           : t('The history, and its copy in the Backups folder, go to the Trash. You can get them back from there until it is emptied, but not from inside NEO.'),
         library.recordWriting !== false ? t('NEO starts a new history from the book as it is now.') : t('Writing History is off, so nothing new is recorded until you turn it on.')

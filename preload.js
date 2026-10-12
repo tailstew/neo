@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld('neo', {
   writeJSON: (bookId, name, data) => ipcRenderer.invoke('json:write', bookId, name, data),
 
   // Writing History (recording.js): one device's own folder in the book
-  recStart: (bookId) => ipcRenderer.invoke('rec:start', bookId),
+  recStart: (bookId, proof) => ipcRenderer.invoke('rec:start', bookId, proof),
   recChunk: (bookId, session, first, text) => ipcRenderer.invoke('rec:chunk', bookId, session, first, text),
   recRollup: (bookId, session) => ipcRenderer.invoke('rec:rollup', bookId, session),
   recClose: (bookId, session) => ipcRenderer.invoke('rec:close', bookId, session),
@@ -45,6 +45,10 @@ contextBridge.exposeInMainWorld('neo', {
   recTrack: (bookId, day, part, from) => ipcRenderer.invoke('rec:track', bookId, day, part, from),
   onRecProgress: (cb) => ipcRenderer.on('rec:progress', (_e, msg) => cb(msg)),
   recState: (st) => ipcRenderer.send('rec:state', st),
+  proofSet: (flags) => ipcRenderer.invoke('proof:set', flags),
+  proofSeal: (bookId) => ipcRenderer.invoke('proof:seal', bookId),
+  proofStatus: (bookId) => ipcRenderer.invoke('proof:status', bookId),
+  onProofChanged: (fn) => ipcRenderer.on('proof:changed', (_e, bookId) => fn(bookId)),
 
   exportSave: (payload) => ipcRenderer.invoke('export:save', payload),
   emailDraft: (payload) => ipcRenderer.invoke('email:draft', payload),

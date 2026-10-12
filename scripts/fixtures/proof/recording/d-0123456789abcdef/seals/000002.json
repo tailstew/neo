@@ -1,0 +1,25 @@
+{
+ "neoSeal": 1,
+ "seq": 2,
+ "at": "2026-10-12T16:40:08.095Z",
+ "book": "book-fixture-v1",
+ "device": "d-0123456789abcdef",
+ "publicKey": "5SD9q6xd3GOeDEWvfN113neppq0QZsMvESy11RxzdWU=",
+ "after": [
+  {
+   "beacon": "drand-quicknet",
+   "round": 33006614,
+   "randomness": "2b8ab35b347972825fdb4030f24027b1bda77f00b99cbe4cdf31f6b06d543285",
+   "signature": "822b851953d6062b7482b72d89b2eefb856a3d648deb3202e40f211bdeff6d68f937cd07b7f6b9509e6c94a8325de484"
+  }
+ ],
+ "heads": {
+  "2026-10-08T08-30-00Z-t4g5": "xlDYwfmhgaakupKIKmT4dg"
+ },
+ "tokens": {
+  "000001.digicert.tsr": "117c5b3cafa47fd384be9ef127e9cbd79994a1887fdce699549488f666c49ba2",
+  "000001.sectigo.tsr": "432f66c8eda8dad19f73dabb9df9165cc502bf35fee60394dff77136f1e8e7c6"
+ },
+ "prev": "8e8bdf4cab77d209a8380d7e6f2ff73611e86a296ca2c3bd53d8e8153cc054cc",
+ "sig": "c5JPcQ7UKEXmP7w2lo6p6En9rc12QO+RUVHXTOoIBsGeGE2iMa7IiVfoY7qcqjsB3rlEMl6gOV1A7QubvG10CA=="
+}

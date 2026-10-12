@@ -11,7 +11,8 @@
 // catch-up, a crash (after a flush, and between a save and a flush) and the
 // off switch each keep every line. Then the Writing History dialog, restore
 // (a chapter, a deleted chapter, paragraphs, text copied from a moment), books imported
-// from a .docx and from Fountain, and last, deleting a book's history.
+// from a .docx and from Fountain, proof of when I wrote (seals, a tag sealed
+// at once, nothing sent but fingerprints), and last, deleting a book’s history.
 // Run with `npm run test:recording`.
 
 'use strict';
@@ -1577,6 +1578,87 @@ test('a script imported from Fountain: a scene card moved is recorded, and ⌘Z 
 /* ---------- runner ---------- */
 
 /* ---------- deleting a book's history ---------- */
+
+/* ---------- proof of when I wrote ---------- */
+
+test('proof turned on seals the session being written; a named tag seals it again at once; only fingerprints leave', async () => {
+  if (await js('!book || book.id !== ' + JSON.stringify(BOOK))) {
+    await js(`openBook(${JSON.stringify(BOOK)})`);
+    await tick(500);
+  }
+  // the network, as the test's: drand answers, the timestamp authorities don't
+  const crypto = require('crypto');
+  const sig = crypto.randomBytes(48).toString('hex');
+  const randomness = crypto.createHash('sha256').update(Buffer.from(sig, 'hex')).digest('hex');
+  const round = Math.floor((Date.now() / 1000 - 1692803367) / 3) + 1; // quicknet's, now
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    sent.push({ url: String(url), body: opts.body ? Buffer.from(opts.body) : null });
+    if (String(url).includes('/public/latest')) return new Response(JSON.stringify({ round, signature: sig, randomness }), { status: 200 });
+    throw new Error('offline (the test)');
+  };
+  const sealsDir = () => path.join(recDirOf(), 'seals');
+  const seal = (n) => JSON.parse(fs.readFileSync(path.join(sealsDir(), String(n).padStart(6, '0') + '.json'), 'utf8'));
+  const headNow = async () => R.verifyChain(readOpen(await sessionId()).text).last;
+  try {
+    await caretAt(0, 0, -1);
+    await type(' Proven.');
+    await flush();
+    // asked first, in plain words; nothing is sent until the writer says yes
+    await js('setProveWriting(true).then((on) => { window.__proved = on; }); 0');
+    const asked = await confirmShown();
+    assert.ok(asked.points.some((x) => /never your words/.test(x)));
+    assert.equal(sent.length, 0, 'nothing sent while asking');
+    await answer(true);
+    await waitFor('window.__proved === true');
+    assert.equal(await js('library.proveWriting'), true);
+    for (let i = 0; i < 300 && !fs.existsSync(path.join(sealsDir(), '000001.json')); i++) await tick(100);
+    const first = seal(1);
+    const session = await sessionId();
+    assert.equal(first.heads[session], await headNow(), 'the open session, as far as it’s on disk');
+    assert.ok(closedSessions().every((s) => first.heads[s]), 'and every session before it');
+    assert.deepEqual(first.after, [{ beacon: 'drand-quicknet', round, randomness, signature: sig }]);
+
+    // within the hour, more writing waits for the next hour's seal
+    await type(' Still.');
+    await flush();
+    await tick(500);
+    assert.ok(!fs.existsSync(path.join(sealsDir(), '000002.json')), 'not sealed again within the hour');
+    // a tag the writer names is sealed at once
+    await js('rec.tag("Sent to my agent"); 0');
+    for (let i = 0; i < 300 && !fs.existsSync(path.join(sealsDir(), '000002.json')); i++) await tick(100);
+    const second = seal(2);
+    assert.deepEqual(Object.keys(second.heads), [session]);
+    assert.equal(second.heads[session], await headNow());
+    assert.ok(R.parseSession(readOpen(session).text).lines.some((l) => l[1] === 'tag' && l[3] === 'Sent to my agent'));
+
+    // what left the computer: drand asked, and seal fingerprints, never a word
+    const words = Buffer.from('Proven');
+    for (const s of sent) assert.ok(!s.body || (s.body.length <= 70 && !s.body.includes(words)), 'only fingerprints: ' + s.url);
+    assert.ok(sent.some((s) => /timestamp\.digicert\.com/.test(s.url)) && sent.some((s) => /timestamp\.sectigo\.com/.test(s.url)), 'both authorities asked');
+    assert.deepEqual(fs.readdirSync(sealsDir()).sort(), ['000001.json', '000002.json'], 'nothing stamped while offline');
+
+    // History says so
+    await js('openHistory()');
+    await daysReady();
+    await waitFor('/Waiting for the network/.test(document.querySelector(".hs-proof").textContent)');
+    assert.equal(await js('document.querySelector(".hs-prove input").checked'), true);
+    key('Escape');
+    await tick(300);
+
+    // and anyone can check what's there
+    const { verifyBook } = require('./verify-recording.js');
+    const report = await verifyBook(path.join(LIB, BOOK));
+    const mine = report.devices.find((d) => d.seals);
+    assert.equal(mine.seals.seals.length, 2);
+    for (const s of mine.seals.seals) assert.equal(s.ok, true, s.problems.join('; '));
+  } finally {
+    await js('setProveWriting(false); 0');
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(await js('library.proveWriting'), false);
+});
 
 test('a book’s history deleted goes to the trash with its backup; the book is untouched and records afresh', async () => {
   if (await js('!book || book.id !== ' + JSON.stringify(BOOK))) {

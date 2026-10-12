@@ -879,10 +879,12 @@ const recReadme = () => [
 
 // A book opens: sessions this device left open are closed, and the window
 // learns where the last recording left each chapter.
-ipcMain.handle('rec:start', async (_e, bookId) => {
+ipcMain.handle('rec:start', async (_e, bookId, proof) => {
   const device = recDevice();
   const r = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
   await recMirrorMine(bookId);
+  proofSetFlags(proof);
+  proofRun(bookId, 'start');
   return { device, app: app.getVersion(), ...r };
 });
 
@@ -891,6 +893,7 @@ ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
   const dir = await RecFiles.prepare(recIO, recRoot(bookId), libName(device), recReadme(),
     { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
   await RecFiles.chunk(recIO, dir, recSession(session), first, text);
+  proofRun(bookId, 'hourly');
   return true;
 });
 
@@ -902,6 +905,7 @@ ipcMain.handle('rec:rollup', async (_e, bookId, session) => {
 ipcMain.handle('rec:close', async (_e, bookId, session) => {
   const dir = recDir(bookId);
   if (fs.existsSync(path.join(dir, recSession(session)))) await RecFiles.closeSession(recIO, dir, session, false);
+  proofRun(bookId, 'now');
   await recMirrorMine(bookId);
   return true;
 });
@@ -1010,10 +1014,109 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
     }
   }
   const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
+  proofSealers.delete(bookId); // its seals went with the history
   if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
   historyCleaned.delete(cache);
   fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
   return true;
+});
+
+// ---------------------------------------------------------------------------
+// Proof of when I wrote (docs/neo-recording-plan.md, part 2; proof.js):
+// opt-in, off unless library.proveWriting. Seals of this device's recording
+// of a book, at most hourly while it's written, when a session closes and
+// when the writer names a tag, each signed with this computer's key and
+// stamped by two timestamp authorities. Only a seal's SHA-256 leaves the
+// computer, never a word. Nothing here holds up a save: the window isn't
+// waiting, and a stamp that fails is asked for again later.
+// ---------------------------------------------------------------------------
+const Proof = require('./proof.js');
+const PROOF_HOUR = 3600 * 1000;
+let proofOn = false;
+let proofBitcoin = false;
+let proofTimer = null;
+const proofSealers = new Map(); // bookId -> { sealer, queue }
+
+// the window says what the writer chose (in library.json, which it reads)
+function proofSetFlags(f) {
+  if (!f || typeof f !== 'object') return;
+  proofOn = !!f.on;
+  proofBitcoin = !!f.bitcoin;
+  for (const p of proofSealers.values()) p.sealer.bitcoin = proofBitcoin;
+  // stamps that failed (offline) are asked for again every half hour
+  if (proofOn && !proofTimer) {
+    proofTimer = setInterval(() => {
+      if (!proofOn) return;
+      for (const bookId of proofSealers.keys()) proofRun(bookId, 'retry');
+    }, 30 * 60 * 1000);
+  }
+}
+
+// This computer's signing key, Ed25519, made the first time it seals and
+// kept encrypted with safeStorage in userData, never in the library
+function proofKey() {
+  let pem = readSecret('proofKey');
+  if (!pem) {
+    pem = Proof.newKey();
+    writeSecret('proofKey', pem);
+  }
+  return Proof.keyOf(pem);
+}
+
+function proofSealer(bookId) {
+  let p = proofSealers.get(bookId);
+  if (!p) {
+    const device = recDevice();
+    p = {
+      sealer: new Proof.Sealer({
+        dir: recDir(bookId, device), book: libName(bookId), device, key: proofKey(), write: writeFileDurable,
+        fetch: (...a) => globalThis.fetch(...a), // (looked up each time, so the tests can stand in for the network)
+        log: (source, err) => logError(source, err), bitcoin: proofBitcoin,
+        cacheFile: path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'heads.json')
+      }),
+      queue: Promise.resolve()
+    };
+    proofSealers.set(bookId, p);
+  }
+  return p;
+}
+
+// A book's seals, one call at a time: `hourly` seals what changed once the
+// last seal is an hour old, `now` whatever changed, `start` renews a seal
+// nearly a year old; then each asks for the stamps the newest seal lacks
+// (`retry` only that). Resolves to the seal made, or null.
+function proofRun(bookId, how) {
+  if (!proofOn) return Promise.resolve(null);
+  let p;
+  try { p = proofSealer(bookId); } catch (err) { logError('proof', err); return Promise.resolve(null); }
+  const s = p.sealer;
+  if (how === 'hourly' && s.last() && Date.now() - Date.parse(s.last().at) < PROOF_HOUR) return Promise.resolve(null);
+  const job = p.queue.then(async () => {
+    let made = null;
+    if (how === 'start') { if (s.renewDue()) made = await s.seal({ force: true }); }
+    else if (how !== 'retry') made = await s.seal();
+    await s.stamp();
+    await s.upgrade();
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
+    return made;
+  }).catch((err) => { logError('proof', err); return null; });
+  p.queue = job;
+  return job;
+}
+
+ipcMain.handle('proof:set', (_e, flags) => { proofSetFlags(flags); return true; });
+// a tag the writer named, or proof just turned on: sealed at once
+ipcMain.handle('proof:seal', async (_e, bookId) => !!(await proofRun(libName(bookId), 'now')));
+// for the dialog: how many seals, the newest, who stamped it
+ipcMain.handle('proof:status', (_e, bookId) => {
+  const st = { on: proofOn, bitcoin: proofBitcoin, seals: 0 };
+  try {
+    if (!fs.existsSync(path.join(recDir(bookId), 'seals'))) return st;
+    return { ...st, ...proofSealer(libName(bookId)).sealer.status() };
+  } catch (err) {
+    logError('proof', err);
+    return st;
+  }
 });
 
 // File → Writing History… is for the open book: the window says when one is
@@ -1107,7 +1210,7 @@ function readSecret(name) {
   }
 }
 
-ipcMain.handle('secret:set', (_e, name, value) => {
+function writeSecret(name, value) {
   const { safeStorage } = require('electron');
   const all = readJSON(SECRETS_FILE(), {});
   if (!value) {
@@ -1118,6 +1221,11 @@ ipcMain.handle('secret:set', (_e, name, value) => {
     all[name] = { enc: false, value: String(value) };
   }
   writeJSON(SECRETS_FILE(), all);
+}
+
+ipcMain.handle('secret:set', (_e, name, value) => {
+  if (name === 'proofKey') return false; // the signing key is NEO's own, never the window's
+  writeSecret(name, value);
   return true;
 });
 

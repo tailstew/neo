@@ -1,0 +1,22 @@
+{
+ "neoSeal": 1,
+ "seq": 1,
+ "at": "2026-10-12T16:40:07.130Z",
+ "book": "book-fixture-v1",
+ "device": "d-0123456789abcdef",
+ "publicKey": "5SD9q6xd3GOeDEWvfN113neppq0QZsMvESy11RxzdWU=",
+ "after": [
+  {
+   "beacon": "drand-quicknet",
+   "round": 33006614,
+   "randomness": "2b8ab35b347972825fdb4030f24027b1bda77f00b99cbe4cdf31f6b06d543285",
+   "signature": "822b851953d6062b7482b72d89b2eefb856a3d648deb3202e40f211bdeff6d68f937cd07b7f6b9509e6c94a8325de484"
+  }
+ ],
+ "heads": {
+  "2026-10-06T09-14-03Z-k3f9": "3ZpCOnxXPB2wQIqnfRo7GA",
+  "2026-10-07T20-01-44Z-q7m2": "C3Xnt9kgWoIb2x4sxa4naQ"
+ },
+ "prev": null,
+ "sig": "5kLeE1tdnsXdowJpa6r6lhf8cN8EGdn2uyYFPSANxX08udgljxwZfkMxAY5vQoN5tCgl+8oqJWbL3tWq2sWDAA=="
+}

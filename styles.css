@@ -600,6 +600,9 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-foot { grid-area: foot; display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-top: 1px solid #2a2a2a; }
 .hs-keep { display: flex; align-items: center; gap: 7px; color: #c9c3b8; white-space: nowrap; cursor: pointer; }
 .hs-desc { font-size: 11px; color: #77736b; line-height: 1.4; }
+/* Prove when I wrote, and when the book was last sealed */
+.hs-proof { min-width: 0; font-size: 11px; color: #77736b; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-foot:has(.hs-proof:not([hidden])) .hs-desc { display: none; }
 .hs-delete {
   margin-left: auto; flex: none; background: transparent; border: none; color: #77736b; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
 }
