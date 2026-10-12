@@ -15,31 +15,31 @@ The analogy also sets honest expectations. A timelapse is convincing because fak
 3. **A historical record.** How a book actually came to be, kept as long as the book.
 4. **Evidence of human involvement.** A record detailed enough that how the text was made can be judged: rhythm, hesitation, revision and non-linear composition. Someone retyping a finished text tends to go in a straight line. A writer doubles back. When the writer chooses, that record can be fixed in time by independent timestamp services.
 
-## The shape: two patches to NEO
+## The shape: one patch, two halves
 
-The work goes to Hugh as two separate patches (pull requests), so the first one never depends on the second being accepted.
+The work goes to Hugh as one pull request (decided 2026-10-12; it was to be two, proof following once the history was in). Its two halves are equally the reason for it: a history in which no version of the book is ever lost, and, when the writer wants it, proof of when they wrote.
 
-| | Patch 1: Writing History | Patch 2: Proof of when I wrote |
+| | Part 1: Writing History | Part 2: Proof of when I wrote |
 |---|---|---|
-| What it does | Records every chapter edit, keystroke, caret move and paste. A history dialog with replay. Restore any moment | Signs the recording, has it timestamped by independent services, reports on the evidence, exports a replay page others can check |
+| What it does | Records every chapter edit, keystroke, caret move and paste. A history dialog with replay. Restore any moment. Name moments with tags | Signs the recording, has it timestamped by independent services, reports on the evidence, exports a replay page others can check |
 | Default | **On**, recording stays local | **Off**, the writer opts in |
 | Network | None | Sends a 32-byte fingerprint (never words) to timestamp services |
 | Dependencies | None (Node/Electron built-ins only) | None (`crypto`, `https` built-ins; RFC 3161 and OpenTimestamps code written in-house) |
-| Stands on | Benefits to every NEO writer (see The case for Hugh) | Writers who need to show their work is theirs |
+| Stands on | Benefits to every NEO writer (see The case for Hugh) | Writers who need to show their work is theirs, and when it existed |
 
-`proof.js`, the module patch 2 adds, is self-contained: it takes recording files and a signing key and returns seals and timestamp tokens. **If Hugh declines patch 2**, the same module ships in a slimmed-down NEO Witness that only seals `recording/` and does nothing else, and nothing in patch 1 changes. Otherwise NEO Witness is retired.
+Part 1 never depends on part 2. `proof.js`, the module part 2 adds, is self-contained: it takes recording files and a signing key and returns seals and timestamp tokens. **If Hugh wants the history but not the proof**, part 2 comes out of the pull request whole and `proof.js` ships in a slimmed-down NEO Witness that only seals `recording/`; nothing in part 1 changes. Otherwise NEO Witness is retired.
 
 ## The case for Hugh
 
-The short version for Hugh: **painters show a timelapse to prove they made the painting; this gives writers the same thing, and the writer gets their history back for free.**
+The short version for Hugh: **painters show a timelapse to prove they made the painting; this gives writers the same thing, fixed in time by independent timestamps, and the writer gets every version of their book back besides.**
 
-AGENTS.md sets the bar: "A change that helps someone finish a book belongs here. A change that adds a panel, a prompt, or a dependency usually does not." Patch 1 meets it without any appeal to proof.
+AGENTS.md sets the bar: "A change that helps someone finish a book belongs here. A change that adds a panel, a prompt, or a dependency usually does not." The history meets it without any appeal to proof; the proof is why it matters now, and the two are argued as equals.
 
-1. **It makes NEO's first rule fully true: words are never lost.** Today NEO has native ⌘Z for the current session, Darlings, a structural undo stack, and 14 daily zips. With patch 1, every chapter can go back to any moment it has ever been in, including chapters since deleted.
+1. **It makes NEO's first rule fully true: words are never lost.** Today NEO has native ⌘Z for the current session, Darlings, a structural undo stack, and 14 daily zips. With the history, every chapter can go back to any moment it has ever been in, including chapters since deleted.
 2. **It helps Hugh debug data loss.** NEO's code and history show a lot of care spent on lost-words cases (#219, the both-sides-changed sync logic, "an empty read must not wipe a chapter"). A writer who reports missing words can show a replay of exactly what happened: a sync adoption, a merge, a healing pass. The check before each save (see Capture) also catches recorder gaps nobody has reported yet.
 3. **Watching your own book being written** is a delightful feature in itself.
 4. **It adds no dependency, no prompt and no panel.** zlib and crypto are built in. The history opens in a dialog from the menus and footer, like the shelf's bound pages, and is otherwise invisible.
-5. **Patch 2 meets a need authors have right now.** Writers are being accused of using AI on work they wrote themselves, and AI detectors often wrongly flag human writing. Artists answer the same accusation with a timelapse of the painting; writers have had no equivalent. NEO is a tool built by an author for authors. Proof of human writing, quiet and opt-in, with no Bitcoin unless asked for, fits that pitch.
+5. **Proof meets a need authors have right now, and is half the point.** Writers are being accused of using AI on work they wrote themselves, and AI detectors often wrongly flag human writing. Artists answer the accusation with a timelapse of the painting; writers have had no equivalent. A replay shows how a text was written, but not when: a recording made last weekend could claim to be from last year. Timestamps from two independent authorities close that gap, and a named tag, sealed and timestamped ("Sent to my agent"), is the exact claim a writer needs to make: this text existed, reading just like this, on this day. Classroom tools (Draftback, Grammarly Authorship, Turnitin Clarity) replay writing for a teacher's eyes; standalone proof apps (WritersProof, Writermark) seal typing done somewhere other than where the book is written. None does it inside the writer's own book, locally, in plain files. NEO is a tool built by an author for authors. Proof of human writing, quiet and opt-in, sending a fingerprint and never a word, with no Bitcoin unless asked for, fits that pitch.
 
 ## Why this goes inside NEO
 
@@ -77,7 +77,7 @@ Keystrokes, the caret and the causes of changes exist only inside the editor, so
 
 From `AGENTS.md` and `app.js` / `main.js` / `preload.js` at 1.2.10:
 
-- Plain JS Electron app. No bundler, no framework. `contextIsolation: true`. **The renderer never touches the filesystem.** A new capability takes an `ipcMain.handle` in `main.js`, a method on `window.neo` in `preload.js`, and a call site in `app.js`. IPC names are grouped (`library:`, `book:`, `chapter:`, `aux:`, `json:`, `cover:`); add `rec:` (and `proof:` in patch 2).
+- Plain JS Electron app. No bundler, no framework. `contextIsolation: true`. **The renderer never touches the filesystem.** A new capability takes an `ipcMain.handle` in `main.js`, a method on `window.neo` in `preload.js`, and a call site in `app.js`. IPC names are grouped (`library:`, `book:`, `chapter:`, `aux:`, `json:`, `cover:`); add `rec:` (and `proof:` in part 2).
 - Every name goes through `libName()`. Every library write goes through `writeFileDurable` (tmp, fsync, rename). There is no append. The recording keeps to that: it writes small files that never change and rolls them up into bigger ones (see Storage).
 - Each chapter is its own `contenteditable` `.chapter-body` inside `#chapters`. `wireChapterBody(body, chId)` in **EDITOR — typing** wires `input`, `paste`, `keydown`, `compositionstart/end` and `beforeinput`. On every `input`: `chapterHTML[chId] = captureBody(body)`. That is the natural hook, and `captureBody` already runs on every keystroke, so the recorder gets the new HTML for free.
 - `captureBody` strips screen-only attributes (`data-attr`, `data-speech`, `data-first`), so `chapterHTML` is the canonical saved form. Record against it.
@@ -87,12 +87,12 @@ From `AGENTS.md` and `app.js` / `main.js` / `preload.js` at 1.2.10:
 - Native ⌘Z covers typing. A structural undo stack covers big moves (`structuralUndo`).
 - `flushAllSaves` runs every 20 s and on blur, hide and close. `refreshFromDisk` runs on focus, on visibility, and every 30 s.
 - `dailyBackup` zips the whole library, skipping only `Backups/` and `Exports/`, and keeps 14 days. There are no restore instructions anywhere; restoring means opening a zip by hand.
-- NEO already makes network calls: update checks (`electron-updater`) and cover painting (OpenAI, opt-in with a key). Patch 2 adds the third, also opt-in.
+- NEO already makes network calls: update checks (`electron-updater`) and cover painting (OpenAI, opt-in with a key). Part 2 adds the third, also opt-in.
 - `pocket/` runs the same `app.js` with `pocket-bridge.js` standing in for `window.neo`. CI copies `app.js`, `covers.js`, `styles.css`, `i18n.js`, `fonts/` and `locales/` into Pocket, so a new shared JS file has to be added to that list. (Since 4e it also copies `recording.js`, `recording-files.js` and `history-worker.js`.)
 - Tests: `node --test scripts/*.test.js` loads `app.js` in `vm`. `npm run test:words` is an Electron end-to-end test (`scripts/words.e2e.js`). Use it as the pattern for an end-to-end recorder test.
 - Upstream hand-off: pull requests to `hughhowey/neo` from the fork (`tailstew/neo-authorship`), as other contributors' work goes in. The git bundle in `AGENTS.md` ("Handing changes to Hugh", `npm run bundle`) is how Hugh's own agents hand him work; it isn't how outside contributions arrive.
 
-# Patch 1: Writing History
+# Part 1: Writing History
 
 ## Overview
 
@@ -205,9 +205,9 @@ Either way it records honestly that the text changed while nothing was watching.
 
 ## Hash chain (local, no network)
 
-Part of patch 1 because it costs almost nothing, catches corruption, and is what patch 2 seals.
+Part of part 1 because it costs almost nothing, catches corruption, and is what part 2 seals.
 
-Every chunk ends with `["h", n, H]`, where `n` is the number of lines in the session so far and `H = digest(H_prev ‖ bytes of every line since the previous h)`, with `H_prev` as its 16 bytes. A line's bytes are its UTF-8 text and the `\n` after it, exactly as written. The first `H_prev` is the hash of the header line. The header's `prev` names the last `H` of this device's previous session for the book, so sessions chain together too. Rollups and closing join files by concatenating their bytes, never by re-serializing, so the chain doesn't depend on how the lines are spread over files. Together with the `w` lines, this lets anyone holding the book and its recording confirm that the replayed text *is* the book, and that the recording hasn't been edited since it was written. It can't say *when* it was written; that is patch 2.
+Every chunk ends with `["h", n, H]`, where `n` is the number of lines in the session so far and `H = digest(H_prev ‖ bytes of every line since the previous h)`, with `H_prev` as its 16 bytes. A line's bytes are its UTF-8 text and the `\n` after it, exactly as written. The first `H_prev` is the hash of the header line. The header's `prev` names the last `H` of this device's previous session for the book, so sessions chain together too. Rollups and closing join files by concatenating their bytes, never by re-serializing, so the chain doesn't depend on how the lines are spread over files. Together with the `w` lines, this lets anyone holding the book and its recording confirm that the replayed text *is* the book, and that the recording hasn't been edited since it was written. It can't say *when* it was written; that is part 2.
 
 ## Storage
 
@@ -220,13 +220,13 @@ NEO Library/
     recording/
       README.txt                                written once: what this folder is
       <deviceId>/
-        device.json                             device name, created, NEO version (+ public key, patch 2)
+        device.json                             device name, created, NEO version (+ public key, part 2)
         2026-10-06T09-14-03Z-k3f9/              the open session
           s-000001-000411.jsonl.gz              a rollup of the chunks before it
           c-000412.jsonl                        a chunk: one flush, named by its first line number
           c-000498.jsonl
         2026-10-05T20-02-11Z-a81b.jsonl.gz      a finished session, one file
-        seals/                                  patch 2 only
+        seals/                                  part 2 only
 ```
 
 - **Device id**: random, made once, kept in `userData/settings.json`. Never in the library.
@@ -266,7 +266,7 @@ A new top-level file with no DOM and no Node APIs, loaded by the window (`<scrip
 - `normText(text)` → the text search matches against: case-folded, NFC, `’` as `'`, runs of whitespace as one space
 - `findPhrase(html, phrase)` → where a phrase is in a chapter's text, within one paragraph (see Days, seeking and search)
 - `Page` (4d): every device's sessions as one page. Each device plays onto its own copies; the page shows, chapter by chapter, the copy of the device that last changed it. Joins between devices are where one device's change takes the page over (Days, seeking and search; Phases, 4d).
-- `stats(sessions)` → the measures for the evidence report (patch 2) and the dialog's chapter list, words counted with `Intl.Segmenter`
+- `stats(sessions)` → the measures for the evidence report (part 2) and the dialog's chapter list, words counted with `Intl.Segmenter`
 - `textOf(html)`: the same paragraph rules as the witness's `htmlToParagraphs` (ghost paragraphs and `⚑` marks aren't prose)
 
 ## Where the history opens
@@ -282,7 +282,7 @@ One dialog, **Writing History**, built on NEO's existing full-window sheet (`she
 
 Pocket has no File menu, so there it's the footer button and the book menu.
 
-The dialog has four parts: the days, the text as it is above a tile for each writing day, which the dialog opens on (see Days, seeking and search), with a search field; the player (below); a list of the book's chapters, including deleted ones, with when each was first and last written; and a footer with **Keep a replay of my writing** (the on/off setting). Patch 2 adds **Prove when I wrote**, the evidence report and **Export replay…** to that footer.
+The dialog has four parts: the days, the text as it is above a tile for each writing day, which the dialog opens on (see Days, seeking and search), with a search field; the player (below); a list of the book's chapters, including deleted ones, with when each was first and last written; and a footer with **Keep a replay of my writing** (the on/off setting). Part 2 adds **Prove when I wrote**, the evidence report and **Export replay…** to that footer.
 
 ## Replay (the player)
 
@@ -484,9 +484,36 @@ From any moment in the player:
 
 - **Keep a replay of my writing** is on by default, stored in `library.json` beside the other writer settings. Its description: "Like a painter's timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays on this computer." The once-per-library hint names it the same way. Turning it off stops recording at once and closes the open session. Nothing already recorded is touched.
 - **Delete this book's writing history** moves `recording/` to the system trash (`shell.trashItem`), never deletes it outright, and says what is lost: replay, restore, and any proof sealed from it.
-- The recording holds every deleted word, including drafts the writer may regret. In patch 1 nothing ever leaves the computer.
+- The recording holds every deleted word, including drafts the writer may regret. Without proof turned on, nothing ever leaves the computer.
 
-# Patch 2: Proof of when I wrote
+## Tags
+
+A tag is a name on a moment of the book's history: "Draft 2", "Sent to my agent", "Before the big cut". It costs one line in the recording.
+
+- **The line.** `["tag", id, label, at, snapshot]`. `at` is `null` for the moment the line is written, or `[session, line, device]` for one in the past, named as `x restore` names one. `snapshot` is the folder name of the snapshot the tag stands for, or absent. A later line with the same `id` renames the tag; `label` `false` removes it. Files are never rewritten, so that is the only way a tag changes. `tag` is a new line kind, but format 1 hasn't shipped, so it joins format 1 and isn't a new `neoRec`; `scripts/fixtures/recording-v1/` gains a session with tags (a new fixture beside the frozen ones, which stay as they are). The recorder flushes as soon as a tag is written, so a tag is on disk when NEO says it was made.
+- **Making one.** In the History dialog, paused in the player or in the days: **Tag This Moment…** beside the restore button, or ⌘S (Ctrl+S) there; a name, and Enter. In the editor, ⌘S takes a snapshot exactly as in 1.5, and while recording it also writes an unnamed tag for that snapshot (`["tag", id, null, null, name]`).
+- **Seeing them.** A tag is a mark on its day's tile and on the player's timeline, with its label; a snapshot's tag reads as the snapshot list names it ("Taken by you", "Start of the day", "Before a restore"). The side pane lists the tags, newest first, each one a way to its moment. The tag's menu renames or removes it; a snapshot's tag can be named, which names it in History, never in the snapshot's folder. Search finds a tag by its label.
+- **Proof.** With proof on, a named tag is sealed at once rather than at the next hour, so "Sent to my agent" is timestamped minutes after the writer named it. The exported replay page lists the tags with each one's seal and timestamps.
+- Tags belong to the history: deleting the history takes them, and its confirmation says how many.
+- Tests: tags round-trip through chunks, rollups and the closed session; a rename and a removal read as the last line for the id; a past moment's tag points at the step `x restore` would; tags from two devices interleave by wall clock; a snapshot's tag carries its folder name.
+
+## Snapshots beside Writing History
+
+NEO 1.5 added snapshots (SNAPSHOTS in `app.js`): ⌘S keeps the chapters changed since the last one as plain HTML in `snapshots/<name>/`, NEO takes one at the start of each day and one before each snapshot restore, and the Darlings tab lists them, shows the book as it was with the words gone since marked, and restores a chapter or the whole book. **They stay as they are** (decided 2026-10-12). They're a plain, open format, readable without NEO and independent of the replay engine, and they work with recording off, on iOS before 16.4, and after a history is deleted. History doesn't replace them. What has to change is that the two read as one way of going back, not two that disagree:
+
+| Where 1.5.0 and History disagree | Settled (2026-10-12) |
+|---|---|
+| A snapshot restore keeps what it replaced in a "Before a restore" snapshot; a History restore sends it to Darlings | **One rule: every restore first takes a "Before a restore" snapshot** (`takeSnapshot('r')`), as snapshot restore does now. History's chapter and paragraph restores stop sending the replaced text to Darlings. With recording on, the history keeps that text for good as well. A History restore that can't take the snapshot changes nothing and says so, as snapshot restore does. The paragraph dialog's **Add to Darlings, and copy** stays: there Darlings is where the writer chose to put old paragraphs, not where replaced ones go |
+| A snapshot restore acts at once (⌘Z, and a toast); a History restore asks first (`confirmRestore`) | **Both act at once.** The toast says what changed, where the replaced text is (the snapshot, on the Darlings tab) and that ⌘Z undoes it, in snapshot restore's words. `confirmRestore` goes; History keeps a dialog only where there's a choice to make: paragraphs that can't be put back where they were (copy, or Darlings and copy), and a book that isn't open (it opens first, then restores) |
+| NEO's start-of-day snapshot uses the calendar date (`toDateString()`); History's days, goals and sessions use the writer's day (`writingDay()`, `library.dayEndsAt`) | `maybeDailySnapshot` uses `writingDay()`, so "Start of the day" is the start of a History day tile. A one-line change to 1.5's code |
+| Neither mentions the other | Each snapshot in the list gets **Watch from Here** while the book has a history: History opens in the player at that snapshot's tag (or, for a snapshot older than the history, at the history's first day). History shows snapshots as tags. The snapshot pane's hint gains one sentence, and History's footer one link (**Snapshots**, to the Darlings tab's list) |
+| Different names for the same things: "Restore This Chapter" and "Your book {when}" there; "Restore Chapter N to this moment" and "As it was on …" here | History takes the snapshot view's words, since they shipped first: **Restore This Chapter**, **Restore Paragraphs**, **Put This Chapter Back** for a deleted one, and "Your book {when}" for the moment shown |
+| Deleting the history says every earlier version goes | It also says snapshots on the Darlings tab stay, and that the history's tags go (with their number) |
+| Duplicate copies `recording/` with the book, so two books claim one history (and, with proof on, one set of seals) | `book:duplicate` leaves `recording/` out. The copy starts its own history from a baseline; the original keeps the past |
+
+What they still do differently, on purpose: snapshots are moments the writer (or the day) chose, kept as files; History is every moment, kept as a recording. The snapshot view marks words gone since, because it compares; the player tints nothing, because it replays.
+
+# Part 2: Proof of when I wrote
 
 Opt-in. Off until the writer turns on **Prove when I wrote** in the Writing History dialog. It's never offered mid-writing. The setting's description says exactly what happens: "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time."
 
@@ -563,9 +590,9 @@ The recorder runs on the writer's own computer, so a determined forger could scr
 
 # Phases
 
-Each phase leaves NEO working. The order is 0, 1, 2, 4, 3: phase 4 comes before the first pull request, because the player has to cope with a year of writing (and a year-long script) before Hugh's writers record one. The first pull request was to be phases 0, 1, 2 and 4 together, with restore (phase 3) as its own; on 2026-10-12 the writer chose to send everything, phase 3 included, as one pull request.
+Each phase leaves NEO working. The order is 0, 1, 2, 4, 3: phase 4 comes before the first pull request, because the player has to cope with a year of writing (and a year-long script) before Hugh's writers record one. The first pull request was to be phases 0, 1, 2 and 4 together, with restore (phase 3) as its own; on 2026-10-12 the writer chose to send everything, phase 3 included, as one pull request, and later that day to put proof in it too: phases 0 to 7 go together.
 
-**Patch 1: Writing History**
+**Part 1: Writing History**
 
 - **Phase 0: spike (1 session).** Wire `setChapterHTML` through all the mutation sites and log edits to the console, with an `unobserved` counter. Drive the editor through typing, smart quotes, triple-Enter splits, merges, darlings, replace-all, ⌘Z, paste, IME (if available) and a sync adoption. Done when `unobserved` stays at 0 and replaying the in-memory log reproduces `chapterHTML` exactly. **Done 2026-10-06** on branch `recording-phase-0` (`npm run test:recording`). It records only in memory, so it isn't sent upstream on its own: it goes in the same pull request as phase 1. Its log is still the earlier one-line-per-edit shape, with the chapter on every line; phase 1 moves it to the Event format above (runs, `ch` lines, the layout table).
 - **Phase 1: recorder and storage, no UI.** `rec:chunk` / `rec:rollup` / `rec:close` / `rec:list` / `rec:read` in `main.js`, the `preload.js` methods, the device id, session lifecycle, chunks, 10-minute rollups, joining and gzip on close, crash recovery, baseline/continue/catch-up, typing runs and the layout table, `w` lines, the hash chain. `recording.js` with `joinParts`, `parseSession`, `encodeRuns`/`expandRuns`, `verifyChain`, `applyEdit`, `replayCheck`. Tests: unit tests for the diff and its caret bias; runs round-tripping to per-key events, including keys that must break a run (`&`, Enter, a Backspace joining paragraphs, a key from a different layout entry); joining chunks and rollups, including a crash between a rollup and its deletes; and `replayCheck` on generated sessions; an end-to-end test (after `words.e2e.js`) that types, pastes, splits and saves, then asserts every `w` hash replays exactly. The setting, on by default, and the hint. All strings through `t()`. `AGENTS.md` updated. **Done 2026-10-06** on branch `recording-phase-0`, together with phase 0 (`recording.js`, `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
@@ -658,12 +685,14 @@ Each phase leaves NEO working. The order is 0, 1, 2, 4, 3: phase 4 comes before 
   - Copy from a moment: the sheet's `copy` puts the text, and the HTML without the player's caret, on the clipboard, and remembers the hash; a paste of it is `internal` and its `c` line ends with the moment (`[…, true, [session, line, device]]`), another optional field old readers ignore.
   - **Delete this book's history…** is in the dialog's footer. It's the one thing here NEO can't take back, so the confirmation (`confirmModal` with a `phrase`) says what goes (every replay and every version it could restore, on every device sharing the library), what stays (the book, its notes and Darlings), where the history goes (the system trash, with its copy in Backups, recoverable from there but not from NEO), and whether recording carries on; its button stays off until the writer types "delete history" (in the interface's language, any case). Then the session ends (its close awaited), `recording/` and the book's mirror in `Backups/recordings/` go to the trash (if the trash refuses one, it stays where it is and is shown, as for a book), the cache (and `known.json`) goes, and recording starts again: the next session's chapters are `baseline`. Another device still recording the book writes into a fresh folder; its next `continue` lines have nothing before them, so its history starts at its next anchor. Pocket has no system trash, so it doesn't offer it.
 
-**Patch 2: Proof of when I wrote**
+- **Phase 7: tags, and snapshots beside History.** Done before phase 5, since seals take tags. On top of upstream 1.5.0. Tags and Snapshots beside Writing History above: the `tag` line and its fixture, Tag This Moment… and ⌘S in the dialog, the snapshot's tag from ⌘S in the editor, tags on tiles, the timeline and the side pane, search by label, rename and remove; one restore rule (a "Before a restore" snapshot, no Darlings) and no confirmation; `maybeDailySnapshot` by `writingDay()`; Watch from Here; History's words taken from the snapshot view's; the delete wording; Duplicate without `recording/`. Tests as listed under Tags, plus: a History restore takes an `r` snapshot holding the replaced chapter before it changes anything, and changes nothing when it can't; Duplicate leaves `recording/` out; `npm run test:recording` covers ⌘S writing both a snapshot and its tag. `docs/manual-tests.md` gains the cases a hand has to check.
+
+**Part 2: Proof of when I wrote**
 
 - **Phase 5: seals and timestamps.** `proof.js`; the opt-in setting and its wording; the `safeStorage` device key; seals with the open session's head and the drand `after`; two RFC 3161 authorities (request, store, in-house DER/CMS check against bundled roots, failover); the yearly re-stamp; OpenTimestamps as the optional extra (port `ots.js`, plus the Bitcoin `after`). `scripts/verify-recording.js <book folder>`: chain, signatures, `replayCheck`, each timestamp, each `after`, and a list of time-cover gaps, for support and third parties.
 - **Phase 6: evidence report and exported replay page.**
 
-**If Hugh declines patch 2:** ship `proof.js` in a slimmed-down NEO Witness that only seals `recording/` (no launcher, no git history of its own). Otherwise NEO Witness is retired with no migration. Its existing records stay as they are and can still be checked with its own `verify`, or with `ots verify` on its `.ots` files.
+**If Hugh takes the history but not the proof:** take phases 5 and 6 out of the pull request and ship `proof.js` in a slimmed-down NEO Witness that only seals `recording/` (no launcher, no git history of its own). Otherwise NEO Witness is retired with no migration. Its existing records stay as they are and can still be checked with its own `verify`, or with `ots verify` on its `.ots` files.
 
 # Decisions
 
@@ -671,7 +700,7 @@ Settled with the writer on 2026-10-06:
 
 1. **Recording is on by default and local.** What wasn't recorded can never be claimed, and nothing leaves the computer unless the writer turns on proof or exports.
 2. **Proof of time is opt-in, and needs no Bitcoin.** Default timestamps come from two RFC 3161 authorities, with a drand round as the lower bound. OpenTimestamps (Bitcoin) is an optional extra for writers who want proof that trusts no company. We don't build a timestamp server of our own: anyone sceptical could say we backdated, and it would have to run for decades.
-3. **Everything happens in NEO, in two patches.** Patch 1 (Writing History) stands on its own benefits; patch 2 (proof) is separate and opt-in. NEO Witness is retired, or kept only as a sealer if patch 2 is declined.
+3. **Everything happens in NEO, in two patches** (amended 2026-10-12: one pull request, decision 15). Patch 1 (Writing History) stands on its own benefits; patch 2 (proof) is separate and opt-in. NEO Witness is retired, or kept only as a sealer if patch 2 is declined.
 4. **Recordings live in each book folder** (`book-…/recording/`). They're synced and go to the trash with the book. They are backed up as a mirror in `Backups/recordings/`, each closed session copied once, not in the daily zip (amended 2026-10-09: zipping an immutable history daily kept fourteen copies of it).
 5. **The history opens in a dialog, reached from four places** (see Where the history opens). The player is never a permanent panel.
 6. **The format stays JSON lines, built for density.** Ordinary typing is written as runs (characters plus the gap before each key, on one clock), the chapter and the physical key are written once and implied after, and runs are never split by pauses. Binary was measured and rejected: about 20% smaller after gzip, at the cost of a file nobody can read. Timings stay at millisecond resolution.
@@ -691,13 +720,23 @@ Settled with the writer on 2026-10-09:
 13. **Anchors by how much was written, not by time.** A full `b` once a chapter has had 200,000 characters inserted and deleted since its last one, or four times its length if that is more. The writing between damage and the next anchor is what damage can cost, and the edits since the last anchor are what a build replays, so the bound is in writing, the same for a fast writer as a slow one. The multiple only matters for chapters over 50 KB, such as a whole script, where a fixed figure would rewrite the chapter too often.
 14. **A change made all at once is recorded as a splice per run of paragraphs it changed.** A catch-up, Replace All, an Outline move or a structural undo comes to the recorder as two versions of a chapter, and one splice from the first difference to the last can be the whole chapter for a name changed on its first and last pages. Matching paragraphs as patience diff matches lines, then cutting each run that changed to the characters that changed, records the change itself: a move is a delete and an insert. It isn't a new format: several `e` lines under one `x` already mean that cause made them all. In 4a it made a novel's recording a quarter smaller, and its anchors went from 8.5% of it to 3%.
 
+Settled with the writer on 2026-10-12:
+
+15. **One pull request, with proof in it.** Proof is as much the case for the patch as the history and restore are: a replay shows how a book was written, timestamps show when, and a writer accused of using AI needs both. Proof stays opt-in and part 2 stays separable.
+16. **Snapshots stay as they are.** Plain HTML in the book folder is an open format the recording can't replace. History links to them and shares their words and their restore rule.
+17. **Tags in the recording.** Named moments, made now or after the fact, one line each; ⌘S's snapshots appear among them.
+18. **Every restore takes a "Before a restore" snapshot, and acts at once.** Snapshot restore's behaviour, shipped in 1.5, becomes History's too: the replaced text goes to a snapshot, not Darlings, and ⌘Z undoes it, with no confirmation first.
+
 # To ask Hugh
+
+- **Keep "Before a restore" snapshots.** NEO's own snapshots go after 30 days (`snapsToThin`), the `r` ones included, and a thinned snapshot hands its chapters to the next one, which holds them as they were later. With recording off, the text a restore replaced can then be gone from every snapshot a month on, which strains "words are never discarded". Keeping `r` like ⌘S's `k` is a one-letter change in `snapsToThin`. With recording on, the history keeps that text regardless.
+- **Proof in the same pull request.** It's opt-in and separable (see The shape); he can take the history without it.
 
 - **Daily zips on several computers.** Every desktop writes `Backups/neo-backup-<date>.zip` into the same synced folder and skips the day only if that file is already there (`dailyBackup`, `main.js`). Two computers started the same day before sync catches up both write the same name: a conflict copy, or one machine's zip silently replacing the other's. Once recordings are out of the zip (4g) the zips are small, so each device could have its own (`neo-backup-<date>-<device>.zip`). It changes behaviour NEO already has, so it's his call.
 - **Restore and sync aren't documented.** README.md says the zips are kept for two weeks and suggests iCloud; TUTORIAL.md says to sync with Dropbox or anything; `pocket/README.md` says Android shares the library over Syncthing and iOS over iCloud. Nothing says how to restore from a backup, or how to set up two computers on one library. 4g's `Backups/README.txt` covers restoring; a short section on two devices may belong in README.md.
 
-# Still to check before building patch 2
+# Still to check before building part 2
 
 - The terms of use and rate limits of each RFC 3161 authority for this use, and which two to default to.
 - drand `quicknet`'s API endpoints and how to check a round's BLS signature without adding a dependency (or accept trusting the API for `after`, and say so).
-- Whether Hugh is willing to add the third network feature at all, even opt-in.
+- Whether Hugh is willing to add the third network feature at all, even opt-in. If not, part 2 comes out of the pull request (see The shape).
