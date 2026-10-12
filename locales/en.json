@@ -73,5 +73,29 @@
   "Snapshot taken, {time}: {n} chapters changed. It’s on the Darlings tab.": {
     "one": "Snapshot taken, {time}: {n} chapter changed. It’s on the Darlings tab.",
     "other": "Snapshot taken, {time}: {n} chapters changed. It’s on the Darlings tab."
+  },
+  "{n} sessions": {
+    "one": "{n} session",
+    "other": "{n} sessions"
+  },
+  "In the book now: {n} times": {
+    "one": "In the book now: once",
+    "other": "In the book now: {n} times"
+  },
+  "{chapter} will read exactly as it does here: {n} words, where it has {now} now.": {
+    "one": "{chapter} will read exactly as it does here: {n} word, where it has {now} now.",
+    "other": "{chapter} will read exactly as it does here: {n} words, where it has {now} now."
+  },
+  "It comes back as a new chapter after {chapter}, reading exactly as it does here ({n} words).": {
+    "one": "It comes back as a new chapter after {chapter}, reading exactly as it does here ({n} word).",
+    "other": "It comes back as a new chapter after {chapter}, reading exactly as it does here ({n} words)."
+  },
+  "It comes back as a new chapter at the start of the book, reading exactly as it does here ({n} words).": {
+    "one": "It comes back as a new chapter at the start of the book, reading exactly as it does here ({n} word).",
+    "other": "It comes back as a new chapter at the start of the book, reading exactly as it does here ({n} words)."
+  },
+  "They will read exactly as they do here: {n} words, where they have {now} now.": {
+    "one": "They will read exactly as they do here: {n} word, where they have {now} now.",
+    "other": "They will read exactly as they do here: {n} words, where they have {now} now."
   }
 }

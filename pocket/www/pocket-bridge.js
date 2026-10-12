@@ -128,6 +128,18 @@
     } catch { /* never let the reporter itself hiccup */ }
   }
 
+  const POCKET_VERSION = 'Pocket 0.1.0';
+
+  // neo-errors.log in the library, as on the desktop
+  async function appendLog(msg) {
+    try {
+      let prior = '';
+      try { prior = await readText(p('neo-errors.log')); } catch { /* first entry */ }
+      const line = `[${new Date().toISOString()}] [pocket] ${msg}\n`;
+      await writeText(p('neo-errors.log'), (prior + line).slice(-100000));
+    } catch { console.error(msg); }
+  }
+
   // JSON reads fall back on the copies a write leaves, as on the desktop:
   // the .tmp a write was making when it stopped, then .bak, the last
   // version that read whole. What they recover is put back as the file.
@@ -490,14 +502,9 @@
       return true;
     },
     setSpellLanguage: async (code) => spellEnsure(code),
-    appVersion: async () => 'Pocket 0.1.0',
+    appVersion: async () => POCKET_VERSION,
     logError: async (msg) => {
-      try {
-        let prior = '';
-        try { prior = await readText(p('neo-errors.log')); } catch { /* first entry */ }
-        const line = `[${new Date().toISOString()}] [pocket] ${msg}\n`;
-        await writeText(p('neo-errors.log'), (prior + line).slice(-100000));
-      } catch { console.error(msg); }
+      await appendLog(msg);
       showErrorDetail(msg);
     },
     // no menu bar in your pocket: the ⋯ sheet (index.html) sends the same
@@ -508,6 +515,267 @@
     typewriterState: (on) => { window.pocketState.typewriter = !!on; }
   };
   window.pocketState = { poetry: false, flush: false, typewriter: false };
+
+  /* ---------- Writing History ---------- */
+  // Recorded and played by the desktop's own code: recording-files.js writes
+  // and reads the recording, history-worker.js builds the cache of days and
+  // searches it (in a web worker, pocket-history.js, that asks the page for
+  // each file). Both reach the files through recIO: the library here, and
+  // '@data/…' for the app's own folder, which keeps what desktop NEO keeps
+  // in userData (this device's id, the cache). Gzip is the web view's
+  // CompressionStream; one without it (iOS before 16.4) records nothing, and
+  // History isn't offered. Pocket makes no backups, so it mirrors nothing:
+  // a desktop sweeps its sessions into the mirror (docs/neo-recording-plan.md).
+  const Files = window.NeoRecordingFiles;
+  const canGzip = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+  const DATA = '@data/';
+  const recWhere = (rel) => (rel.startsWith(DATA) ? { path: rel.slice(DATA.length), directory: 'DATA' } : at(rel));
+  // a file or folder that isn't there says so the way Node does
+  const missing = (err) => {
+    if (/(does ?n[o’']t|not) exist|not found|no such/i.test(String(err && err.message || err))) err.code = 'ENOENT';
+    return err;
+  };
+  const fromB64 = (b64) => {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const toB64 = (bytes) => {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+  const gzip = async (text) => new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  const gunzip = async (data) => new Response(new Blob([typeof data === 'string' ? fromB64(data) : data]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+
+  const recIO = {
+    join: (...parts) => parts.filter((x) => x !== '').join('/'),
+    async list(dir) {
+      await ready;
+      try {
+        const ls = await FS().readdir(recWhere(dir));
+        return (ls.files || []).map((f) => (f && f.name) || String(f)).filter((n) => !n.endsWith('.icloud'));
+      } catch (err) { throw missing(err); }
+    },
+    async read(file) {
+      await ready;
+      try { return (await FS().readFile({ ...recWhere(file), encoding: 'utf8' })).data; } catch (err) { throw missing(err); }
+    },
+    async readGz(file) {
+      await ready;
+      let r;
+      try { r = await FS().readFile(recWhere(file)); } catch (err) { throw missing(err); }
+      return gunzip(r.data);
+    },
+    async write(file, text) {
+      await ready;
+      await FS().writeFile({ ...recWhere(file), data: text, encoding: 'utf8', recursive: true });
+    },
+    async writeGz(file, text) {
+      await ready;
+      await FS().writeFile({ ...recWhere(file), data: toB64(await gzip(text)), recursive: true });
+    },
+    async remove(path) {
+      await ready;
+      let st;
+      try { st = await FS().stat(recWhere(path)); } catch { return; } // not there
+      if (st.type === 'directory') await FS().rmdir({ ...recWhere(path), recursive: true });
+      else await FS().deleteFile(recWhere(path));
+    },
+    async exists(path) {
+      await ready;
+      try { await FS().stat(recWhere(path)); return true; } catch { return false; }
+    },
+    log: (source, err) => { appendLog(source + ': ' + (err && err.stack || err)); }
+  };
+
+  // This device's id, made once and kept in the app's own folder: it names
+  // the one folder in each book's recording/ that this device writes
+  let recDeviceId = null;
+  async function recDevice() {
+    if (recDeviceId) return recDeviceId;
+    try {
+      const d = JSON.parse(await recIO.read(DATA + 'recording-device.json'));
+      if (Files.DEVICE.test(d.id)) return (recDeviceId = d.id);
+    } catch { /* made below */ }
+    const id = 'd-' + [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    await recIO.write(DATA + 'recording-device.json', JSON.stringify({ id }));
+    return (recDeviceId = id);
+  }
+  // what the Writing History calls this device
+  function deviceName() {
+    if (isIOS()) return /iPhone/.test(navigator.userAgent) ? 'iPhone' : 'iPad';
+    return 'Android';
+  }
+  // README.txt in a book's recording/ folder: main.js's words (and its translations)
+  const recReadme = () => [
+    'This is NEO’s Writing History for this book: how it was written, keystroke by keystroke, like a painter’s timelapse. NEO uses it to replay the writing and to bring back any earlier version of a chapter.',
+    'Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.',
+    'Deleting this folder deletes the history. The book itself is untouched.'
+  ].map((s) => (typeof NeoI18n !== 'undefined' ? NeoI18n.t(s) : s)).join('\n\n') + '\n';
+
+  const recBook = (bookId) => {
+    if (!/^[^/\\\0]+$/.test(String(bookId)) || bookId === '.' || bookId === '..') throw new Error('Invalid book');
+    return p(bookId, 'recording');
+  };
+  // the book's backup mirror, which only a desktop writes: a closed session
+  // the book has lost, or holds broken, is read from there
+  const recMirror = (bookId) => { recBook(bookId); return p('Backups', 'recordings', bookId); };
+  const recSession = (session) => {
+    if (!Files.SESSION.test(String(session))) throw new Error('Invalid recording session');
+    return session;
+  };
+
+  // The history worker, and what it asks of the page. A web view that can't
+  // run it builds on the page instead (history-worker.js loaded here). It
+  // lives while the Writing History is open: once the dialog closes and the
+  // worker has nothing left to do (a build finishes first, so its cache is
+  // whole), it goes, and the days it read with it.
+  let historyRun = null;
+  let historyRetire = null;
+  let historyPage = null; // history-worker.js on the page, once loaded
+  const historyNews = new Set();
+  function historyEngine() {
+    if (historyRun) return historyRun;
+    const news = (m) => { for (const f of historyNews) f(m); };
+    let onPage = historyPage;
+    const pageRun = (msg) => {
+      if (!onPage) {
+        onPage = new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'history-worker.js';
+          s.onload = () => resolve(window.NeoHistory);
+          s.onerror = () => reject(new Error('history-worker.js did not load'));
+          document.head.appendChild(s);
+        });
+        historyPage = onPage;
+      }
+      return onPage.then((H) => H.handle(msg, news, recIO));
+    };
+    // on the page: what it holds is let go, and the next opening starts over
+    const pageRetire = () => {
+      historyRun = null;
+      historyRetire = null;
+      if (onPage) onPage.then((H) => H.handle({ type: 'forget' }, news, recIO)).catch(() => {});
+    };
+    let worker = null;
+    try { worker = new Worker('pocket-history.js'); } catch { worker = null; }
+    if (!worker) {
+      historyRetire = pageRetire;
+      return (historyRun = pageRun);
+    }
+    const waiting = new Map();
+    let seq = 0;
+    let broken = false;
+    let building = false;
+    let retiring = false;
+    const settle = () => {
+      if (!retiring || building || waiting.size) return;
+      try { worker.terminate(); } catch { /* gone */ }
+      historyRun = null;
+      historyRetire = null;
+    };
+    historyRetire = () => {
+      if (broken) { pageRetire(); return; }
+      retiring = true;
+      settle();
+    };
+    worker.onmessage = async (e) => {
+      const m = e.data || {};
+      if (m.io) { // a file it wants
+        try {
+          worker.postMessage({ ioId: m.ioId, ok: true, result: await recIO[m.io](...m.args) });
+        } catch (err) {
+          worker.postMessage({ ioId: m.ioId, ok: false, error: String(err && err.message || err), code: err && err.code });
+        }
+        return;
+      }
+      if (m.log) { recIO.log(m.log, m.error); return; }
+      if (m.id) {
+        const w = waiting.get(m.id);
+        if (!w) return;
+        waiting.delete(m.id);
+        if (m.ok) w.resolve(m.result); else w.reject(new Error(m.error));
+        settle();
+        return;
+      }
+      if (m.type === 'built') building = false;
+      news(m);
+      settle();
+    };
+    worker.onerror = (e) => {
+      if (e && e.preventDefault) e.preventDefault();
+      broken = true;
+      try { worker.terminate(); } catch { /* gone */ }
+      for (const w of waiting.values()) pageRun(w.msg).then(w.resolve, w.reject);
+      waiting.clear();
+    };
+    return (historyRun = (msg) => broken ? pageRun(msg) : new Promise((resolve, reject) => {
+      retiring = false; // opened again before it went
+      if (msg.type === 'days') building = true;
+      const id = ++seq;
+      waiting.set(id, { msg, resolve, reject });
+      worker.postMessage({ ...msg, id });
+    }));
+  }
+  const historyTarget = (bookId) => ({ key: bookId, root: recBook(bookId), mirror: recMirror(bookId), cache: DATA + 'recording-cache/' + bookId });
+
+  if (Files && canGzip) {
+    Object.assign(window.neo, {
+      // a book opens: the sessions this device left open are closed, and the
+      // window learns where its last recording left each chapter
+      recStart: async (bookId) => {
+        const device = await recDevice();
+        const r = await Files.start(recIO, p(recBook(bookId), device), device, DATA + 'recording-cache/' + bookId + '/known.json', p(recMirror(bookId), device));
+        return { device, app: POCKET_VERSION, ...r };
+      },
+      recChunk: async (bookId, session, first, text) => {
+        const dir = await Files.prepare(recIO, recBook(bookId), await recDevice(), recReadme(),
+          { name: deviceName(), created: new Date().toISOString(), app: POCKET_VERSION });
+        await Files.chunk(recIO, dir, recSession(session), first, text);
+        return true;
+      },
+      recRollup: async (bookId, session) => {
+        const folder = p(recBook(bookId), await recDevice(), recSession(session));
+        return (await recIO.exists(folder)) ? Files.rollup(recIO, folder) : 0;
+      },
+      recClose: async (bookId, session) => {
+        const dir = p(recBook(bookId), await recDevice());
+        if (await recIO.exists(p(dir, recSession(session)))) await Files.closeSession(recIO, dir, session, false);
+        return true;
+      },
+      // every device's sessions; on iCloud, the other devices' fetched first
+      recList: async (bookId) => {
+        await fetchCloud(recBook(bookId), 15000);
+        return Files.list(recIO, recBook(bookId), await recDevice(), recMirror(bookId));
+      },
+      recRead: async (bookId, device, session) => {
+        if (!Files.DEVICE.test(String(device))) throw new Error('Invalid recording device');
+        return Files.read(recIO, p(recBook(bookId), device), recSession(session), p(recMirror(bookId), device));
+      },
+      recDays: (bookId) => historyEngine()({ type: 'days', ...historyTarget(bookId) }),
+      recDayStart: (bookId, day) => {
+        if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+        return historyEngine()({ type: 'dayStart', day, ...historyTarget(bookId) });
+      },
+      recSearch: (bookId, phrase, sid) => {
+        const p = phrase && typeof phrase === 'object' ? phrase : { text: phrase };
+        const q = { text: String(p.text || '').slice(0, 200), word: p.word !== false, cs: !!p.cs };
+        if (!q.text.trim()) throw new Error('Nothing to search for');
+        return historyEngine()({ type: 'search', phrase: q, sid: Number(sid) || 0, ...historyTarget(bookId) });
+      },
+      recSearchStop: (bookId) => historyEngine()({ type: 'searchStop', ...historyTarget(bookId) }),
+      recTrack: (bookId, day, part, from) => {
+        if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+        const q = { ch: String(part && part.ch), a: Number(part && part.a) || 0, b: Number(part && part.b) || 0 };
+        return historyEngine()({ type: 'track', day, part: q, from: String(from), ...historyTarget(bookId) });
+      },
+      onRecProgress: (cb) => { historyNews.add(cb); },
+      // the dialog closed: the worker goes once it's idle
+      recHistoryClosed: () => { if (historyRetire) historyRetire(); }
+    });
+  }
 
   // Interface language: the same locales/ files as the desktop, picked by
   // the device's language (regional file over its base, English beneath).
@@ -767,6 +1035,11 @@
       if (nav && nav.classList.contains('open')) { nav.classList.remove('open'); return true; }
       const side = document.getElementById('side-pane');
       if (side && side.classList.contains('open')) { side.classList.remove('open'); return true; }
+      // the Writing History: from the player back to the days, then closed
+      if (typeof historyShown === 'function' && historyShown) {
+        historyShown.back();
+        return true;
+      }
       const modal = document.querySelector('.modal-backdrop:not([hidden])');
       if (modal) { modal.hidden = true; return true; }
       const editor = document.getElementById('editor-view');

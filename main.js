@@ -807,6 +807,11 @@ ipcMain.handle('book:delete', async (_e, bookId, title) => {
     const { shell } = require('electron');
     try {
       await shell.trashItem(bookDir(bookId));
+      // its recording's backup goes with it, so both come back from the trash
+      // together. If this one won't go, it stays where it is: nothing is lost.
+      if (fs.existsSync(recMirror(bookId))) {
+        try { await shell.trashItem(recMirror(bookId)); } catch (err) { logError('trash', err); }
+      }
       return true;
     } catch (err) {
       // Some filesystems have no Trash (network mounts, odd drives).
@@ -821,6 +826,201 @@ ipcMain.handle('book:delete', async (_e, bookId, title) => {
     }
   }
   return false;
+});
+
+// ---------------------------------------------------------------------------
+// Writing History: the recording (docs/neo-recording-plan.md). Each device
+// writes only its own folder in the book, recording/<device>/; what it writes
+// and how it is read back is recording-files.js, which Pocket runs too. What
+// the recording is made of: recording.js.
+// ---------------------------------------------------------------------------
+const zlib = require('zlib');
+const RecFiles = require('./recording-files.js');
+
+const recIO = RecFiles.nodeIO({ fs, path, zlib, write: writeFileDurable, log: (source, err) => logError(source, err) });
+
+// this computer's id, made once; it names the folder only this computer writes
+function recDevice() {
+  const s = readSettings();
+  if (typeof s.recordingDevice === 'string' && RecFiles.DEVICE.test(s.recordingDevice)) return s.recordingDevice;
+  const id = 'd-' + require('crypto').randomBytes(8).toString('hex');
+  writeSettings({ ...s, recordingDevice: id });
+  return id;
+}
+const recRoot = (bookId) => path.join(bookDir(bookId), 'recording');
+const recDir = (bookId, device = recDevice()) => path.join(recRoot(bookId), libName(device));
+function recSession(name) {
+  if (!RecFiles.SESSION.test(libName(name))) throw new Error('Invalid recording session');
+  return name;
+}
+const recKnownFile = (bookId) => path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'known.json');
+// The book's backup mirror: its recording/ again, closed sessions only, kept
+// out of the daily zip (dailyBackup)
+const recMirrorRoot = () => path.join(LIBRARY_DIR, 'Backups', 'recordings');
+const recMirror = (bookId) => path.join(recMirrorRoot(), libName(bookId));
+
+// This device's closed sessions of a book into the mirror, as soon as they
+// close. A copy that fails is tried again at the next, or by dailyBackup.
+async function recMirrorMine(bookId) {
+  const device = recDevice();
+  try {
+    await RecFiles.mirrorDevice(recIO, recDir(bookId, device), path.join(recMirror(bookId), device));
+  } catch (err) { logError('recording backup', err); }
+}
+
+// What README.txt in a book's recording/ folder says
+const recReadme = () => [
+  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke, like a painter’s timelapse. NEO uses it to replay the writing and to bring back any earlier version of a chapter.'),
+  t('Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.'),
+  t('Deleting this folder deletes the history. The book itself is untouched.')
+].join('\n\n') + '\n';
+
+// A book opens: sessions this device left open are closed, and the window
+// learns where the last recording left each chapter.
+ipcMain.handle('rec:start', async (_e, bookId) => {
+  const device = recDevice();
+  const r = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
+  await recMirrorMine(bookId);
+  return { device, app: app.getVersion(), ...r };
+});
+
+ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
+  const device = recDevice();
+  const dir = await RecFiles.prepare(recIO, recRoot(bookId), libName(device), recReadme(),
+    { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
+  await RecFiles.chunk(recIO, dir, recSession(session), first, text);
+  return true;
+});
+
+ipcMain.handle('rec:rollup', async (_e, bookId, session) => {
+  const folder = path.join(recDir(bookId), recSession(session));
+  return fs.existsSync(folder) ? RecFiles.rollup(recIO, folder) : 0;
+});
+
+ipcMain.handle('rec:close', async (_e, bookId, session) => {
+  const dir = recDir(bookId);
+  if (fs.existsSync(path.join(dir, recSession(session)))) await RecFiles.closeSession(recIO, dir, session, false);
+  await recMirrorMine(bookId);
+  return true;
+});
+
+// Every device's sessions for a book, the mirror's too: [{ device, name, mine, sessions: [{ id, open }] }]
+ipcMain.handle('rec:list', (_e, bookId) => RecFiles.list(recIO, recRoot(bookId), recDevice(), recMirror(bookId)));
+
+// One session's text, closed or still open, from any device (a closed one
+// the book has lost or holds broken, from the mirror)
+ipcMain.handle('rec:read', (_e, bookId, device, session) => RecFiles.read(recIO, path.join(recRoot(bookId), libName(device)), recSession(session), path.join(recMirror(bookId), libName(device))));
+
+// The Writing History cache: each day's end state and stats, built from the
+// recording by history-worker.js in its own process, oldest day first, so
+// the window never waits on a year of writing. Derived from the recording,
+// so it lives in userData (recording-cache/<book>/), never the library.
+// The worker's progress goes to the window as rec:progress.
+let historyChild = null;
+let historySeq = 0;
+const historyWaiting = new Map();
+const historyCleaned = new Set();
+
+function historyRequest(msg) {
+  if (!historyChild) {
+    historyChild = utilityProcess.fork(path.join(__dirname, 'history-worker.js'), [], { serviceName: 'NEO Writing History' });
+    historyChild.on('message', (m) => {
+      if (m.id) {
+        const w = historyWaiting.get(m.id);
+        if (!w) return;
+        historyWaiting.delete(m.id);
+        if (m.ok) w.resolve(m.result); else w.reject(new Error(m.error));
+        return;
+      }
+      if (m.type === 'built' && m.error) logError('history', m.error);
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('rec:progress', m);
+    });
+    historyChild.on('exit', () => {
+      historyChild = null;
+      for (const w of historyWaiting.values()) w.reject(new Error('the history process exited'));
+      historyWaiting.clear();
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const id = ++historySeq;
+    historyWaiting.set(id, { resolve, reject });
+    historyChild.postMessage({ ...msg, id });
+  });
+}
+
+// What the worker needs to know about a book's recording: every device's.
+// Caches an earlier NEO made of it go: the keyframes the player kept before
+// days (PLAYER 1), and the days of one device at a time (before 4d).
+function historyTarget(bookId) {
+  const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
+  if (!historyCleaned.has(cache)) {
+    historyCleaned.add(cache);
+    try {
+      for (const n of fs.readdirSync(cache)) if (/^(kf-.*|days?-d-[0-9a-f]{16}.*)\.json\.gz$/.test(n)) fs.rmSync(path.join(cache, n), { force: true });
+    } catch { /* nothing cached yet */ }
+  }
+  return { key: libName(bookId), root: recRoot(bookId), mirror: recMirror(bookId), cache };
+}
+
+// the days built so far (the rest follow as rec:progress)
+ipcMain.handle('rec:days', (_e, bookId) => historyRequest({ type: 'days', ...historyTarget(bookId) }));
+// the page and each device's chapters as they were when a day began
+ipcMain.handle('rec:dayStart', (_e, bookId, day) => {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+  return historyRequest({ type: 'dayStart', day, ...historyTarget(bookId) });
+});
+
+// Search: the first pass over the day states is the answer; the worker then
+// looks inside days and posts what it finds as rec:progress. The phrase is
+// { text, word, cs } (Rec.phraseQuery), or a string
+ipcMain.handle('rec:search', (_e, bookId, phrase, sid) => {
+  const p = phrase && typeof phrase === 'object' ? phrase : { text: phrase };
+  const q = { text: String(p.text || '').slice(0, 200), word: p.word !== false, cs: !!p.cs };
+  if (!q.text.trim()) throw new Error('Nothing to search for');
+  return historyRequest({ type: 'search', phrase: q, sid: Number(sid) || 0, ...historyTarget(bookId) });
+});
+ipcMain.handle('rec:searchStop', (_e, bookId) => historyRequest({ type: 'searchStop', ...historyTarget(bookId) }));
+// Restore: paragraphs picked at the end of `day`, carried on to the last day built
+ipcMain.handle('rec:track', (_e, bookId, day, part, from) => {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+  const p = { ch: String(part && part.ch), a: Number(part && part.a) || 0, b: Number(part && part.b) || 0 };
+  return historyRequest({ type: 'track', day, part: p, from: String(from), ...historyTarget(bookId) });
+});
+
+// Deleting a book's Writing History, once the window has asked the writer
+// (who types a phrase to say yes): the book's recording/ and its backup
+// mirror go to the system trash (never deleted outright), and the cache
+// made from them goes. If the trash won't take one, it stays where it is,
+// shown, and nothing is lost.
+ipcMain.handle('rec:delete', async (_e, bookId) => {
+  const { shell } = require('electron');
+  const win = BrowserWindow.getFocusedWindow();
+  for (const dir of [recRoot(bookId), recMirror(bookId)]) {
+    if (!fs.existsSync(dir)) continue;
+    try { await shell.trashItem(dir); } catch (err) {
+      logError('trash', err);
+      shell.showItemInFolder(dir);
+      dialog.showMessageBox(win, {
+        message: t('NEO couldn’t move that folder to the Trash.'),
+        detail: t('The history is untouched. Its folder is highlighted so you can deal with it yourself.')
+      });
+      return false;
+    }
+  }
+  const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
+  if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
+  historyCleaned.delete(cache);
+  fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
+  return true;
+});
+
+// File → Writing History… is for the open book: the window says when one is
+let recState = { book: false };
+ipcMain.on('rec:state', (_e, st) => {
+  const next = { book: !!(st && st.book) };
+  if (next.book === recState.book && !(st && st.menu)) return;
+  recState = next;
+  try { buildMenu(); } catch (err) { logError('menu', err); }
 });
 
 // ---------------------------------------------------------------------------
@@ -1881,13 +2081,49 @@ process.on('uncaughtException', (err) => logError('main', err));
 process.on('unhandledRejection', (err) => logError('main-promise', err));
 ipcMain.handle('log:error', (_e, msg) => logError('renderer', msg));
 
+// What Backups/README.txt says: how to get things back
+const backupReadme = () => [
+  t('These are NEO’s backups of your library.'),
+  t('Each neo-backup-<date>.zip is the whole library as it was that day, and the last 14 days are kept. To get a book or a chapter back, open a zip and copy the book’s folder, or the chapter’s file from its chapters folder, into your library. Close NEO first.'),
+  t('Writing History is kept apart, in the recordings folder, because a finished session never changes: each one is copied there once, when it ends, and kept. To get a book’s history back, copy recordings/<book folder>/ into that book’s recording folder. Names never clash, and a file in both places is the same file.'),
+  t('Restoring a chapter from a zip leaves its history alone: the history already holds every earlier version, and shows the text going back.')
+].join('\n\n') + '\n';
+
+// Writing History's backup: each book's closed sessions copied once into
+// Backups/recordings/<book folder>/, this device's every one, another
+// device's once it closed more than 7 days ago and is still missing
+// (RecFiles.sweep). Copies only what the mirror lacks, so a second run copies
+// nothing. Returns how many it copied.
+async function backupRecordings() {
+  let n = 0;
+  const mirror = recMirrorRoot();
+  let names = [];
+  try { names = fs.readdirSync(LIBRARY_DIR); } catch { return n; }
+  let device = null;
+  for (const name of names) {
+    if (name === 'Backups' || name === 'Exports') continue;
+    const root = path.join(LIBRARY_DIR, name, 'recording');
+    try { if (!fs.statSync(root).isDirectory()) continue; } catch { continue; }
+    device = device || recDevice();
+    try { n += await RecFiles.sweep(recIO, root, path.join(mirror, name), device); } catch (err) { logError('recording backup', err); }
+  }
+  return n;
+}
+
 // One zip of the whole library per day, keeping the last 14. Cheap insurance.
+// Books' recordings aren't in it: a finished session never changes, so they
+// are mirrored once instead (backupRecordings).
 async function dailyBackup() {
   if (backupRunning) return; // one at a time (the hourly look can meet a slow one)
   try {
     ensureLibrary();
     const backupsDir = path.join(LIBRARY_DIR, 'Backups');
     if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    const readme = path.join(backupsDir, 'README.txt');
+    let was = null;
+    try { was = fs.readFileSync(readme, 'utf8'); } catch { /* not yet */ }
+    if (was !== backupReadme()) writeFileDurable(readme, backupReadme());
+    await backupRecordings();
     const today = new Date().toISOString().slice(0, 10);
     const target = path.join(backupsDir, `neo-backup-${today}.zip`);
     if (fs.existsSync(target)) return;
@@ -1916,6 +2152,7 @@ async function dailyBackup() {
         const relPath = rel ? rel + '/' + name : name;
         try {
           const stat = fs.statSync(full);
+          if (stat.isDirectory() && name === 'recording' && rel && !rel.includes('/')) continue; // a book's Writing History: mirrored instead
           if (stat.isDirectory()) walk(full, relPath);
           else zip.file(relPath, fs.readFileSync(full));
         } catch (err) {
@@ -1924,6 +2161,7 @@ async function dailyBackup() {
       }
     };
     walk(LIBRARY_DIR, '');
+    zip.file('_recordings.txt', t('Writing History isn’t in this zip. Each book’s recording is in Backups/recordings/, beside the zips, and Backups/README.txt says how to put it back.') + '\n');
     if (missed.length) {
       zip.file('_left-out-of-this-backup.txt', missed.join('\n') + '\n');
       logError('backup', new Error('left out of today\'s backup: ' + missed.join(', ')));
@@ -2367,6 +2605,17 @@ function buildMenu() {
           label: t('Goals…'),
           accelerator: 'CmdOrCtrl+,',
           click: () => sendToWindow({ type: 'stats' })
+        },
+        {
+          label: t('Writing History…'),
+          enabled: recState.book,
+          click: () => sendToWindow({ type: 'history' })
+        },
+        {
+          label: t('Keep a Replay of My Writing'),
+          type: 'checkbox',
+          checked: readJSON(LIBRARY_FILE, {}).recordWriting !== false,
+          click: (item) => sendToWindow({ type: 'recordWriting', checked: item.checked })
         },
         {
           label: t('New Books Open To'),

@@ -406,6 +406,52 @@ function askInput(title, placeholder, value = '') {
   });
 }
 
+// A yes or no that says, point by point, what will happen. With `phrase`,
+// the writer types it before the button works: for what can't be taken
+// back from inside NEO. True on yes.
+function confirmModal({ title, points = [], ok, danger = false, phrase = '' }) {
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop confirm-modal';
+    const typeIt = phrase
+      ? escHtml(t('To confirm, type {phrase} below.', { phrase: '\u0000' })).replace('\u0000', '<strong></strong>')
+      : '';
+    bd.innerHTML = `
+      <div class="modal" role="alertdialog" aria-modal="true" style="width:460px">
+        <h2 style="font-size:16px"></h2>
+        <ul class="cm-points">${points.map(() => '<li></li>').join('')}</ul>
+        ${phrase ? `<p class="cm-type">${typeIt}</p><input type="text" spellcheck="false" autocomplete="off">` : ''}
+        <div style="text-align:right;margin-top:16px">
+          <button class="m-cancel btn-quiet" style="margin-right:10px">${t('Cancel')}</button>
+          <button class="m-ok ${danger ? 'btn-danger' : 'btn-gold'}"></button>
+        </div>
+      </div>`;
+    bd.querySelector('h2').textContent = title;
+    bd.querySelector('.modal').setAttribute('aria-label', title);
+    bd.querySelectorAll('.cm-points li').forEach((li, i) => { li.textContent = points[i]; });
+    if (phrase) bd.querySelector('.cm-type strong').textContent = phrase;
+    const okBtn = bd.querySelector('.m-ok');
+    okBtn.textContent = ok;
+    const input = bd.querySelector('input');
+    const typed = () => !input || input.value.trim().toLocaleLowerCase() === phrase.toLocaleLowerCase();
+    if (input) {
+      okBtn.disabled = true;
+      input.setAttribute('aria-label', t('To confirm, type {phrase} below.', { phrase }));
+      input.addEventListener('input', () => { okBtn.disabled = !typed(); });
+    }
+    document.body.appendChild(bd);
+    const done = (val) => { bd.remove(); resolve(val); };
+    okBtn.onclick = () => { if (typed()) done(true); };
+    bd.querySelector('.m-cancel').onclick = () => done(false);
+    bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(false); });
+    bd.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); done(false); } else if (e.key === 'Enter' && typed() && e.target.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
+    });
+    (input || bd.querySelector('.m-cancel')).focus();
+  });
+}
+
 // A list of choices, null on cancel.
 function optionModal(title, message, options) {
   return new Promise((resolve) => {
@@ -432,6 +478,8 @@ function optionModal(title, message, options) {
     });
     bd.querySelector('.m-cancel').onclick = () => done(null);
     bd.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } });
+    // (the keys come here, not to whatever was behind it)
+    bd.querySelector('.m-cancel').focus();
   });
 }
 
@@ -1963,6 +2011,7 @@ function bookTile(meta, opts = {}) {
       if (coverItems.length) options.push({ label: t('Cover'), desc: t('A new cover, your own art, or a saved image.'), value: 'coverMenu' });
       options.push(
         { label: t('Set word goal…'), desc: t('Adds the subtle progress bar to the cover.'), value: 'goal' },
+        ...(historyCanOpen() ? [{ label: t('Writing history…'), desc: t('Watch this book being written, keystroke by keystroke, like a painter’s timelapse.'), value: 'history' }] : []),
         { label: t('Remove from bookshelf'), desc: t('Takes it off your shelves. The files stay safe in your NEO Library folder on disk.'), value: 'remove' },
         { label: trashLabel, desc: window.Capacitor ? t('Moves the book folder to Deleted Books in your NEO Library, where you can recover it.') : t('Sends the book folder to your system trash, where you can recover it.'), danger: true, value: 'trash' }
       );
@@ -1975,6 +2024,7 @@ function bookTile(meta, opts = {}) {
       items.push({ label: t('Export…'), value: 'export' });
       if (canCopy) items.push({ label: t('Duplicate'), value: 'duplicate' });
       items.push({ label: t('Set word goal…'), value: 'goal' });
+      if (historyCanOpen()) items.push({ label: t('Writing history…'), value: 'history' });
       if (coverItems.length) items.push({ label: t('Cover') + '  ›', value: 'coverMenu' });
       items.push('-', { label: t('Remove from bookshelf'), value: 'remove' }, { label: trashLabel, value: 'trash', danger: true });
       const x = e.clientX;
@@ -1988,6 +2038,8 @@ function bookTile(meta, opts = {}) {
       await duplicateBook(meta);
     } else if (choice === 'refresh') {
       await refreshCover(meta, el);
+    } else if (choice === 'history') {
+      await openHistory({ bookId: meta.id });
     } else if (choice === 'export' && script) {
       const fmt = await optionModal(t('Export “{title}”', { title: escHtml(shownTitle(meta.title)) }), null, [
         { label: 'PDF (.pdf)', value: 'pdf' },
@@ -2476,6 +2528,2965 @@ $('#author-chip').onclick = async () => {
 };
 
 /* ================================================================== */
+/*  RECORDING                                                          */
+/*  Writing History (docs/neo-recording-plan.md). Every change to a   */
+/*  chapter's HTML comes through setChapterHTML with its cause, and   */
+/*  the recorder keeps it, with the keys, caret, clipboard and focus  */
+/*  around it, as lines in recording.js's format. The lines go to     */
+/*  disk as a chunk in flushAllSaves (every 20 s, and on blur, hide   */
+/*  and close). A crash can leave a chapter up to 20 s ahead of the   */
+/*  recording; the next session's `b` line catches it up, so the      */
+/*  words are kept, only those seconds' keys are not. persistChapter  */
+/*  reconciles first: a change the recorder didn't see is logged as   */
+/*  `unobserved`. Off when library.recordWriting is false, and where  */
+/*  window.neo has no recStart (Pocket in a web view without gzip).   */
+/*  In the console:                                                    */
+/*    rec.check()        replays this session against the page        */
+/*    rec.verbose = true logs each line as it is recorded             */
+/*    rec.strict = true  also notices the page drifting between events */
+/* ================================================================== */
+
+const Rec = window.NeoRecording;
+const REC_IDLE = 60000;         // no keys or edits this long: an `idle` line
+const REC_WALL = 5 * 60000;     // a wall-clock line this often
+const REC_ROLLUP = 10 * 60000;  // chunks joined into one file this often
+
+const recordingWanted = () => !!(Rec && window.neo.recStart && library && library.recordWriting !== false);
+
+function recSessionId() {
+  return new Date().toISOString().replace(/\.\d+Z$/, 'Z').replace(/:/g, '-') + '-' +
+    Math.random().toString(36).slice(2, 6).padEnd(4, '0');
+}
+
+// A place in a chapter as an `s` line holds it: the paragraph's index among
+// the body's Rec.CARET_BLOCKs, and the letters before it within that
+// paragraph. Changing what's counted is a new recording format.
+function recPoint(body, node, offset) {
+  const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  const p = el && el.closest ? el.closest(Rec.CARET_BLOCK) : null;
+  if (!p || !body.contains(p)) return [0, 0];
+  const r = document.createRange();
+  r.selectNodeContents(p);
+  r.setEnd(node, offset);
+  return [[...body.querySelectorAll(Rec.CARET_BLOCK)].indexOf(p), r.toString().length];
+}
+const recBodyOf = (n) => {
+  const el = n && (n.nodeType === Node.TEXT_NODE ? n.parentElement : n);
+  return el && el.closest ? el.closest('.chapter-body') : null;
+};
+// [chapter, anchor pIdx, off, focus pIdx, off], or null outside the chapters
+function recSelection() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  const body = recBodyOf(sel.focusNode);
+  if (!body) return null;
+  const f = recPoint(body, sel.focusNode, sel.focusOffset);
+  const a = recBodyOf(sel.anchorNode) === body ? recPoint(body, sel.anchorNode, sel.anchorOffset) : f;
+  return [body.closest('.chapter').dataset.id, ...a, ...f];
+}
+
+const rec = {
+  on: false,
+  bookId: null,
+  device: null,
+  appVersion: '',
+  prev: null,        // the last hash of this device's previous session for the book
+  w: null,           // the session's Rec.SessionWriter
+  session: null,     // { id, day }
+  model: {},         // chapterId -> HTML as the recorder last saw it (and each stream's text)
+  wrote: {},         // stream -> its text at its last `w`
+  known: {},         // chapterId -> HTML where this device's recordings left it
+  startKnown: {},    // known, as this session began
+  edited: {},        // chapterId -> characters inserted and deleted since its last full `b` (anchors)
+  inSession: new Set(), // chapters with a `b` line this session
+  cur: null,         // the chapter the lines apply to
+  clock: 0,          // performance.now() of the last event, rounded
+  lastKind: '',
+  key: null,         // the key that is down: { code }
+  lastKeyAt: -1e9,
+  lastPointerAt: -1e9,
+  pointerDown: false,
+  sel: '',           // the last caret or selection seen
+  copied: [],        // hashes of what was copied or cut in NEO lately
+  copiedFrom: new Map(), // hash -> the moment of Writing History it was copied from: [session, line, device]
+  orderSig: '',
+  live: false,       // the session holds a change: worth keeping
+  chunks: 0,         // sent since the last rollup
+  retry: [],
+  counts: { keys: 0, edits: 0, bases: 0, drops: 0, writes: 0, unobserved: 0, drift: 0 },
+  idleTimer: 0,
+  verbose: false,
+  strict: false,
+
+  async begin(bookId) {
+    this.end();
+    this.bookId = bookId;
+    this.model = {};
+    this.wrote = {};
+    if (!recordingWanted()) return;
+    let info;
+    try { info = await window.neo.recStart(bookId); } catch (err) {
+      window.neo.logError('recording start: ' + (err && err.message || err));
+      return;
+    }
+    if (this.bookId !== bookId || !info) return; // another book opened meanwhile
+    this.device = info.device;
+    this.appVersion = info.app || '';
+    this.prev = info.prev || null;
+    this.known = info.known || {};
+    this.edited = info.edited || {};
+    this.on = true;
+    this.newSession();
+  },
+
+  newSession() {
+    const now = new Date();
+    this.session = { id: recSessionId(), day: writingDay(now) };
+    this.w = new Rec.SessionWriter({
+      neoRec: Rec.FORMAT, session: this.session.id, device: this.device, app: this.appVersion,
+      platform: navigator.platform || '', book: this.bookId, day: this.session.day, startedAt: now.toISOString(),
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', prev: this.prev
+    });
+    this.startKnown = { ...this.known };
+    this.inSession = new Set();
+    this.cur = null;
+    this.sel = '';
+    this.orderSig = '';
+    this.live = false;
+    this.chunks = 0;
+    this.retry = [];
+    this.clock = Math.round(performance.now());
+    this.lastKind = '';
+    this.counts = { keys: 0, edits: 0, bases: 0, drops: 0, writes: 0, unobserved: 0, drift: 0 };
+  },
+
+  // The session's last line, its last chunk, and the folder joined into one
+  // file. A session that never changed a chapter leaves nothing behind.
+  // The promise is the close reaching the disk.
+  closeSession() {
+    clearTimeout(this.idleTimer);
+    if (!this.live) return Promise.resolve();
+    const { keys, edits, unobserved } = this.counts;
+    this.event(['end', { keys, edits, unobserved }]);
+    this.flush();
+    for (const chId of this.inSession) {
+      if (chId in this.model) this.known[chId] = this.model[chId];
+      else delete this.known[chId];
+    }
+    this.prev = this.w.H;
+    this.live = false;
+    return window.neo.recClose(this.bookId, this.session.id).catch((err) => window.neo.logError('recording close: ' + (err && err.message || err)));
+  },
+
+  end() {
+    let closed = Promise.resolve();
+    if (this.on) {
+      closed = this.closeSession();
+      if (this.counts.unobserved) console.warn('[rec] closed with', this.counts.unobserved, 'unobserved changes');
+    }
+    this.on = false;
+    this.bookId = null;
+    return closed;
+  },
+
+  // a session is at most the writer's day (the goals' day, which ends at
+  // library.dayEndsAt): when it ends the next one starts
+  tick() {
+    if (this.session.day === writingDay()) return;
+    this.closeSession();
+    this.newSession();
+  },
+
+  // an event, dt after the one before (or at the same moment, dt 0)
+  event(fields, sameMoment = false) {
+    let dt = 0;
+    if (!sameMoment) {
+      const now = Math.round(performance.now());
+      dt = Math.max(0, now - this.clock);
+      this.clock = now;
+    }
+    this.put([dt, ...fields]);
+  },
+  // a description of what follows: dt 0, and the clock stays
+  meta(fields) { this.put([0, ...fields]); },
+  put(line) {
+    this.w.push(line);
+    this.lastKind = line[1];
+    if (this.verbose) console.debug('[rec]', JSON.stringify(line).slice(0, 300));
+  },
+
+  focusChapter(chId) {
+    if (this.cur === chId) return;
+    this.cur = chId;
+    this.meta(['ch', chId]);
+  },
+
+  order() {
+    if (!book || !this.live) return;
+    const sig = book.chapterOrder.join(' ');
+    if (sig === this.orderSig) return;
+    this.orderSig = sig;
+    this.meta(['o', [...book.chapterOrder]]);
+  },
+
+  // The first time this session touches a chapter, a `b` line says what it
+  // was: as the last recording left it (only its hash, or all of it again
+  // when an anchor is due), then the change made while nothing was
+  // recording (catch-up); or, for a chapter never recorded, all of it
+  // (baseline). Rec.baseLines decides.
+  establish(chId, html) {
+    if (this.inSession.has(chId)) return;
+    this.inSession.add(chId);
+    this.live = true;
+    this.counts.bases++;
+    Rec.baseLines(chId, html, this.known[chId], this.edited[chId] || 0).forEach((line, i) => {
+      if (line[0] === 'b' && line[2] !== null) this.edited[chId] = 0;
+      if (line[0] === 'e') this.counted(chId, line[2], line[3]);
+      this.event(line, i > 0);
+    });
+    this.cur = chId;
+    this.order();
+  },
+
+  // what an anchor waits on: the characters inserted and deleted
+  counted(chId, del, ins) {
+    this.edited[chId] = (this.edited[chId] || 0) + del + ins.length;
+  },
+
+  change(chId, html, cause, opts = {}) {
+    if (!this.on) return;
+    html = html == null ? '' : String(html);
+    if (cause === 'open') { // the book as it opened: nothing happened yet
+      this.model[chId] = html;
+      if (Rec.isStream(chId)) this.wrote[chId] = html;
+      return;
+    }
+    this.tick(); // (a new day's session starts before the change, not after)
+    const old = this.model[chId];
+    this.model[chId] = html;
+    if (old === undefined) {
+      // a chapter new to the page: all of it, with what made it (and, for a
+      // restore, the moment it came from)
+      this.inSession.add(chId);
+      this.live = true;
+      this.counts.bases++;
+      this.edited[chId] = 0;
+      if (opts.ref) this.event(['x', cause, ...opts.ref]);
+      this.event(['b', chId, html, Rec.digest(html), cause], !!opts.ref);
+      this.cur = chId;
+      this.order();
+      this.noteCaret();
+      return;
+    }
+    if (old === html) return;
+    this.establish(chId, old);
+    this.focusChapter(chId);
+    this.counts.edits++;
+    if (cause === 'input') {
+      let sp = Rec.splice(old, html, opts.hint);
+      // what a key typed happened when the key went down
+      let now = !!this.key && this.lastKind === 'k';
+      // A key that comes with a tidy elsewhere in the chapter (the junk
+      // spans an open strips, saved with the next change): the tidy as its
+      // own changes, a splice per run of paragraphs, and only the run at the
+      // caret as what was typed, so a letter isn't the chapter between
+      if ((sp.ins + old.slice(sp.at, sp.at + sp.del)).includes('</p>')) {
+        const runs = Rec.splices(old, html);
+        const h = typeof opts.hint === 'function' ? opts.hint(html) : opts.hint;
+        const k = runs.length > 1 && typeof h === 'number' ? runs.findIndex((r) => h >= r.at && h <= r.at + r.ins.length) : -1;
+        if (k >= 0) {
+          this.event(['x', 'tidy'], now);
+          now = true;
+          // right to left, each where the HTML was before any of them, so
+          // the typed run is where Rec.splices put it once they're made
+          let delta = 0;
+          const at = runs.map((r) => { const a = r.at - delta; delta += r.ins.length - r.del; return a; });
+          let tidied = old;
+          for (let j = runs.length - 1; j >= 0; j--) {
+            if (j === k) continue;
+            this.counted(chId, runs[j].del, runs[j].ins);
+            this.event(['e', at[j], runs[j].del, runs[j].ins], true);
+            tidied = Rec.applyEdit(tidied, at[j], runs[j].del, runs[j].ins);
+          }
+          // (placed by the caret, as typing is, among repeated letters)
+          sp = Rec.splice(tidied, html, opts.hint);
+        }
+      }
+      const line = ['e', sp.at, sp.del, sp.ins, Rec.inputCode(opts.inputType)];
+      if (!this.key) line.push(0); // no key was down: dictation, autocorrect, a tool
+      this.counted(chId, sp.del, sp.ins);
+      this.event(line, now);
+      this.active();
+    } else {
+      // NEO's own moves change a chapter all at once: a splice per run of
+      // paragraphs they changed, so a name replaced on the first page and
+      // the last is two small splices, not the chapter between them. A
+      // restore says the moment it came from: [session, line, device]
+      this.event(['x', cause, ...(opts.ref || [])]);
+      for (const sp of Rec.splices(old, html)) {
+        this.counted(chId, sp.del, sp.ins);
+        this.event(['e', sp.at, sp.del, sp.ins], true);
+      }
+      this.order();
+    }
+    this.noteCaret();
+  },
+
+  drop(chId, cause) {
+    if (!this.on || !(chId in this.model)) return;
+    this.tick();
+    this.establish(chId, this.model[chId]); // its words are in the history before it goes
+    delete this.model[chId];
+    this.counts.drops++;
+    this.event(['d', chId, cause]);
+    this.order();
+  },
+
+  // Titles, the outline and stickies, as the book holds them now: what
+  // changed since the recorder last looked is recorded with `cause`. Those
+  // in `written` were just written to disk (book.json, stickies.json): a
+  // `w` for each that changed since its last.
+  streams(cause = 'edit', written = []) {
+    if (!this.on || !book || book.id !== this.bookId) return;
+    for (const [id, text] of Object.entries(Rec.streamTexts(book, stickies))) {
+      if (this.model[id] === undefined) continue; // not opened yet
+      if (this.model[id] !== text) this.change(id, text, cause);
+      if (written.includes(id) && this.wrote[id] !== text) this.reconcile(id, text);
+    }
+  },
+
+  // Just before a chapter is written: the write is explained by what the
+  // recording already holds, or the difference is logged as unobserved.
+  // Then the write itself. It reaches the disk with the next flush.
+  reconcile(chId, html) {
+    if (!this.on) return;
+    html = html == null ? '' : String(html);
+    this.tick();
+    if (this.model[chId] !== html) {
+      this.counts.unobserved++;
+      console.warn('[rec] unobserved change to', chId, Rec.splice(this.model[chId] || '', html));
+      this.change(chId, html, 'unobserved');
+    }
+    this.establish(chId, html);
+    if (Rec.isStream(chId)) this.wrote[chId] = html;
+    this.counts.writes++;
+    this.event(chId === this.cur ? ['w', Rec.digest(html)] : ['w', Rec.digest(html), chId]);
+  },
+
+  keyDown(e, chId) {
+    if (['Shift', 'Control', 'Alt', 'Meta', 'AltGraph'].includes(e.key)) return; // shown as the mods of the key they go with
+    this.tick();
+    this.focusChapter(chId); // before the key, so what it types can join a run
+    const mods = (e.shiftKey ? Rec.MOD.shift : 0) | (e.ctrlKey ? Rec.MOD.ctrl : 0) | (e.altKey ? Rec.MOD.alt : 0) |
+      (e.metaKey ? Rec.MOD.meta : 0) | (e.repeat ? Rec.MOD.repeat : 0) | (e.isTrusted ? 0 : Rec.MOD.untrusted);
+    this.counts.keys++;
+    this.event(['k', e.code || '', mods]);
+    this.key = { code: e.code };
+    this.lastKeyAt = performance.now();
+    this.active();
+  },
+
+  keyUp(e) {
+    if (this.key && this.key.code === e.code) this.key = null;
+  },
+
+  // where an edit leaves the caret goes without saying
+  noteCaret() {
+    const s = recSelection();
+    if (s) this.sel = s.join(' ');
+  },
+
+  selection() {
+    const s = recSelection();
+    if (!s) return;
+    const sig = s.join(' ');
+    if (sig === this.sel) return;
+    this.sel = sig;
+    this.tick();
+    const [chId, ap, ao, fp, fo] = s;
+    this.focusChapter(chId);
+    const line = ap === fp && ao === fo ? ['s', fp, fo] : ['s', ap, ao, fp, fo];
+    // moved by the pointer, by NEO itself, or (unmarked) by a key
+    const now = performance.now();
+    if (this.pointerDown || (this.lastPointerAt > this.lastKeyAt && now - this.lastPointerAt < 1000)) line.push('p');
+    else if (now - this.lastKeyAt >= 1000) line.push('n');
+    this.event(line);
+  },
+
+  clip(kind, text, flavour) {
+    this.tick();
+    const hash = Rec.digest(text);
+    const line = ['c', kind, text.length, flavour, hash];
+    if (kind === 'paste') {
+      line.push(this.copied.includes(hash));
+      // copied from a moment of Writing History: that moment
+      if (this.copiedFrom.has(hash)) line.push(this.copiedFrom.get(hash));
+    } else {
+      this.copied.push(hash);
+      if (this.copied.length > 50) this.copied.shift();
+    }
+    this.event(line);
+  },
+
+  context(what) {
+    if (!this.on) return;
+    this.tick();
+    this.event(['f', what]);
+    if (what === 'focus') this.wallClock();
+  },
+
+  wallClock() {
+    if (!this.on) return;
+    this.tick();
+    this.event(['T', new Date().toISOString()]);
+  },
+
+  // keys or edits: the `idle` line waits for a minute without either
+  active() {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => this.context('idle'), REC_IDLE);
+  },
+
+  // The lines so far, as one chunk, to disk: from flushAllSaves, and when
+  // a session closes or the history is opened.
+  flush() {
+    if (!this.on || !this.live) return;
+    this.order();
+    const c = this.w.chunk();
+    if (!c) return;
+    const { bookId } = this;
+    const id = this.session.id;
+    const send = (part) => window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; }, (err) => {
+      window.neo.logError('recording chunk: ' + (err && err.message || err));
+      if (this.session && this.session.id === id) this.retry.push(part); // tried again with the next
+    });
+    for (const part of this.retry.splice(0)) send(part);
+    send(c);
+  },
+
+  rollup() {
+    if (!this.on || !this.chunks) return;
+    this.chunks = 0;
+    window.neo.recRollup(this.bookId, this.session.id).catch((err) => window.neo.logError('recording rollup: ' + (err && err.message || err)));
+  },
+
+  // In strict mode, before a key, a paste or an input is handled: a page
+  // that no longer matches chapterHTML was changed by something that
+  // didn't say so. It's counted and shown, and the next change takes it in.
+  drift(chId, body) {
+    if (!this.strict || !this.on || chapterHTML[chId] === undefined) return;
+    const html = captureBody(body);
+    if (html === chapterHTML[chId]) return;
+    this.counts.drift++;
+    console.warn('[rec] page drifted from chapterHTML in', chId, Rec.splice(chapterHTML[chId], html));
+  },
+
+  // Replays this session and compares it with the book in memory.
+  check() {
+    if (!this.w) return { ok: true, lines: 0, mismatched: [], badWrites: [], problems: [], ...this.counts };
+    this.streams(); // (titles, the outline and stickies are looked at when they're saved)
+    this.w.endRun();
+    const text = this.w.lines.join('\n') + '\n';
+    const r = Rec.replayCheck([text], this.startKnown);
+    const mismatched = [];
+    const texts = book ? Rec.streamTexts(book, stickies) : {};
+    const want = (chId) => {
+      if (chId === Rec.STREAMS.notes) return recNotesNow();
+      if (Rec.isStream(chId)) return book ? texts[chId] : this.model[chId];
+      return chapterHTML[chId] == null ? undefined : String(chapterHTML[chId]);
+    };
+    for (const chId of this.inSession) if (r.chapters[chId] !== want(chId)) mismatched.push(chId);
+    if (this.on) for (const chId of [...Object.keys(chapterHTML), ...Object.keys(texts), Rec.STREAMS.notes]) if (!this.inSession.has(chId) && this.model[chId] !== want(chId)) mismatched.push(chId);
+    const badWrites = r.bad.map((w) => w.line);
+    const result = {
+      ok: !mismatched.length && !badWrites.length && !r.problems.length && !this.counts.unobserved,
+      ...this.counts, lines: this.w.lines.length, mismatched, badWrites, problems: r.problems
+    };
+    console.log('[rec] check', result);
+    return result;
+  }
+};
+
+// Every change to chapterHTML comes through here, with what caused it:
+// 'input' (typing, paste, dictation: anything the engine did, with its
+// inputType) or one of NEO's own moves ('split', 'merge', 'new', …).
+function setChapterHTML(chId, html, cause, opts) {
+  chapterHTML[chId] = html;
+  rec.change(chId, html, cause, opts);
+}
+function dropChapterHTML(chId, cause) {
+  delete chapterHTML[chId];
+  rec.drop(chId, cause);
+}
+
+// The book's other writing as it opened (notes.html, and the titles,
+// outline and stickies as book.json and stickies.json hold them): what the
+// recorder's first look at each is measured from
+async function recOpenStreams(bookId) {
+  if (!rec.on || rec.bookId !== bookId) return;
+  const notes = await window.neo.readAux(bookId, 'notes');
+  if (!rec.on || rec.bookId !== bookId || !book || book.id !== bookId) return;
+  rec.change(Rec.STREAMS.notes, notes || '', 'open');
+  for (const [id, text] of Object.entries(Rec.streamTexts(book, stickies))) rec.change(id, text, 'open');
+}
+
+// The Notes tab, as it reads notes.html: text that isn't what the recorder
+// last saw came from another device. recNotesShown is the notes as the
+// page drew them, so a page that drew them differently (the browser tidies
+// HTML it's given) is a tidy of its own, not part of the first key.
+let recNotesShown = null;
+function recNotesRead(html, bookId) {
+  if (!rec.on || rec.bookId !== bookId) return;
+  const id = Rec.STREAMS.notes;
+  if (rec.model[id] === undefined) rec.change(id, html, 'open');
+  else if (rec.model[id] !== html) rec.change(id, html, 'disk-adopt');
+}
+function recNotesInput(e) {
+  if (!rec.on) return;
+  const id = Rec.STREAMS.notes;
+  if (recNotesShown !== null && rec.model[id] !== undefined && rec.model[id] !== recNotesShown) rec.change(id, recNotesShown, 'tidy');
+  recNotesShown = null;
+  rec.change(id, $('#aux-editor').innerHTML, 'input', { inputType: e.inputType });
+}
+// the notes as they are now: on the page while the Notes tab shows them
+function recNotesNow() {
+  const ed = $('#aux-editor');
+  return currentTab === 'notes' && ed.dataset.kind === 'notes' && !ed.hidden ? ed.innerHTML : rec.model[Rec.STREAMS.notes];
+}
+
+// Where the caret sits in a chapter's HTML: the length of what captureBody
+// would write for everything before it, or -1 when that can't be said.
+// Only asked for when a splice could sit in more than one place.
+function caretHtmlOffset(body, html) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || !sel.isCollapsed || !body.contains(sel.focusNode)) return -1;
+  const r = document.createRange();
+  r.selectNodeContents(body);
+  r.setEnd(sel.focusNode, sel.focusOffset);
+  const holder = document.createElement('div');
+  holder.appendChild(r.cloneContents());
+  const before = captureBody(holder).replace(/(<\/[a-z0-9]+>)+$/i, '');
+  return html.startsWith(before) ? before.length : -1;
+}
+
+// What happens around the chapters. Capture phase, so a key is in the
+// recording before NEO's own handlers act on it.
+// the chapter (or the notes) a key or a clipboard event is in, or null
+function recWhere(target) {
+  if (!rec.on) return null;
+  const body = recBodyOf(target);
+  if (body) return body.closest('.chapter').dataset.id;
+  const el = target && (target.nodeType === Node.TEXT_NODE ? target.parentElement : target);
+  const notes = el && el.closest ? el.closest('#aux-editor') : null;
+  return notes && notes.dataset.kind === 'notes' ? Rec.STREAMS.notes : null;
+}
+const recInChapter = (target) => !!recWhere(target);
+// the notes' caret isn't recorded, so neither are the keys that only move it
+const REC_CARET_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+document.addEventListener('keydown', (e) => {
+  const id = recWhere(e.target);
+  if (id && !(Rec.isStream(id) && REC_CARET_KEYS.has(e.key))) rec.keyDown(e, id);
+}, true);
+document.addEventListener('keyup', (e) => rec.keyUp(e), true);
+document.addEventListener('pointerdown', () => { rec.pointerDown = true; rec.lastPointerAt = performance.now(); }, true);
+document.addEventListener('pointerup', () => { rec.pointerDown = false; rec.lastPointerAt = performance.now(); }, true);
+document.addEventListener('selectionchange', () => { if (rec.on) rec.selection(); });
+for (const kind of ['copy', 'cut']) {
+  document.addEventListener(kind, (e) => { if (recInChapter(e.target)) rec.clip(kind, String(window.getSelection()), 'text'); }, true);
+}
+document.addEventListener('paste', (e) => {
+  if (!recInChapter(e.target)) return;
+  const data = e.clipboardData;
+  rec.clip('paste', data ? data.getData('text/plain') : '', data && [...data.types].includes('text/html') ? 'html' : 'text');
+}, true);
+document.addEventListener('compositionstart', (e) => { if (recInChapter(e.target)) rec.context('compose'); }, true);
+document.addEventListener('compositionend', (e) => { if (recInChapter(e.target)) rec.context('composed'); }, true);
+window.addEventListener('focus', () => rec.context('focus'));
+window.addEventListener('blur', () => rec.context('blur'));
+document.addEventListener('visibilitychange', () => rec.context(document.visibilityState === 'visible' ? 'visible' : 'hidden'));
+setInterval(() => rec.wallClock(), REC_WALL);
+setInterval(() => rec.rollup(), REC_ROLLUP);
+
+// File → Keep a Replay of My Writing
+async function setRecordWriting(on) {
+  library.recordWriting = !!on;
+  writeLibrary(library);
+  if (!on) {
+    rec.end();
+    toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
+    return;
+  }
+  toast(t('Like a painter’s timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
+  if (book) await recRestart(book.id);
+}
+
+// Recording the open book from now, as it is now
+async function recRestart(bookId) {
+  await rec.begin(bookId);
+  if (!book || book.id !== bookId) return;
+  for (const [chId, html] of Object.entries(chapterHTML)) rec.change(chId, html, 'open');
+  await recOpenStreams(bookId);
+}
+
+/* ================================================================== */
+/*  WRITING HISTORY — the dialog and its player                        */
+/*  The recording played back like a painter's timelapse: the book, or */
+/*  one chapter, on sheets set like the manuscript, the text and the   */
+/*  caret looking just as they did in the editor, and a timeline of    */
+/*  how busy the writing was, marked where text was                    */
+/*  pasted, came from another device, or changed while nothing was     */
+/*  recording, and where the writer was away. It changes the book only */
+/*  when asked to restore (historyRestore) or to delete the history.   */
+/*  The steps and keyframes are recording.js's                         */
+/*  History, a day at a time, every device's sessions on one page      */
+/*  (Rec.Page), from the day states history-worker.js caches.          */
+/*  Ways in: History in the footer, File → Writing History…, a book's  */
+/*  menu on the shelf, and a chapter's right-click menu. The sheets    */
+/*  are .rp-chapter / .rp-body, never .chapter / .chapter-body, so     */
+/*  nothing that looks after the manuscript mistakes them for it.      */
+/* ================================================================== */
+
+const HISTORY_SPEEDS = [1, 2, 4, 8, 32];
+const HISTORY_SKIP = 3000;    // with Skip Pauses on, a pause longer than this…
+const HISTORY_SKIP_TO = 500;  // …plays this long, and a badge says how long it was
+const HISTORY_INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
+const historyPrefs = { speed: 8, skip: true }; // kept while NEO runs
+const historyCanOpen = () => !!(Rec && window.neo.recList && window.neo.recRead && window.neo.recDays && window.neo.recDayStart);
+let historyShown = null; // the open dialog's close()
+let historyFindSeq = 0;  // each search's number, so the worker's news reaches the search it's for
+const historyFindOpts = { word: true, cs: false }; // whole words, any case: kept while NEO is open
+
+// what made a change, as the timeline's markers say it
+const HISTORY_CAUSES = {
+  split: tk('Chapter split'), merge: tk('Chapters joined'), new: tk('New chapter'), delete: tk('Chapter deleted'),
+  'darling-out': tk('Sent to Darlings'), 'darling-in': tk('Back from Darlings'), 'darling-delete': tk('Sent to Darlings'),
+  'replace-all': tk('Replace All'), 'undo-structural': tk('Undone'), snapshot: tk('Snapshot restored'), outline: tk('Moved in the Outline'),
+  'disk-adopt': tk('From another device'), 'disk-twin': tk('From another device, kept beside this one'), 'disk-new': tk('From another device'),
+  'catch-up': tk('Changed while nothing was recording'), restore: tk('Restored'), unobserved: tk('A change the recorder didn’t see'),
+  anchor: tk('Kept whole again')
+};
+const HISTORY_SYNC = ['disk-adopt', 'disk-twin', 'disk-new'];
+// the book's other writing, as a day names it
+function historyStreamName(id) {
+  const S = Rec.STREAMS;
+  return id === S.notes ? tabName('notes') : id === S.outline ? tabName('outline')
+    : id === S.titles ? t('Chapter titles') : id === S.stickies ? t('Notes & Comments') : '';
+}
+
+// The worker's progress (rec:progress), to the dialog that's waiting on it
+const historyListeners = new Set();
+if (window.neo.onRecProgress) window.neo.onRecProgress((m) => { for (const f of historyListeners) f(m); });
+
+// One day's sessions, every device's ({ id, device }, in the order they
+// play), read and played from the page and each device's chapters as the
+// day began (from the cache), keeping keyframes. A book open in the editor
+// flushes first, so the session in progress is read up to now.
+async function historyLoadDay(bookId, day, list) {
+  if (rec.on && rec.bookId === bookId) rec.flush();
+  const [start, read] = await Promise.all([
+    window.neo.recDayStart(bookId, day),
+    Promise.all(list.map((s) => window.neo.recRead(bookId, s.device, s.id).catch(() => null)))
+  ]);
+  const sessions = [];
+  list.forEach((s, i) => {
+    const r = read[i];
+    if (r && r.text) sessions.push({ id: s.id, device: s.device, open: r.open, text: r.text });
+  });
+  const h = new Rec.History(sessions);
+  h.build(start && start.devices ? start : {});
+  h.day = day;
+  return h;
+}
+
+// A place in a chapter's HTML where a mark can go: never inside a tag or an
+// entity, and a place between paragraphs moves into the one that follows.
+function historyPlace(html, at) {
+  at = Math.max(0, Math.min(at, html.length));
+  const lt = html.lastIndexOf('<', at - 1);
+  if (lt >= 0) {
+    const gt = html.indexOf('>', lt);
+    if (gt >= at) at = gt + 1;
+  }
+  const amp = html.lastIndexOf('&', at - 1);
+  if (amp >= 0 && at - amp < 12) {
+    const m = /^&[#a-z0-9]+;/i.exec(html.slice(amp, amp + 12));
+    if (m && amp + m[0].length > at) at = amp + m[0].length;
+  }
+  for (;;) {
+    const m = /^<p\b[^>]*>/.exec(html.slice(at, at + 300));
+    if (!m) break;
+    at += m[0].length;
+  }
+  return at;
+}
+
+// HTML with marks put in at offsets ({ at, html, order }), for the player
+// only: the mark is its caret
+function historyMarked(html, marks) {
+  if (!marks.length) return html;
+  const sorted = marks.map((m) => ({ ...m, at: historyPlace(html, m.at) })).sort((a, b) => a.at - b.at || a.order - b.order);
+  let out = '';
+  let last = 0;
+  for (const m of sorted) {
+    out += html.slice(last, m.at) + m.html;
+    last = m.at;
+  }
+  return out + html.slice(last);
+}
+
+// Whether a piece of a chapter (a ChapterText paragraph) closes every tag it
+// opens, so it parses alone just as it does in the whole chapter. A chapter
+// with one that doesn't (a blockquote around paragraphs) is drawn whole.
+const HISTORY_VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+function historyBalanced(html) {
+  const open = [];
+  for (const m of html.matchAll(/<(\/?)([a-z][a-z0-9-]*)\b[^>]*>/gi)) {
+    const tag = m[2].toLowerCase();
+    if (HISTORY_VOID.has(tag)) continue;
+    if (!m[1]) { if (!m[0].endsWith('/>')) open.push(tag); } else if (open.pop() !== tag) return false;
+  }
+  return !open.length;
+}
+// A piece's nodes, parsed apart from the page
+let historyTemplate = null;
+function historyNodes(html) {
+  if (!historyTemplate) historyTemplate = document.createElement('template');
+  historyTemplate.innerHTML = html;
+  return [...historyTemplate.content.childNodes];
+}
+
+// The DOM point that is `off` letters into paragraph pIdx of a player body,
+// as recPoint counts them
+function historyPoint(body, pIdx, off) {
+  const ps = body.querySelectorAll(Rec.CARET_BLOCK);
+  const p = ps[Math.min(pIdx, ps.length - 1)];
+  if (!p) return null;
+  const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  let n;
+  let last = null;
+  while ((n = w.nextNode())) {
+    if (off <= n.data.length) return [n, off];
+    off -= n.data.length;
+    last = n;
+  }
+  return last ? [last, last.data.length] : [p, 0];
+}
+
+function historyWhen(ms, opts) {
+  if (ms === null || ms === undefined) return '';
+  try { return new Intl.DateTimeFormat(NeoI18n.getLocale(), opts).format(new Date(ms)); } catch { return new Date(ms).toLocaleString(); }
+}
+const HISTORY_DAY = { day: 'numeric', month: 'short' };
+const HISTORY_DATE = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+const HISTORY_MOMENT = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+const HISTORY_TIME = { hour: 'numeric', minute: '2-digit' };
+// a writer's day as a moment: its noon, where it is
+const historyDayMs = (day) => Date.parse(day + 'T12:00:00');
+
+function historyPause(ms) {
+  if (ms >= 3600000) return t('paused {n} h', { n: Math.round(ms / 360000) / 10 });
+  if (ms >= 60000) return t('paused {n} min', { n: Math.round(ms / 60000) });
+  return t('paused {n} s', { n: Math.round(ms / 1000) });
+}
+
+// time spent writing, said plainly
+function historySpent(ms) {
+  if (ms >= 3600000) {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.round((ms % 3600000) / 60000);
+    return m ? t('{h} h {m} min', { h, m }) : t('{h} h', { h });
+  }
+  if (ms >= 60000) return t('{n} min', { n: Math.round(ms / 60000) });
+  return t('{n} s', { n: Math.max(1, Math.round(ms / 1000)) });
+}
+const historyWords = (added, removed) => t('+{added} −{removed} words', { added: added.toLocaleString(NeoI18n.getLocale()), removed: removed.toLocaleString(NeoI18n.getLocale()) });
+
+// a canvas sized to its box, for drawing in CSS pixels
+function historyCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.max(1, canvas.clientWidth);
+  const H = Math.max(1, canvas.clientHeight);
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  return { g, W, H };
+}
+
+// a day as its tile says it: 12th Oct 26 in English, the locale's own way otherwise
+function historyDayLabel(day) {
+  const ms = historyDayMs(day);
+  if (!/^en\b/i.test(NeoI18n.getLocale())) return historyWhen(ms, { day: 'numeric', month: 'short', year: '2-digit' });
+  const n = new Date(ms).getDate();
+  const th = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
+  return n + th + ' ' + historyWhen(ms, { month: 'short' }) + ' ' + historyWhen(ms, { year: '2-digit' });
+}
+
+// Text copied out of Writing History, remembered so that pasting it in the
+// book is recorded as from this book, and from that moment
+function historyRemember(text, ref) {
+  const hash = Rec.digest(text);
+  rec.copied.push(hash);
+  if (rec.copied.length > 50) rec.copied.shift();
+  rec.copiedFrom.set(hash, ref);
+  if (rec.copiedFrom.size > 50) rec.copiedFrom.delete(rec.copiedFrom.keys().next().value);
+}
+
+// Paragraphs (HTML) to the clipboard, as prose and as HTML
+async function historyClip(html, ref) {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const text = [...holder.children].map((p) => p.textContent).join('\n\n') || holder.textContent;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }), 'text/html': new Blob([html], { type: 'text/html' }) })]);
+  } catch {
+    await navigator.clipboard.writeText(text);
+  }
+  historyRemember(text, ref);
+}
+
+// Paragraphs (HTML) into a book's Darlings, the open one's or one on the shelf
+async function historyToDarlings(bookId, html, label) {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const entry = {
+    id: 'd-' + Date.now().toString(36),
+    html,
+    text: [...holder.children].map((p) => p.textContent).join('\n\n').slice(0, 2000),
+    chapterId: null,
+    chapterLabel: label,
+    date: new Date().toISOString()
+  };
+  if (book && book.id === bookId) {
+    darlings.unshift(entry);
+    await writeSidecar(bookId, 'darlings', darlings);
+    if (currentTab === 'darlings') renderDarlings();
+    updateCounters();
+    return;
+  }
+  const list = (await window.neo.readJSON(bookId, 'darlings', [])) || [];
+  list.unshift(entry);
+  await window.neo.writeJSON(bookId, 'darlings', list);
+}
+
+// Restore: a chapter back as it was at a moment of its history. One still
+// in the book takes the old text, and what it held goes to Darlings; one
+// deleted since comes back as a new chapter, after the chapter it followed
+// then (`before`: the chapters before it at that moment, nearest last).
+// Either is one ⌘Z, and the recording says which moment it came from
+// (x restore: session, line, device). A book not open is opened first.
+async function historyRestore({ bookId, ch, html, title = '', before = [], when, ref, paras = null }) {
+  if (!book || book.id !== bookId || $('#editor-view').hidden) {
+    if (book) await backToShelf();
+    await openBook(bookId);
+    if (!book || book.id !== bookId) return;
+  }
+  if (currentTab !== 'manuscript') switchTab('manuscript');
+  if (paras) return historyRestoreParagraphs({ ch, html, when, ref, paras });
+  let target = ch;
+  let said;
+  if (book.chapterOrder.includes(ch) && chapterHTML[ch] !== undefined) {
+    const now = chapterHTML[ch];
+    if (now === html) { toast(t('This chapter is already as it was then.')); return; }
+    snapshotStructure('restore');
+    const holder = document.createElement('div');
+    holder.innerHTML = now;
+    const text = [...holder.children].map((p) => p.textContent).join('\n\n').trim();
+    if (text) {
+      darlings.unshift({
+        id: 'd-' + Date.now().toString(36),
+        html: now,
+        text: text.slice(0, 2000),
+        chapterId: ch,
+        chapterLabel: t('{chapter}, before restoring to {when}', { chapter: chapterName(ch), when }),
+        date: new Date().toISOString()
+      });
+    }
+    setChapterHTML(ch, html, 'restore', { ref });
+    wordCache[ch] = null;
+    await persistChapter(ch, html);
+    if (text) await writeSidecar(book.id, 'darlings', darlings);
+    said = text
+      ? t('{chapter} is as it was on {when}. What it held is in Darlings ({key} undoes it).', { chapter: chapterName(ch), when, key: KZ })
+      : t('{chapter} is as it was on {when} ({key} undoes it).', { chapter: chapterName(ch), when, key: KZ });
+  } else {
+    snapshotStructure('restore');
+    target = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    const prev = [...before].reverse().find((x) => book.chapterOrder.includes(x));
+    book.chapterOrder.splice(prev ? book.chapterOrder.indexOf(prev) + 1 : 0, 0, target);
+    if (title) {
+      book.chapterTitles = book.chapterTitles || {};
+      book.chapterTitles[target] = title;
+    }
+    setChapterHTML(target, html, 'restore', { ref });
+    rec.streams('restore');
+    await persistChapter(target, html);
+    await saveMeta();
+    said = t('The chapter is back, as it was on {when} ({key} undoes it).', { when, key: KZ });
+  }
+  renderChapters();
+  updateCounters();
+  if (currentTab === 'darlings') renderDarlings();
+  const sec = document.querySelector(`.chapter[data-id="${CSS.escape(target)}"]`);
+  if (sec) sec.scrollIntoView({ block: 'start' });
+  focusChapterStart(target);
+  resetNativeUndo();
+  toast(said, 9000);
+}
+
+// Paragraphs a…b of a chapter (as it was when they were found: `expect`)
+// back as they were (`html`): what they hold goes to Darlings, one ⌘Z
+// undoes it, and the recording names the moment
+async function historyRestoreParagraphs({ ch, html, when, ref, paras }) {
+  const cur = chapterHTML[ch];
+  if (cur === undefined || !book.chapterOrder.includes(ch)) { toast(t('That couldn’t be restored. The book is as it was.')); return; }
+  const q = { ch, a: paras.a, b: paras.b };
+  // (the chapter as it opened can differ from its file by a tidy)
+  if (cur !== paras.expect) Rec.partSplices(q, Rec.splices(paras.expect, cur), 1);
+  if (q.gone || q.b <= q.a) { toast(t('Those paragraphs changed meanwhile, so nothing was restored.')); return; }
+  const now = cur.slice(q.a, q.b);
+  if (now === html) { toast(t('These paragraphs are already as they were then.')); return; }
+  snapshotStructure('restore');
+  const holder = document.createElement('div');
+  holder.innerHTML = now;
+  const text = [...holder.children].map((p) => p.textContent).join('\n\n').trim();
+  const chapter = chapterName(ch);
+  if (text) {
+    darlings.unshift({
+      id: 'd-' + Date.now().toString(36),
+      html: now,
+      text: text.slice(0, 2000),
+      chapterId: ch,
+      chapterLabel: t('{chapter}, before restoring paragraphs to {when}', { chapter, when }),
+      date: new Date().toISOString()
+    });
+  }
+  const next = cur.slice(0, q.a) + html + cur.slice(q.b);
+  setChapterHTML(ch, next, 'restore', { ref });
+  wordCache[ch] = null;
+  await persistChapter(ch, next);
+  if (text) await writeSidecar(book.id, 'darlings', darlings);
+  renderChapters();
+  updateCounters();
+  if (currentTab === 'darlings') renderDarlings();
+  // the caret at the first paragraph restored
+  const pIdx = (cur.slice(0, q.a).match(/<p[\s>]/g) || []).length;
+  const body = document.querySelector(`.chapter[data-id="${CSS.escape(ch)}"] .chapter-body`);
+  const p = body && body.querySelectorAll('p')[pIdx];
+  if (p) {
+    body.focus({ preventScroll: true });
+    const r = document.createRange();
+    r.setStart(p, 0);
+    r.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    currentChapterId = ch;
+    p.scrollIntoView({ block: 'center' });
+  } else focusChapterStart(ch);
+  resetNativeUndo();
+  toast(text ? t('The paragraphs are as they were on {when}. What they held is in Darlings ({key} undoes it).', { when, key: KZ })
+    : t('The paragraphs are as they were on {when} ({key} undoes it).', { when, key: KZ }), 9000);
+}
+
+// Opens the Writing History of a book (the open one unless another is
+// named). It opens on the days: the chapter the writer is in (or the
+// book) as it is now, with a tile for each day it was written on below.
+// A day picked opens the player on it, with its typing timeline, play and
+// speed. With `play`, straight into the player at the first day the
+// chapter was written, playing.
+async function openHistory({ bookId = book && book.id, chId = null, play = false } = {}) {
+  if (!bookId || !historyCanOpen() || historyShown) return;
+  const here = !!(book && book.id === bookId && !$('#editor-view').hidden);
+  const caret = here ? captureCaret() : null;
+  const meta = here ? book : await window.neo.readBookMeta(bookId);
+  if (!meta || historyShown) return;
+  meta.chapterOrder = meta.chapterOrder || [];
+  const bd = sheetBackdrop('history', t('Writing History'), `
+    <div class="hs-side">
+      <div class="hs-find" hidden><div class="hs-qbox"><input class="hs-q" type="search" spellcheck="false" autocomplete="off"><button class="hs-opt" type="button" data-opt="cs">Aa</button><button class="hs-opt" type="button" data-opt="word"><span class="hs-opt-word">ab</span></button></div><div class="hs-results" hidden></div></div>
+      <div class="hs-list" role="listbox"></div>
+    </div>
+    <div class="hs-main">
+      <div class="hs-scroll"><div class="hs-paper"></div></div>
+      <div class="hs-badge" hidden></div>
+      <button class="hs-restore" type="button" hidden></button>
+      <div class="hs-bottom">
+        <div class="hs-controls" hidden>
+          <button class="hs-back"></button>
+          <button class="hs-play"></button>
+          <span class="hs-speeds" role="group"></span>
+          <label class="hs-skip"><input type="checkbox"> <span></span></label>
+          <span class="hs-part"><button class="hs-part-prev">‹</button><span class="hs-part-name"></span><button class="hs-part-next">›</button><button class="hs-part-x">×</button></span>
+          <span class="hs-when"></span>
+        </div>
+        <div class="hs-dayline" hidden>
+          <span class="hs-prevday"></span>
+          <div class="hs-timeline" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100">
+            <canvas></canvas><div class="hs-head"></div><div class="hs-tip" hidden></div>
+          </div>
+          <span class="hs-nextday"></span>
+        </div>
+        <div class="hs-strip" role="listbox"></div>
+      </div>
+    </div>
+    <div class="hs-foot">
+      <label class="hs-keep"><input type="checkbox"> <span></span></label>
+      <span class="hs-desc"></span>
+      <button class="hs-delete" type="button" hidden></button>
+    </div>`);
+  const $h = (sel) => bd.querySelector(sel);
+  const list = $h('.hs-list');
+  const scroller = $h('.hs-scroll');
+  const paper = $h('.hs-paper');
+  const playBtn = $h('.hs-play');
+  const backBtn = $h('.hs-back');
+  const controls = $h('.hs-controls');
+  const dayline = $h('.hs-dayline');
+  const prevDay = $h('.hs-prevday');
+  const nextDay = $h('.hs-nextday');
+  const strip = $h('.hs-strip');
+  const timeline = $h('.hs-timeline');
+  const canvas = $h('.hs-timeline canvas');
+  const headEl = $h('.hs-head');
+  const tip = $h('.hs-timeline .hs-tip');
+  const badgeEl = $h('.hs-badge');
+  const qIn = $h('.hs-q');
+  const results = $h('.hs-results');
+  const partEl = $h('.hs-part');
+  const restoreBtn = $h('.hs-restore');
+  const deleteBtn = $h('.hs-delete');
+  $h('.hs-find').hidden = !window.neo.recSearch;
+  qIn.placeholder = t('Search the history');
+  qIn.setAttribute('aria-label', t('Search the history'));
+  qIn.title = t('When a word or phrase was first written, last written, written out or moved') + ' (' + (IS_MAC ? '⌘F' : 'Ctrl+F') + ')';
+  const optLabels = { cs: t('Match case'), word: t('Whole words only') };
+  for (const b of bd.querySelectorAll('.hs-opt')) {
+    const opt = b.dataset.opt;
+    b.title = optLabels[opt];
+    b.setAttribute('aria-label', optLabels[opt]);
+    b.setAttribute('aria-pressed', String(historyFindOpts[opt]));
+    // a search showing is searched again the new way
+    b.addEventListener('click', () => {
+      historyFindOpts[opt] = !historyFindOpts[opt];
+      b.setAttribute('aria-pressed', String(historyFindOpts[opt]));
+      if (find) runFind(find.phrase.text);
+    });
+  }
+  list.setAttribute('aria-label', t('Chapters'));
+  timeline.setAttribute('aria-label', t('Timeline'));
+  strip.setAttribute('aria-label', t('Days'));
+  $h('.hs-skip span').textContent = t('Skip pauses');
+  $h('.hs-keep span').textContent = t('Keep a replay of my writing');
+  $h('.hs-desc').textContent = t('Like a painter’s timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays with your book and is never sent anywhere.');
+  backBtn.textContent = '← ' + t('Days');
+  backBtn.title = t('Back to the days') + ' (Esc)';
+  const keep = $h('.hs-keep input');
+  keep.checked = library.recordWriting !== false;
+  keep.addEventListener('change', async () => {
+    await setRecordWriting(keep.checked);
+    if (window.neo.recState) window.neo.recState({ book: !!book && !$('#editor-view').hidden, menu: true });
+  });
+  document.body.appendChild(bd);
+  bd.tabIndex = -1;
+  bd.focus();
+
+  // what the history holds, from the cache: its days, and each day's sessions
+  const S = {
+    devices: [],    // the devices that wrote it: { device, name, mine }
+    names: {},      // device -> its name, as the history says it
+    entries: [],    // the days the cache has built, oldest first
+    open: [],       // the sessions still open: { id, device, stats }
+    building: false, done: 0, total: 0, error: null,
+    days: [],       // { day, list: [session], stats, from, to }
+    sessions: [],   // every session, oldest first: { id, device, day, di, stats, open }
+    frames: [],     // the book after each session: { order, words }
+    untouched: []    // chapters in the book the recording never saw
+  };
+  let view = 'days';      // or 'player'
+  // the chapter the writer is in, unless the history never saw it
+  let mode = chId || (here && ((caret && caret.chId) || currentChapterId)) || 'book';
+  let settled = !!chId;   // whether the history has had its say on the mode
+  let dsel = -1;          // the day the days show, an index into S.days
+  let following = true;   // the days stay on the latest as the cache fills in
+
+  let h = null;           // the day in the player, a History
+  let dayLoads = new Map(); // day -> its History, loading or loaded
+  let steps = [];         // the steps this mode plays (indexes into h.steps)
+  let vt = new Float64Array(0); // each one's moment on the player's clock
+  let pauses = {};        // view index -> how long the pause before it really was
+  let total = 0;
+  let pos = 0;            // view entries played
+  let clock = 0;
+  let chapters = {};      // chapter id -> Rec.ChapterText, as played
+  let caretAt = null;     // { ch, at } after an edit, or { ch, a, f } after a caret line
+  let playing = false;
+  let lastFrame = 0;
+  let raf = 0;
+  let follow = true;
+  let shown = {};         // ch -> what its sheet was last drawn from
+  let markers = [];       // { x (clock), kind, label, step }
+  let badgeUntil = 0;
+  let loaded = { state: 'loading' }; // then ready, empty or failed, with ms and error
+  let token = 0;          // a newer load makes an older one's result moot
+  let find = null;        // a search: { phrase ({ text, word, cs }), sid, findings, within: { done, total }, finished, stopped, error }
+  let part = null;        // paragraphs picked on the sheet, to step through their changes: { ch, a, b (Rec's part), h, n (where it is once n steps of h played) }
+  let partSeq = 0;        // each step through them, so a newer one makes an older one moot
+  const resize = new ResizeObserver(() => { if (bd.isConnected) drawAll(); });
+
+  const progress = (m) => {
+    if (!bd.isConnected || m.key !== bookId) return;
+    if (m.type === 'progress' || m.type === 'kept') {
+      // a day built, or (kept) the days the cache already held
+      for (const entry of m.type === 'kept' ? m.entries : [m.entry]) {
+        const at = S.entries.findIndex((e) => e.day >= entry.day);
+        if (at < 0) S.entries.push(entry); else S.entries.splice(at, S.entries[at].day === entry.day ? 1 : 0, entry);
+      }
+      S.done = m.done;
+      S.total = m.total;
+      reindex();
+    } else if (m.type === 'built') {
+      S.built = m;
+      if (S.listed) built();
+    } else if (m.type === 'search' && find && m.sid === find.sid) {
+      foundMore(m);
+    }
+  };
+  // The cache is built: the sessions still open come with it. (Its message
+  // can come before the answer to rec:days does; whichever is last calls this.)
+  function built() {
+    const m = S.built;
+    S.built = null;
+    S.building = false;
+    S.open = m.open || [];
+    if (m.error) S.error = m.error;
+    if (play && chId) { play = false; reindex({ show: false }); startWatching(); } else reindex();
+  }
+  historyListeners.add(progress);
+
+  const close = () => {
+    if (!bd.isConnected) return;
+    cancelAnimationFrame(raf);
+    resize.disconnect();
+    historyListeners.delete(progress);
+    CSS.highlights.delete('neo-replay-sel');
+    CSS.highlights.delete('neo-replay-find');
+    CSS.highlights.delete('neo-replay-part');
+    if (find && find.within) window.neo.recSearchStop(bookId).catch(() => {});
+    if (window.neo.recHistoryClosed) window.neo.recHistoryClosed();
+    bd.remove();
+    historyShown = null;
+    if (caret && book && book.id === bookId) restoreCaret(caret);
+  };
+  historyShown = close;
+  // Esc, or Pocket's back gesture: from the player to the days, then closed
+  close.back = () => { if (part) clearPart(); else if (view === 'player') showDays(curDay()); else close(); };
+  // Find, from the menu or ⌘F: the history's own search
+  close.focusFind = () => { if ($h('.hs-find').hidden) return; qIn.focus(); qIn.select(); };
+  // for the tests and the console: historyShown.player.h() and the rest
+  close.player = {
+    h: () => h, loaded: () => loaded, view: () => view, steps: () => steps, pos: () => pos, mode: () => mode,
+    chapters: () => Object.fromEntries(Object.entries(chapters).map(([ch, c]) => [ch, c.toString()])),
+    sessions: () => S.sessions, days: () => S.days, day: () => dsel, building: () => S.building,
+    seek, setMode, setPlaying, openPlayer, showDays, skipSession, paper,
+    find: () => find, runFind: (q) => runFind(q), goFind: (kind, x) => goFind(kind, x),
+    part: () => part, pickPart, partGo
+  };
+  $h('.ps-done').onclick = close;
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) close(); });
+
+  /* ---------- the history's days and sessions ---------- */
+
+  // The days and sessions again, as the cache fills in. With `show`, the
+  // days (when they're up) go to the day they should show: the latest,
+  // unless the writer picked another.
+  function reindex({ show = true } = {}) {
+    const byDay = new Map();
+    const add = (day, s) => {
+      if (!byDay.has(day)) byDay.set(day, []);
+      const l = byDay.get(day);
+      if (!l.some((x) => x.id === s.id && x.device === s.device)) l.push(s);
+    };
+    for (const e of S.entries) for (const s of e.sessions) add(e.day, { id: s.id, device: s.device, stats: s.stats, open: false });
+    for (const o of S.open) add(o.stats.day || o.id.slice(0, 10), { id: o.id, device: o.device, stats: o.stats, open: true });
+    const was = S.days[dsel] ? S.days[dsel].day : null;
+    S.days = [...byDay.keys()].sort().map((day) => {
+      const l = byDay.get(day).sort(Rec.sessionOrder);
+      return { day, list: l, stats: Rec.dayStats(l.map((x) => x.stats)) };
+    });
+    S.sessions = [];
+    S.days.forEach((d, di) => {
+      d.from = S.sessions.length;
+      for (const s of d.list) { s.di = di; s.day = d.day; S.sessions.push(s); }
+      d.to = S.sessions.length;
+    });
+    // the book after each session
+    const words = {};
+    const seen = new Set();
+    let order = null;
+    S.frames = S.sessions.map((s) => {
+      for (const [ch, c] of Object.entries(s.stats.chapters)) {
+        seen.add(ch);
+        if (c.gone) delete words[ch]; else words[ch] = c.words;
+      }
+      for (const ch of s.stats.lost || []) delete words[ch];
+      if (s.stats.order) order = s.stats.order;
+      return { order, words: { ...words } };
+    });
+    S.untouched = meta.chapterOrder.filter((ch) => !seen.has(ch));
+    // a chapter the recording never saw: the whole book instead
+    if (!S.building && !settled) {
+      settled = true;
+      if (mode !== 'book' && !S.days.some(dayFits)) mode = 'book';
+    }
+    const fits = fitting();
+    dsel = following || !was ? -1 : S.days.findIndex((d) => d.day === was && dayFits(d));
+    if (dsel < 0) dsel = fits.length ? fits[fits.length - 1] : -1;
+    renderList();
+    renderStrip();
+    if (view !== 'days') { renderDayline(); return; }
+    if (show && !S.building) showDays(dsel);
+    else if (!h) paper.innerHTML = `<p class="hs-empty">${escHtml(S.total ? t('Reading the history: {n} of {total} days', { n: S.done, total: S.total }) : t('Reading the history…'))}</p>`;
+  }
+
+  // the chapters a book's tile shows after session i, in the book's order then
+  function columns(i) {
+    const f = S.frames[i];
+    if (!f) return S.untouched.slice();
+    const alive = new Set([...Object.keys(f.words), ...S.untouched]);
+    const order = f.order || meta.chapterOrder;
+    const cols = order.filter((ch) => alive.has(ch));
+    for (const ch of alive) if (!cols.includes(ch)) cols.push(ch);
+    return cols;
+  }
+
+  // the session the player is in, as an index into S.sessions
+  // (the step about to play: at a session's start, that session)
+  const nowStep = () => Math.max(0, Math.min(pos, steps.length - 1));
+  function playerSession() {
+    if (!h || !steps.length) return S.days[curDay()] ? S.days[curDay()].from : -1;
+    const st = h.steps[steps[nowStep()]];
+    const x = st && h.sessions[st.session];
+    return x ? S.sessions.findIndex((s) => s.id === x.id && s.device === x.device) : -1;
+  }
+
+  // the days a chapter was written on (all of them for the book)
+  const dayFits = (d) => mode === 'book' || d.stats.chapters.includes(mode);
+  const fitting = () => S.days.map((d, di) => (dayFits(d) ? di : -1)).filter((di) => di >= 0);
+  // the day on the sheet: the player's, or the one the days show
+  const curDay = () => (view === 'player' && h ? S.days.findIndex((d) => d.day === h.day) : dsel);
+  // a day's sessions, as the cache has them: a new one makes it another day to load
+  const dayKey = (d) => d.day + ':' + d.list.map((s) => s.device + '/' + s.id).join(',');
+  // a device as the history names it, when the book has more than one
+  const deviceName = (device) => (S.devices.length > 1 ? S.names[device] || '' : '');
+
+  function chapterLabel(ch, order) {
+    const m = { ...meta, chapterOrder: order.includes(ch) ? order : [...order, ch] };
+    const title = ((meta.chapterTitles || {})[ch] || '').trim();
+    const kind = chapterKind(ch, m);
+    if (kind === 'unnumbered') return title || t('Untitled');
+    return title ? chapterName(ch, m) + ' — ' + title : chapterName(ch, m);
+  }
+
+  function goneLead(ch) {
+    for (let i = S.sessions.length - 1; i >= 0; i--) {
+      const c = S.sessions[i].stats.chapters[ch];
+      if (c && c.gone) return c.lead || '';
+    }
+    return '';
+  }
+
+  /* ---------- the days: a tile for each ---------- */
+
+  // A day as the writer saw it end, the tiles below, and none of the
+  // player's controls
+  function showDays(di = dsel) {
+    setPlaying(false);
+    clearPart();
+    dsel = di;
+    const fits = fitting();
+    following = di === fits[fits.length - 1];
+    setView('days');
+    markDay();
+    if (S.days[di]) return openPlayer(S.days[di].to - 1, { at: 'end', as: 'days' });
+    ++token;
+    h = null;
+    steps = [];
+    shown = {};
+    loaded = { state: S.error ? 'failed' : S.building ? 'loading' : 'empty', error: S.error };
+    const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : library.recordWriting === false
+      ? t('Writing History is off. Turn on Keep a replay of my writing, below, and NEO starts recording the next time you write.')
+      : t('Nothing recorded yet. Write in this book and NEO keeps a replay of it here, like a painter’s timelapse.');
+    paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
+  }
+
+  function setView(v) {
+    view = v;
+    controls.hidden = v !== 'player';
+    dayline.hidden = v !== 'player';
+    strip.hidden = v !== 'days';
+    if (v === 'days') badgeEl.hidden = true;
+  }
+
+  function describeDay(d) {
+    let added = d.stats.added;
+    let removed = d.stats.removed;
+    if (mode !== 'book') {
+      added = removed = 0;
+      for (const s of d.list) { const c = s.stats.chapters[mode]; if (c) { added += c.added; removed += c.removed; } }
+    }
+    // the devices it was written on
+    const on = [...new Set(d.list.map((s) => S.names[s.device] || ''))].filter(Boolean).join(', ');
+    // and what else it changed: the notes, titles, outline, stickies
+    const also = mode === 'book' ? (d.stats.streams || []).map(historyStreamName).filter(Boolean).join(', ') : '';
+    return [historyWhen(historyDayMs(d.day), HISTORY_DATE), historySpent(d.stats.ms), on, historyWords(added, removed), also].filter(Boolean).join(' · ');
+  }
+
+  // A day's map: where it changed the chapter, as a grid read like a page
+  // (or a column for each chapter of the book), green where words came,
+  // red where they went, gold where both
+  const HISTORY_TILE = 46;
+  function drawTile(cv, d) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = HISTORY_TILE;
+    cv.width = cv.height = Math.round(W * dpr);
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const whole = mode === 'book';
+    const chs = whole ? columns(d.to - 1) : [mode];
+    const rows = whole ? 8 : 6;
+    const n = whole ? rows : rows * rows;
+    const grids = chs.map((ch) => {
+      const ins = new Float32Array(n);
+      const del = new Float32Array(n);
+      for (const s of d.list) {
+        const c = s.stats.chapters[ch];
+        if (!c || !c.ins) continue;
+        const nb = c.ins.length;
+        for (let b = 0; b < nb; b++) {
+          if (!c.ins[b] && !c.del[b]) continue;
+          const a = Math.floor((b * n) / nb);
+          const z = Math.max(a + 1, Math.ceil(((b + 1) * n) / nb));
+          for (let k = a; k < z; k++) { ins[k] += c.ins[b]; del[k] += c.del[b]; }
+        }
+      }
+      return { ins, del };
+    });
+    let max = 1;
+    for (const gr of grids) for (let k = 0; k < n; k++) max = Math.max(max, gr.ins[k] + gr.del[k]);
+    const cell = (x, y, w, hh, gr, k) => {
+      const v = gr.ins[k] + gr.del[k];
+      g.globalAlpha = v ? 0.45 + 0.55 * Math.sqrt(v / max) : 1;
+      g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : gr.ins[k] && gr.del[k] ? HISTORY_INK.edited : gr.ins[k] ? HISTORY_INK.added : HISTORY_INK.deleted;
+      const gap = w >= 4 ? 1 : 0;
+      g.fillRect(x, y, Math.max(0.5, w - gap), hh - 1);
+    };
+    if (whole) {
+      const cw = W / Math.max(1, chs.length);
+      grids.forEach((gr, c) => { for (let k = 0; k < rows; k++) cell(c * cw, (k * W) / rows, cw, W / rows, gr, k); });
+    } else {
+      const cs = W / rows;
+      for (let k = 0; k < n; k++) cell((k % rows) * cs, Math.floor(k / rows) * cs, cs, cs, grids[0], k);
+    }
+    g.globalAlpha = 1;
+  }
+
+  // a day's tile: its date, and its map
+  function dayTile(d, onPick, label = '') {
+    const b = document.createElement('button');
+    b.className = 'hs-tile';
+    b.dataset.day = d.day;
+    b.setAttribute('role', 'option');
+    b.title = (label ? label + ' · ' : '') + describeDay(d);
+    b.innerHTML = '<canvas></canvas><span></span>';
+    b.lastChild.textContent = historyDayLabel(d.day);
+    drawTile(b.firstChild, d);
+    b.addEventListener('click', onPick);
+    return b;
+  }
+
+  // the day a tile was made for, as S.days has it now
+  const dayIndex = (day) => S.days.findIndex((d) => d.day === day);
+  let tiles = new Map(); // a tile, kept for as long as its day and the mode stay the same
+  function renderStrip() {
+    const keep = new Map();
+    const made = fitting().map((di) => {
+      const d = S.days[di];
+      const key = mode + '|' + dayKey(d);
+      const b = tiles.get(key) || dayTile(d, () => { const i = dayIndex(d.day); if (i >= 0) openPlayer(S.days[i].from, { playIt: true }); });
+      keep.set(key, b);
+      return b;
+    });
+    tiles = keep;
+    strip.replaceChildren(...made);
+    // while the cache is read or built, the days still to come say so
+    if (!made.length || S.building) {
+      const p = document.createElement('span');
+      p.className = made.length ? 'hs-strip-empty hs-strip-more' : 'hs-strip-empty';
+      p.textContent = !S.building ? t('No days yet')
+        : S.total ? t('Reading the history: {n} of {total} days', { n: S.done, total: S.total }) : t('Reading the history…');
+      strip.appendChild(p);
+    }
+    markDay();
+    markFound();
+  }
+
+  // in the player: the days before and after, a tile each, either side of the timeline
+  function renderDayline() {
+    const di = curDay();
+    for (const [el, dir] of [[prevDay, -1], [nextDay, 1]]) {
+      const to = di >= 0 ? dayAfter(di, dir) : -1;
+      if (to < 0) { el.replaceChildren(); continue; }
+      const d = S.days[to];
+      el.replaceChildren(dayTile(d, () => { const i = dayIndex(d.day); if (i >= 0) openPlayer(S.days[i].from, { playIt: playing }); }, dir < 0 ? t('Earlier day') : t('Later day')));
+    }
+    markFound();
+  }
+
+  // the day on the sheet, marked in the strip
+  function markDay() {
+    const cur = S.days[curDay()];
+    const day = cur ? cur.day : null;
+    for (const b of strip.querySelectorAll('.hs-tile')) {
+      const on = b.dataset.day === day;
+      if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
+      if (on) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  function drawWhen() {
+    const el = $h('.hs-when');
+    const s = h && steps.length ? h.steps[steps[Math.max(0, Math.min(pos || 1, steps.length) - 1)]] : null;
+    const when = s ? historyWhen(s.wall, HISTORY_MOMENT) : '';
+    if (el.textContent !== when) el.textContent = when;
+  }
+
+  /* ---------- the player: one day ---------- */
+
+  // the day with index di, loaded once (and the one after it while this one plays)
+  function loadDay(di) {
+    const d = S.days[di];
+    const key = dayKey(d);
+    if (!dayLoads.has(key)) {
+      dayLoads.set(key, historyLoadDay(bookId, d.day, d.list.map((s) => ({ id: s.id, device: s.device }))).then((x) => { x.key = key; return x; }));
+      if (dayLoads.size > 3) for (const k of dayLoads.keys()) { if (k !== key && dayLoads.size > 3) dayLoads.delete(k); }
+    }
+    return dayLoads.get(key);
+  }
+
+  // The player on session i's day: at the start of that session (or its
+  // end, `at: 'end'`), on one chapter if `ch` is given. `as: 'days'` is the
+  // same day under the days' tiles, without the player's controls.
+  async function openPlayer(i, { ch = null, at = 'start', playIt = false, as = 'player' } = {}) {
+    const s = S.sessions[i];
+    if (!s) return;
+    const mine = ++token;
+    setPlaying(false);
+    if (ch) mode = ch;
+    setView(as);
+    const fresh = !h || h.key !== dayKey(S.days[s.di]);
+    if (fresh) {
+      loaded = { state: 'loading' };
+      paper.innerHTML = `<p class="hs-empty">${escHtml(t('Reading the history…'))}</p>`;
+      const began = performance.now();
+      let next;
+      try { next = await loadDay(s.di); } catch (err) {
+        if (mine !== token) return;
+        window.neo.logError('history: ' + (err && err.stack || err));
+        loaded = { state: 'failed', error: String(err && err.message || err) };
+        paper.innerHTML = `<p class="hs-empty">${escHtml(t('The history couldn’t be read.'))}</p>`;
+        return;
+      }
+      if (mine !== token || !bd.isConnected) return;
+      carryPart(h, next);
+      h = next;
+      loaded = { state: 'ready', ms: Math.round(performance.now() - began) };
+      paper.innerHTML = '';
+      shown = {};
+    }
+    if (mine !== token) return;
+    buildView();
+    renderList();
+    renderDayline();
+    markDay();
+    drawTimeline();
+    // the session's first step in this view (or after its last: another's
+    // can come between, where the two were open at once)
+    const k = h.sessions.findIndex((x) => x.id === s.id && x.device === s.device);
+    let p = 0;
+    if (k >= 0) {
+      const to = at === 'end' ? h.sessions[k].to : h.sessions[k].from;
+      while (p < steps.length && steps[p] < to) p++;
+    }
+    seek(p);
+    if (fresh && at !== 'end' && mode === 'book' && !playIt) scrollToChapter(caret && caret.chId);
+    // a chapter deleted that day: the days show it as it was just before it went
+    if (as === 'days' && at === 'end' && mode !== 'book' && chapters[mode] === undefined) {
+      let j = steps.length;
+      while (j > 0 && !(h.steps[steps[j - 1]].k === 'd' && h.steps[steps[j - 1]].ch === mode)) j--;
+      if (j > 0) seek(j - 1);
+    }
+    if (playIt) setPlaying(true);
+    bd.focus();
+  }
+
+  function buildView() {
+    steps = [];
+    const all = h.steps;
+    let from = 0;
+    let to = all.length;
+    if (mode !== 'book') {
+      const c = h.chapters().find((x) => x.ch === mode);
+      from = c ? c.firstStep : 0;
+      to = c ? c.lastStep + 1 : 0;
+    }
+    for (let i = from; i < to; i++) {
+      const s = all[i];
+      // (notes, titles, the outline and stickies are recorded, not played)
+      if ((mode === 'book' && !Rec.isStream(s.ch)) || s.ch === mode || s.k === 'session' || s.k === 'f') steps.push(i);
+    }
+    timeClock();
+  }
+
+  // the player's clock: the recording's own, with long pauses cut short
+  // when Skip Pauses is on. The wait before a session's first change and
+  // after its last (NEO open, nothing written yet, or left open after) isn't
+  // played at all: sessions follow each other with the History's own gap.
+  function timeClock() {
+    vt = new Float64Array(steps.length);
+    pauses = {};
+    const acts = (s) => s.k === 'e' || s.k === 'x' || s.k === 'd' || s.k === 'o' || s.k === 'c' || (s.k === 's' && s.by !== 'n');
+    const first = new Int32Array(steps.length); // per view entry: its session's first and last change in the view
+    const last = new Int32Array(steps.length);
+    for (let a = 0; a < steps.length;) {
+      let b = a + 1;
+      while (b < steps.length && h.steps[steps[b]].k !== 'session') b++;
+      let f = -1;
+      let l = -1;
+      for (let j = a; j < b; j++) if (acts(h.steps[steps[j]])) { if (f < 0) f = j; l = j; }
+      first.fill(f < 0 ? b : f, a, b);
+      last.fill(l, a, b);
+      a = b;
+    }
+    let v = 0;
+    for (let j = 0; j < steps.length; j++) {
+      const s = h.steps[steps[j]];
+      let gap = j ? s.t - h.steps[steps[j - 1]].t : 0;
+      if (s.k === 'session' && j) gap = s.session ? Math.max(0, s.t - h.sessions[s.session - 1].t1) : 0;
+      else if (j <= first[j] || j > last[j]) gap = 0;
+      if (historyPrefs.skip && gap > HISTORY_SKIP) { pauses[j] = gap; gap = HISTORY_SKIP_TO; }
+      v += gap;
+      vt[j] = v;
+    }
+    total = v;
+    buildMarkers();
+  }
+
+  // whether a step changed the page: one another device's copy took
+  // without the page going with it (another device's text already there) didn't
+  const onPage = (s) => s.page !== false || s.sync !== undefined;
+  // the device a step was written on, by name (when the book has more than one)
+  const stepDevice = (s) => (h.sessions[s.session] ? deviceName(h.sessions[s.session].device) : '');
+
+  function buildMarkers() {
+    markers = [];
+    let away = null;
+    // a cause whose changes none reached the page has nothing to mark
+    const reached = (j) => {
+      for (let k = j + 1; k < steps.length; k++) {
+        const s = h.steps[steps[k]];
+        if (s.k === 'x' || s.k === 'session' || s.session !== h.steps[steps[j]].session) return false;
+        if ((s.k === 'b' || s.k === 'e' || s.k === 'd') && onPage(s)) return true;
+      }
+      return false;
+    };
+    steps.forEach((i, j) => {
+      const s = h.steps[i];
+      const x = vt[j];
+      if (s.k === 'session') markers.push({ x, kind: 'session', step: i, label: [historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · ') });
+      else if (s.k === 'c' && s.what === 'paste') {
+        markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', step: i, label: s.internal ? t('Pasted from this book ({n} characters)', { n: s.len }) : t('Pasted from elsewhere ({n} characters)', { n: s.len }) });
+      } else if (s.k === 'x' && HISTORY_CAUSES[s.cause] && Rec.QUIET.has(s.cause) && !reached(j)) {
+        // (another device's text the page already showed)
+      } else if (s.k === 'x' && HISTORY_CAUSES[s.cause]) {
+        const kind = HISTORY_SYNC.includes(s.cause) ? 'sync' : s.cause === 'catch-up' || s.cause === 'unobserved' ? 'catch' : s.cause === 'restore' ? 'restore' : 'move';
+        markers.push({ x, kind, step: i, label: t(HISTORY_CAUSES[s.cause]) });
+      } else if ((s.k === 'b' || s.k === 'e') && s.sync !== undefined && typeof s.html !== 'string' && !(s.k === 'e' && s.page === false)) {
+        // the page took this device's copy, which wasn't what another device
+        // left (where a catch-up ends, its own marker says so)
+        markers.push({ x, kind: 'sync', step: i, label: t('As it was on {name}', { name: stepDevice(s) || t('another device') }) });
+      } else if (s.k === 'b' && !onPage(s)) {
+        // (a chapter the page already showed)
+      } else if (s.k === 'b' && s.cause === 'baseline') {
+        markers.push({ x, kind: 'catch', step: i, label: t('Written before the recording began') });
+      } else if (s.k === 'b' && HISTORY_SYNC.includes(s.cause)) {
+        markers.push({ x, kind: 'sync', step: i, label: t(HISTORY_CAUSES[s.cause]) });
+      } else if (s.k === 'f' && (s.what === 'blur' || s.what === 'hidden')) {
+        if (!away) away = { x, kind: 'away', step: i, label: t('Away from NEO') };
+      } else if (s.k === 'f' && (s.what === 'focus' || s.what === 'visible') && away) {
+        away.to = x;
+        markers.push(away);
+        away = null;
+      }
+      if (s.k === 'session' && away) { away.to = x; markers.push(away); away = null; }
+    });
+    if (away) { away.to = total; markers.push(away); }
+  }
+
+  // jump: the chapters as they were after `p` entries of the view
+  const nAt = (p) => (p <= 0 ? (steps.length ? steps[0] : 0) : steps[p - 1] + 1); // steps of h played
+  function seek(p, { keepFollow = false } = {}) {
+    if (!h) return;
+    p = Math.max(0, Math.min(p, steps.length));
+    pos = p;
+    clock = p ? vt[p - 1] : 0;
+    chapters = h.doc(nAt(p));
+    for (const ch of Object.keys(chapters)) if (Rec.isStream(ch)) delete chapters[ch]; // (not played: see buildView)
+    caretAt = null;
+    for (let j = p - 1; j >= 0 && j >= p - 5000; j--) {
+      const s = h.steps[steps[j]];
+      if (s.page === false) continue;
+      if (s.k === 'e') { caretAt = { ch: s.ch, at: s.at + s.ins.length }; break; }
+      if (s.k === 's') { caretAt = { ch: s.ch, a: s.a, f: s.f }; break; }
+      if (s.k === 'b' && typeof s.html === 'string') { caretAt = { ch: s.ch, at: 0 }; break; }
+    }
+    if (!keepFollow) follow = true;
+    draw();
+  }
+  const seekClock = (c) => {
+    let lo = 0;
+    let hi = steps.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (vt[mid] <= c) lo = mid + 1; else hi = mid; }
+    seek(lo);
+    clock = Math.max(0, Math.min(c, total));
+    drawHead();
+  };
+
+  function playStep(j, now) {
+    const i = steps[j];
+    const s = h.steps[i];
+    if (pauses[j] && playing) { badgeEl.textContent = historyPause(pauses[j]); badgeEl.hidden = false; badgeUntil = now + 1200; }
+    if (h.bad.has(i)) return;
+    if (s.k === 'e') {
+      if (chapters[s.ch] === undefined && s.sync === undefined) return;
+      h.apply(chapters, i);
+      if (s.page !== false) caretAt = { ch: s.ch, at: s.at + s.ins.length };
+    } else if (s.k === 'b' || s.k === 'd') {
+      h.apply(chapters, i);
+      if (s.k === 'b' && typeof s.html === 'string' && s.page !== false) caretAt = { ch: s.ch, at: 0 };
+    } else if (s.k === 's') {
+      caretAt = { ch: s.ch, a: s.a, f: s.f };
+    }
+  }
+
+  // the next (or previous) day this mode plays, as an index into S.days
+  function dayAfter(di, dir) {
+    for (let d = di + dir; d >= 0 && d < S.days.length; d += dir) if (dayFits(S.days[d])) return d;
+    return -1;
+  }
+
+  function frame(now) {
+    raf = 0;
+    if (!playing || !bd.isConnected) return;
+    const dt = Math.min(250, now - lastFrame); // a hidden window doesn't fast-forward
+    lastFrame = now;
+    clock += dt * historyPrefs.speed;
+    while (pos < steps.length && vt[pos] <= clock) playStep(pos++, now);
+    const di = curDay();
+    const next = di >= 0 ? dayAfter(di, 1) : -1;
+    if (next >= 0 && pos > steps.length * 0.7) loadDay(next); // ready by the time it's wanted
+    if (pos >= steps.length) {
+      clock = total;
+      if (next >= 0) { openPlayer(S.days[next].from, { playIt: true }); return; } // play runs on into the next day
+      setPlaying(false);
+    }
+    draw(now);
+    if (playing) raf = requestAnimationFrame(frame);
+  }
+
+  function setPlaying(on) {
+    if (on) {
+      if (view !== 'player' || !steps.length) return;
+      if (pos >= steps.length) seek(0);
+    }
+    playing = on;
+    if (!on) { badgeEl.hidden = true; badgeUntil = 0; }
+    renderRestore();
+    playBtn.textContent = on ? '❚❚' : '▶';
+    playBtn.setAttribute('aria-label', on ? t('Pause') : t('Play'));
+    playBtn.title = (on ? t('Pause') : t('Play')) + ' (Space)';
+    if (on) {
+      follow = true;
+      lastFrame = performance.now();
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+  }
+
+  // ⇧← and ⇧→: the start of the session before or after, crossing days
+  // as play does; in one-chapter mode only sessions that changed it
+  function skipSession(dir) {
+    if (view !== 'player' || !h) return;
+    const cur = playerSession();
+    // how far into its session the player is, in real time at this speed
+    let start = nowStep();
+    const k = steps.length ? h.steps[steps[start]].session : 0;
+    while (start > 0 && h.steps[steps[start - 1]].session === k) start--;
+    const into = clock - (start ? vt[start - 1] : 0);
+    const to = Rec.sessionSkip(S.sessions, cur, dir, { ch: mode === 'book' ? null : mode, atStart: into < 1000 * historyPrefs.speed });
+    if (to >= 0) openPlayer(to, { playIt: playing });
+  }
+
+  /* ---------- drawing the player ---------- */
+
+  // the chapters the sheet shows now, in the book's order at that moment
+  function shownChapters() {
+    if (mode !== 'book') return chapters[mode] !== undefined ? [mode] : [];
+    const order = h.order(nAt(pos)) || dayOrder();
+    const out = order.filter((ch) => chapters[ch] !== undefined);
+    for (const ch of Object.keys(chapters)) if (!out.includes(ch) && !Rec.isStream(ch)) out.push(ch);
+    return out;
+  }
+  // the order the day began with
+  function dayOrder() {
+    const s = h && S.sessions.find((x) => x.day === h.day);
+    const i = s ? S.sessions.indexOf(s) - 1 : -1;
+    return (i >= 0 && S.frames[i] && S.frames[i].order) || meta.chapterOrder;
+  }
+
+  // A chapter's sheet, brought up to the chapter as played. The sheet is the
+  // chapter's own elements, side by side as in the editor, and remembers
+  // which nodes each of its paragraphs (Rec.ChapterText's pieces) made, so a
+  // key replaces one paragraph, not a 300 KB script. The caret is a mark in
+  // its paragraph's HTML. True when anything changed.
+  const HISTORY_CARET = '<span class="rp-caret"></span>';
+  function drawBody(body, ch) {
+    const c = chapters[ch];
+    const parts = c.parts;
+    let mark = null;
+    if (caretAt && caretAt.ch === ch && caretAt.at !== undefined && parts.length) {
+      const i = c.find(caretAt.at);
+      mark = { i, at: caretAt.at - c.startOf(i) };
+    }
+    const piece = (k) => (mark && mark.i === k ? historyMarked(parts[k], [{ at: mark.at, html: HISTORY_CARET, order: 2 }]) : parts[k]);
+    let st = shown[ch];
+    if (st && !st.whole) {
+      // the pieces that changed: everything between what's the same at the start and at the end
+      const old = st.parts;
+      let a = 0;
+      const n = Math.min(old.length, parts.length);
+      while (a < n && old[a] === parts[a]) a++;
+      let oe = old.length;
+      let ne = parts.length;
+      while (oe > a && ne > a && old[oe - 1] === parts[ne - 1]) { oe--; ne--; }
+      let fits = true;
+      for (let k = a; k < ne && fits; k++) fits = historyBalanced(parts[k]);
+      if (fits) return drawPieces(body, st, parts, mark, piece, a, oe, ne);
+    } else if (!st && parts.every(historyBalanced)) {
+      body.textContent = '';
+      st = shown[ch] = { parts: [], nodes: [], mark: null };
+      return drawPieces(body, st, parts, mark, piece, 0, 0, parts.length);
+    }
+    // a chapter with a piece that doesn't parse alone: the whole of it, each
+    // time it changes, until every piece does again
+    if (st && st.whole && parts.every(historyBalanced)) {
+      delete shown[ch];
+      return drawBody(body, ch);
+    }
+    const html = c.toString();
+    const sig = mark ? caretAt.at : -1;
+    if (st && st.whole && st.html === html && st.sig === sig) return false;
+    body.innerHTML = historyMarked(html, mark ? [{ at: caretAt.at, html: HISTORY_CARET, order: 2 }] : []);
+    shown[ch] = { whole: true, html, sig };
+    return true;
+  }
+
+  // Pieces a…oe of what the sheet shows become a…ne of the chapter's, and the
+  // caret's piece is drawn again where it left and where it went
+  function drawPieces(body, st, parts, mark, piece, a, oe, ne) {
+    const was = st.mark;
+    const moved = (i) => (i < a ? i : i >= oe ? i + ne - oe : -1); // -1: drawn again below
+    const same = was && mark ? moved(was.i) === mark.i && was.at === mark.at : !was && !mark;
+    if (a === oe && a === ne && same) return false;
+    // the first node of piece k or after, to put pieces before
+    const after = (k) => {
+      for (; k < st.nodes.length; k++) if (st.nodes[k].length) return st.nodes[k][0];
+      return null;
+    };
+    if (oe > a || ne > a) {
+      const before = after(oe);
+      for (let k = a; k < oe; k++) for (const x of st.nodes[k]) x.remove();
+      const frag = document.createDocumentFragment();
+      const made = [];
+      for (let k = a; k < ne; k++) {
+        const nodes = historyNodes(piece(k));
+        frag.append(...nodes);
+        made.push(nodes);
+      }
+      body.insertBefore(frag, before);
+      st.nodes = st.nodes.slice(0, a).concat(made, st.nodes.slice(oe));
+      st.parts = st.parts.slice(0, a).concat(parts.slice(a, ne), st.parts.slice(oe));
+    }
+    const redraw = (k, html) => {
+      const nodes = historyNodes(html);
+      const before = st.nodes[k].length ? st.nodes[k][0] : after(k + 1);
+      for (const x of nodes) body.insertBefore(x, before);
+      for (const x of st.nodes[k]) x.remove();
+      st.nodes[k] = nodes;
+    };
+    if (!same) {
+      const left = was ? moved(was.i) : -1;
+      if (left >= 0 && !(mark && mark.i === left)) redraw(left, parts[left]);
+      if (mark && !(mark.i >= a && mark.i < ne)) redraw(mark.i, piece(mark.i));
+    }
+    st.mark = mark;
+    return true;
+  }
+
+  function draw(now = performance.now()) {
+    if (!h) return;
+    syncPart();
+    const showing = shownChapters();
+    const order = h.order(nAt(pos)) || dayOrder();
+    const empty = paper.querySelector('.hs-empty');
+    if (showing.length && empty) empty.remove();
+    if (!showing.length && !empty) {
+      paper.innerHTML = `<p class="hs-empty">${escHtml(mode === 'book' ? t('Nothing written yet at this moment.') : t('This chapter doesn’t exist yet at this moment.'))}</p>`;
+      shown = {};
+    }
+    // sheets for the chapters shown, in order; others go
+    const secs = {};
+    for (const sec of paper.querySelectorAll('.rp-chapter')) {
+      if (showing.includes(sec.dataset.ch)) secs[sec.dataset.ch] = sec;
+      else { sec.remove(); delete shown[sec.dataset.ch]; }
+    }
+    let prev = null;
+    for (const ch of showing) {
+      let sec = secs[ch];
+      if (!sec) {
+        sec = document.createElement('section');
+        sec.dataset.ch = ch;
+        sec.innerHTML = '<div class="chapter-head"></div><div class="rp-body"></div>';
+      }
+      const kind = chapterKind(ch, meta);
+      sec.className = `rp-chapter sheet kind-${kind}` + (STORY_KINDS.includes(kind) ? '' : ' bookpage');
+      const label = chapterLabel(ch, order);
+      const head = sec.firstElementChild;
+      if (head.textContent !== label) head.textContent = label;
+      const where = prev ? prev.nextSibling : paper.firstChild;
+      if (where !== sec) paper.insertBefore(sec, where);
+      prev = sec;
+      if (drawBody(sec.lastElementChild, ch)) markDialogueOpening(sec.lastElementChild);
+    }
+    // a caret line's caret, put in where the paragraph and letter say
+    for (const c of paper.querySelectorAll('.rp-caret.rp-dom')) c.remove();
+    const hlSel = new Highlight();
+    if (caretAt && caretAt.f) {
+      const body = paper.querySelector(`.rp-chapter[data-ch="${CSS.escape(caretAt.ch)}"] .rp-body`);
+      const f = body && historyPoint(body, caretAt.f[0], caretAt.f[1]);
+      if (f) {
+        const mark = document.createElement('span');
+        mark.className = 'rp-caret rp-dom';
+        const r = document.createRange();
+        r.setStart(f[0], f[1]);
+        r.insertNode(mark);
+        const a = historyPoint(body, caretAt.a[0], caretAt.a[1]);
+        if (a && (caretAt.a[0] !== caretAt.f[0] || caretAt.a[1] !== caretAt.f[1])) {
+          const sr = document.createRange();
+          try {
+            sr.setStart(a[0], a[1]);
+            sr.setEnd(mark, 0);
+            if (sr.collapsed) { sr.setStartAfter(mark); sr.setEnd(a[0], a[1]); }
+            hlSel.add(sr);
+          } catch { /* a selection the page no longer has */ }
+        }
+      }
+    }
+    CSS.highlights.set('neo-replay-sel', hlSel);
+    if (follow) {
+      const c = paper.querySelector('.rp-caret');
+      if (c) {
+        const box = scroller.getBoundingClientRect();
+        const r = c.getBoundingClientRect();
+        if (r.top < box.top + 40 || r.bottom > box.bottom - 40) scroller.scrollTop += r.top - box.top - box.height * 0.4;
+      }
+    }
+    if (badgeUntil && now > badgeUntil) { badgeEl.hidden = true; badgeUntil = 0; }
+    paintFind(now);
+    paintPart();
+    renderRestore();
+    drawHead();
+  }
+
+  function drawHead() {
+    const x = total ? clock / total : 1;
+    headEl.style.left = (x * 100).toFixed(3) + '%';
+    timeline.setAttribute('aria-valuenow', String(Math.round(x * 100)));
+    drawWhen();
+    timeline.setAttribute('aria-valuetext', $h('.hs-when').textContent);
+  }
+
+  // the strip: how much was written in each sliver of the day, with the
+  // time away shaded and the markers above
+  function drawTimeline() {
+    if (view !== 'player' || !h) return;
+    const { g, W, H } = historyCanvas(canvas);
+    if (!total) return;
+    const X = (c) => (c / total) * (W - 2) + 1;
+    const top = 14;
+    for (const m of markers) {
+      if (m.kind !== 'away') continue;
+      g.fillStyle = 'rgba(128,128,128,0.13)';
+      g.fillRect(X(m.x), top, Math.max(1, X(m.to) - X(m.x)), H - top);
+    }
+    // what was written, and, faintly behind it, the caret moving around
+    const bins = new Float32Array(Math.ceil(W));
+    const nav = new Float32Array(Math.ceil(W));
+    steps.forEach((i, j) => {
+      const s = h.steps[i];
+      const into = s.k === 'e' && s.page !== false ? bins : s.k === 's' && s.by !== 'n' ? nav : null;
+      if (into) into[Math.min(into.length - 1, Math.floor(X(vt[j])))]++;
+    });
+    const bars = (b, color) => {
+      let max = 0;
+      for (const v of b) if (v > max) max = v;
+      g.fillStyle = color;
+      for (let x = 0; x < b.length; x++) {
+        if (!b[x]) continue;
+        const bh = Math.max(1, Math.sqrt(b[x] / max) * (H - top - 2));
+        g.fillRect(x, H - bh, 1, bh);
+      }
+    };
+    bars(nav, 'rgba(201,168,106,0.18)');
+    bars(bins, 'rgba(201,168,106,0.6)');
+    const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b' };
+    let lastLabel = -1e9;
+    g.font = '10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+    for (const m of markers) {
+      if (m.kind === 'away') continue;
+      const x = Math.round(X(m.x)) + 0.5;
+      g.strokeStyle = COLORS[m.kind];
+      g.fillStyle = COLORS[m.kind];
+      if (m.kind === 'session') {
+        g.beginPath(); g.moveTo(x, top); g.lineTo(x, H); g.stroke();
+        if (x - lastLabel > 60) {
+          g.fillStyle = '#8a857a';
+          const label = [historyWhen(h.steps[m.step].wall, HISTORY_TIME), stepDevice(h.steps[m.step])].filter(Boolean).join(' · ');
+          g.fillText(label, x + 3, 10);
+          lastLabel = x + g.measureText(label).width - 57;
+        }
+      } else {
+        g.beginPath(); g.moveTo(x - 3, top - 1); g.lineTo(x + 3, top - 1); g.lineTo(x, top + 4); g.closePath(); g.fill();
+      }
+    }
+  }
+
+  // what's at a point of the timeline, for the tooltip
+  function describe(c) {
+    const span = total / Math.max(1, timeline.clientWidth) * 5;
+    const near = markers.filter((m) => (m.kind === 'away' ? c >= m.x && c <= m.to : Math.abs(m.x - c) <= span) && m.kind !== 'session');
+    let lo = 0;
+    let hi = steps.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (vt[mid] <= c) lo = mid + 1; else hi = mid; }
+    const s = steps.length ? h.steps[steps[Math.max(0, Math.min(lo, steps.length) - 1)]] : null;
+    const lines = near.slice(0, 3).map((m) => m.label);
+    if (s) lines.push([historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · '));
+    return lines.join(' · ');
+  }
+
+  function drawAll() {
+    drawTimeline();
+    draw();
+    drawWhen();
+  }
+
+  /* ---------- restore: a moment back in the book ---------- */
+
+  // What a restore would bring back: the paragraphs picked, when they're
+  // in the text at this moment; else the chapter played, or in the whole
+  // book the picked paragraphs' chapter, else the caret's. None while it
+  // plays. { ch, paras }
+  function restoreTarget() {
+    if (!h || playing || !steps.length) return null;
+    syncPart();
+    if (part && part.h === h && !part.away && part.b > part.a && chapters[part.ch] !== undefined) return { ch: part.ch, paras: true };
+    const ch = mode !== 'book' ? mode : part && !part.away ? part.ch : caretAt ? caretAt.ch : null;
+    return ch && !Rec.isStream(ch) && chapters[ch] !== undefined ? { ch, paras: false } : null;
+  }
+  // the moment on the sheet, as the recording names it: [session, line, device], and when
+  function momentRef() {
+    const s = h.steps[pos ? steps[pos - 1] : steps[0]];
+    const x = h.sessions[s.session];
+    return { ref: [x.id, pos ? s.line : 1, x.device], when: historyWhen(s.wall, HISTORY_MOMENT) };
+  }
+  let restoreSig = '';
+  let restoring = false; // finding picked paragraphs as they are now
+  function renderRestore() {
+    if (restoring) return;
+    const target = restoreTarget();
+    const sig = target ? [h.key, pos, target.ch, target.paras ? part.a + '-' + part.b : '', mode].join(':') : '';
+    if (sig === restoreSig) return;
+    restoreSig = sig;
+    restoreBtn.hidden = !target;
+    if (!target) return;
+    const ch = target.ch;
+    if (target.paras) {
+      const c = chapters[ch];
+      restoreBtn.disabled = false;
+      restoreBtn.textContent = c.find(part.a) !== c.find(part.b - 1) ? t('Restore these paragraphs to this moment') : t('Restore this paragraph to this moment');
+      restoreBtn.title = t('NEO finds them in the book as it is now and puts them back as they are here. What they hold now goes to Darlings. × beside the paragraph’s name restores the whole chapter instead.');
+      return;
+    }
+    const inBook = meta.chapterOrder.includes(ch);
+    const same = inBook && here && book && book.id === bookId && chapterHTML[ch] === chapters[ch].toString();
+    restoreBtn.disabled = same;
+    restoreBtn.textContent = same ? t('As it is now') : inBook ? t('Restore {chapter} to this moment', { chapter: chapterName(ch, meta) }) : t('Put this chapter back');
+    restoreBtn.title = same ? '' : inBook ? t('The chapter becomes what you see here. What it holds now goes to Darlings.')
+      : t('The chapter comes back as you see it here, after the chapter it followed.');
+  }
+  // What a restore will do, said before it does it: what the chapter
+  // becomes, where what it holds now goes, how to undo it, and what the
+  // history and the backups keep
+  async function confirmRestore({ ch, html, before, when }) {
+    const words = (x) => {
+      const holder = document.createElement('div');
+      holder.innerHTML = x || '';
+      return countWords([...holder.children].map((p) => p.textContent).join(' ') || holder.textContent);
+    };
+    const undo = here ? t('{key}, with the caret outside the text, undoes it at once.', { key: KZ })
+      : t('The book opens first. {key}, with the caret outside the text, undoes the restore at once.', { key: KZ });
+    const kept = t('Writing History keeps both versions: the restore is recorded, and you can come back to this moment, or any other, later.');
+    if (meta.chapterOrder.includes(ch)) {
+      const chapter = chapterName(ch, meta);
+      let now = '';
+      try { now = here && book && book.id === bookId ? chapterHTML[ch] || '' : (await window.neo.readChapter(bookId, ch)) || ''; } catch { /* unread: said as nothing */ }
+      const nowWords = words(now);
+      return confirmModal({
+        title: t('Restore {chapter} to {when}?', { chapter, when }),
+        points: [
+          t('{chapter} will read exactly as it does here: {n} words, where it has {now} now.', { chapter, n: words(html), now: nowWords }),
+          nowWords ? t('What it holds now goes to Darlings, as “{label}”, so no words are lost.', { label: t('{chapter}, before restoring to {when}', { chapter, when }) }) : t('It is empty now, so nothing goes to Darlings.'),
+          undo,
+          kept,
+          t('NEO’s daily backups in the Backups folder aren’t touched: the latest still holds the chapter as it was when that backup was made.')
+        ],
+        ok: t('Restore')
+      });
+    }
+    const prev = [...before].reverse().find((x) => meta.chapterOrder.includes(x));
+    return confirmModal({
+      title: t('Put this chapter back as it was on {when}?', { when }),
+      points: [
+        prev ? t('It comes back as a new chapter after {chapter}, reading exactly as it does here ({n} words).', { chapter: chapterName(prev, meta), n: words(html) })
+          : t('It comes back as a new chapter at the start of the book, reading exactly as it does here ({n} words).', { n: words(html) }),
+        t('Nothing else in the book changes.'),
+        undo,
+        kept
+      ],
+      ok: t('Put it back')
+    });
+  }
+
+  restoreBtn.addEventListener('click', async () => {
+    const target = restoreTarget();
+    if (!target) return;
+    if (target.paras) { restoreParagraphs(); return; }
+    const ch = target.ch;
+    const n = nAt(pos);
+    const html = chapters[ch].toString();
+    let title = '';
+    try {
+      const tt = h.doc(n)[Rec.STREAMS.titles];
+      title = (tt !== undefined && JSON.parse(String(tt))[ch]) || '';
+    } catch { /* no titles then */ }
+    const order = h.order(n) || dayOrder();
+    const at = order.indexOf(ch);
+    const before = at < 0 ? order.slice() : order.slice(0, at);
+    const { ref, when } = momentRef();
+    setPlaying(false);
+    if (!(await confirmRestore({ ch, html, before, when }))) { bd.focus(); return; }
+    close();
+    historyRestore({ bookId, ch, html, title, before, when, ref }).catch((err) => {
+      window.neo.logError('history restore: ' + (err && err.stack || err));
+      toast(t('That couldn’t be restored. The book is as it was.'));
+    });
+  });
+
+  // Copy from a moment: what's selected on the sheet, without the player's
+  // caret, and remembered, so a paste of it in the book is recorded as from
+  // this book, and from this moment
+  paper.addEventListener('copy', (e) => {
+    const sel = window.getSelection();
+    if (!h || !steps.length || !sel.rangeCount || sel.isCollapsed || !e.clipboardData) return;
+    const text = String(sel);
+    const holder = document.createElement('div');
+    holder.appendChild(sel.getRangeAt(0).cloneContents());
+    for (const m of holder.querySelectorAll('.rp-caret')) m.remove();
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+    e.clipboardData.setData('text/html', holder.innerHTML);
+    historyRemember(text, momentRef().ref);
+  });
+
+  /* ---------- restoring paragraphs ---------- */
+
+  // The book's chapters as they are now: the open book's, or read from disk
+  async function chaptersNow() {
+    if (here && book && book.id === bookId) return Object.fromEntries(book.chapterOrder.filter((c) => chapterHTML[c] !== undefined).map((c) => [c, chapterHTML[c]]));
+    const out = {};
+    for (const c of meta.chapterOrder) out[c] = (await window.neo.readChapter(bookId, c).catch(() => '')) || '';
+    return out;
+  }
+
+  // Where paragraphs a…b of chapter ch, as the sheet shows them, are in the
+  // book now. They're carried through the rest of this day a step at a
+  // time, through each later day that changed the chapter a day at a time
+  // (the cache's day states, in the worker: Rec.partDays), and to the
+  // chapter as it is. Where that loses them (taken out, moved, or their
+  // chapter deleted), they're looked for by their words in every chapter
+  // (Rec.findParagraphs), which costs milliseconds. Returns { ch, a, b,
+  // now, moved } where they are, or { gone, day, chapter, elsewhere }.
+  async function trackToNow(ch, a, b, now) {
+    const q = { ch, a, b };
+    let last = '';
+    let day = h.day;
+    let chapterGone = false;
+    // the rest of this day, a step at a time
+    for (let i = nAt(pos); i < h.steps.length && !q.gone; i++) {
+      const w = { a: q.a, b: q.b };
+      Rec.partMove(h, q, i, i + 1);
+      if (q.gone) {
+        const c = h.doc(i)[ch];
+        last = c ? c.toString().slice(w.a, w.b) : '';
+        chapterGone = h.steps[i].k === 'd';
+      }
+    }
+    let html = h.end[ch] || '';
+    // each later day, from the cache
+    if (!q.gone && window.neo.recTrack && S.entries.some((e) => e.day > h.day && e.kinds && e.kinds[ch] !== undefined)) {
+      const r = await window.neo.recTrack(bookId, h.day, { ch, a: q.a, b: q.b }, html);
+      Object.assign(q, r.part);
+      html = r.html;
+      if (r.gone) { q.gone = true; last = r.last || ''; day = r.day || day; chapterGone = r.chapter; }
+    }
+    // and to the book as it is
+    if (!q.gone) {
+      const cur = now[ch];
+      if (cur === undefined) {
+        q.gone = chapterGone = true;
+        last = html.slice(q.a, q.b);
+      } else {
+        const w = { a: q.a, b: q.b };
+        Rec.partSplices(q, Rec.splices(html, cur), 1);
+        if (q.gone) last = html.slice(w.a, w.b);
+        else {
+          // whole paragraphs, as they stand now
+          const c = Rec.ChapterText.of(Rec.paragraphs(cur));
+          const i = c.find(q.a);
+          const j = c.find(Math.max(q.a, q.b - 1));
+          return { ch, a: c.startOf(i), b: c.startOf(j) + c.parts[j].length, now: cur, moved: false };
+        }
+      }
+    }
+    // lost on the way: by their words, as they last were, or as they are here
+    const then = chapters[ch].toString().slice(a, b);
+    const found = (last && Rec.findParagraphs(last, now)) || Rec.findParagraphs(then, now);
+    if (found && found.ch === ch) return { ch, a: found.a, b: found.b, now: now[ch], moved: true };
+    return { gone: true, day, chapter: chapterGone, elsewhere: found };
+  }
+
+  // Restore the paragraphs picked: found as they are now, then a
+  // confirmation that says what changes; or, when they aren't in their
+  // chapter any more, what became of them, and an offer to copy them, or
+  // put them in Darlings, as they are here
+  async function restoreParagraphs() {
+    setPlaying(false);
+    const ch = part.ch;
+    const { a, b } = part;
+    const then = chapters[ch].toString().slice(a, b);
+    const { ref, when } = momentRef();
+    const many = chapters[ch].find(a) !== chapters[ch].find(b - 1);
+    const chapter = meta.chapterOrder.includes(ch) ? chapterName(ch, meta) : t('a deleted chapter');
+    restoring = true;
+    restoreBtn.disabled = true;
+    restoreBtn.textContent = t('Finding them in the book as it is now…');
+    let r;
+    try {
+      r = await trackToNow(ch, a, b, await chaptersNow());
+    } catch (err) {
+      window.neo.logError('history restore: ' + (err && err.stack || err));
+      toast(t('That couldn’t be restored. The book is as it was.'));
+    }
+    restoring = false;
+    restoreSig = '';
+    renderRestore();
+    if (!r || !bd.isConnected) return;
+    if (r.gone) {
+      const lost = r.elsewhere
+        ? t('They seem to be in {chapter} now: NEO found words like theirs there. It can’t restore them in place, but it can copy them as they were on {when}.', { chapter: chapterName(r.elsewhere.ch, meta), when })
+        : r.chapter
+          ? t('Their chapter was deleted on {day}, and NEO can’t find these words anywhere else in the book. It can copy them as they were on {when}.', { day: historyWhen(historyDayMs(r.day), HISTORY_DATE), when })
+          : t('They were taken out on {day}, and NEO can’t find them anywhere else in the book. It can copy them as they were on {when}.', { day: historyWhen(historyDayMs(r.day), HISTORY_DATE), when });
+      const title = !meta.chapterOrder.includes(ch)
+        ? (many ? t('The chapter these paragraphs were in was deleted') : t('The chapter this paragraph was in was deleted'))
+        : many ? t('These paragraphs aren’t in {chapter} any more', { chapter }) : t('This paragraph isn’t in {chapter} any more', { chapter });
+      const how = await optionModal(escHtml(title), escHtml(lost), [
+        { label: escHtml(t('Copy to the clipboard')), desc: escHtml(t('Then paste them wherever you want them.')), value: 'copy' },
+        { label: escHtml(t('Add to Darlings, and copy')), desc: escHtml(t('They wait in Darlings, labelled with where and when they came from.')), value: 'darlings' }
+      ]);
+      bd.focus();
+      if (!how) return;
+      try {
+        await historyClip(then, ref);
+        if (how === 'darlings') {
+          await historyToDarlings(bookId, then, t('From {chapter}, as it was on {when}', { chapter, when }));
+          toast(t('In Darlings, and copied, as they were on {when}.', { when }));
+        } else toast(t('Copied as they were on {when}. Paste them wherever you want them.', { when }));
+      } catch (err) {
+        window.neo.logError('history copy: ' + (err && err.stack || err));
+        toast(t('NEO couldn’t copy them. Select them on the page and press {key} instead.', { key: IS_MAC ? '⌘C' : 'Ctrl+C' }));
+      }
+      return;
+    }
+    const nowHtml = r.now.slice(r.a, r.b);
+    if (nowHtml === then) { toast(many ? t('These paragraphs are already as they were then.') : t('This paragraph is already as it was then.')); return; }
+    const words = (x) => Rec.countWords(x);
+    const nowWords = words(nowHtml);
+    const sure = await confirmModal({
+      title: many ? t('Restore these paragraphs to {when}?', { when }) : t('Restore this paragraph to {when}?', { when }),
+      points: [
+        t('They will read exactly as they do here: {n} words, where they have {now} now.', { n: words(then), now: nowWords }),
+        ...(r.moved ? [t('They have moved within {chapter} since; NEO found them by their words.', { chapter })] : []),
+        nowWords ? t('What they hold now goes to Darlings, as “{label}”, so no words are lost.', { label: t('{chapter}, before restoring paragraphs to {when}', { chapter, when }) }) : t('They are empty now, so nothing goes to Darlings.'),
+        t('Nothing else in {chapter} changes.', { chapter }),
+        here ? t('{key}, with the caret outside the text, undoes it at once.', { key: KZ })
+          : t('The book opens first. {key}, with the caret outside the text, undoes the restore at once.', { key: KZ }),
+        t('Writing History keeps both versions: the restore is recorded, and you can come back to this moment, or any other, later.'),
+        t('NEO’s daily backups in the Backups folder aren’t touched: the latest still holds the chapter as it was when that backup was made.')
+      ],
+      ok: t('Restore')
+    });
+    if (!sure) { bd.focus(); return; }
+    close();
+    historyRestore({ bookId, ch, html: then, when, ref, paras: { a: r.a, b: r.b, expect: r.now } }).catch((err) => {
+      window.neo.logError('history restore: ' + (err && err.stack || err));
+      toast(t('That couldn’t be restored. The book is as it was.'));
+    });
+  }
+
+  // Delete this book's history: to the system trash, once the writer has
+  // read what goes and typed the phrase that says so
+  deleteBtn.hidden = !window.neo.recDelete;
+  deleteBtn.textContent = t('Delete this book’s history…');
+  deleteBtn.addEventListener('click', async () => {
+    setPlaying(false);
+    const bin = navigator.platform.toLowerCase().includes('win');
+    const sure = await confirmModal({
+      title: t('Delete the Writing History of “{title}”?', { title: isUntitled(meta.title) ? t('Untitled') : meta.title }),
+      points: [
+        t('Every replay of how this book was written goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
+        t('The book itself is untouched: every chapter, note and Darling stays as it is.'),
+        bin ? t('The history, and its copy in the Backups folder, go to the Recycle Bin. You can get them back from there until it is emptied, but not from inside NEO.')
+          : t('The history, and its copy in the Backups folder, go to the Trash. You can get them back from there until it is emptied, but not from inside NEO.'),
+        library.recordWriting !== false ? t('NEO starts a new history from the book as it is now.') : t('Writing History is off, so nothing new is recorded until you turn it on.')
+      ],
+      ok: t('Delete history'),
+      danger: true,
+      phrase: t('delete history')
+    });
+    bd.focus();
+    if (!sure) return;
+    const recording = rec.on && rec.bookId === bookId;
+    if (recording) await rec.end();
+    let ok = false;
+    try { ok = await window.neo.recDelete(bookId); } catch (err) { window.neo.logError('history delete: ' + (err && err.stack || err)); }
+    if (recording && book && book.id === bookId && recordingWanted()) await recRestart(bookId);
+    if (!bd.isConnected) return;
+    if (ok) toast(t('This book’s Writing History is in the trash. The book is untouched.'), 8000);
+    restoreSig = '';
+    await load();
+  });
+
+  /* ---------- the controls ---------- */
+
+  playBtn.addEventListener('click', () => setPlaying(!playing));
+  backBtn.addEventListener('click', () => showDays(curDay()));
+  const speeds = $h('.hs-speeds');
+  speeds.setAttribute('aria-label', t('Speed'));
+  for (const sp of HISTORY_SPEEDS) {
+    const b = document.createElement('button');
+    b.textContent = sp + '×';
+    b.dataset.speed = sp;
+    b.setAttribute('aria-pressed', String(sp === historyPrefs.speed));
+    b.addEventListener('click', () => {
+      historyPrefs.speed = sp;
+      for (const x of speeds.children) x.setAttribute('aria-pressed', String(+x.dataset.speed === sp));
+    });
+    speeds.appendChild(b);
+  }
+  const skip = $h('.hs-skip input');
+  skip.checked = historyPrefs.skip;
+  skip.addEventListener('change', () => {
+    historyPrefs.skip = skip.checked;
+    if (!h) return;
+    const p = pos;
+    timeClock();
+    clock = p ? vt[p - 1] : 0;
+    drawTimeline();
+    drawHead();
+  });
+  const fromPointer = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total;
+  };
+  timeline.addEventListener('pointerdown', (e) => {
+    if (!h || !total) return;
+    timeline.setPointerCapture(e.pointerId);
+    seekClock(fromPointer(e));
+    const move = (ev) => seekClock(fromPointer(ev));
+    const up = () => { timeline.removeEventListener('pointermove', move); timeline.removeEventListener('pointerup', up); };
+    timeline.addEventListener('pointermove', move);
+    timeline.addEventListener('pointerup', up);
+  });
+  timeline.addEventListener('mousemove', (e) => {
+    if (!h || !total) return;
+    const text = describe(fromPointer(e));
+    tip.textContent = text;
+    tip.hidden = !text;
+    const r = timeline.getBoundingClientRect();
+    tip.style.left = Math.max(0, Math.min(r.width - tip.offsetWidth, e.clientX - r.left - tip.offsetWidth / 2)) + 'px';
+  });
+  timeline.addEventListener('mouseleave', () => { tip.hidden = true; });
+
+  // reading back while it plays: the sheet stops following the caret
+  scroller.addEventListener('wheel', () => { follow = false; }, { passive: true });
+
+  bd.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.target === qIn) {
+      if (e.key === 'Enter') { e.preventDefault(); runFind(qIn.value); } else if (e.key === 'Escape') { e.preventDefault(); if (qIn.value || find) clearFind(); else bd.focus(); }
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); close.focusFind(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close.back();
+      return;
+    }
+    if (e.target.closest('button, input, select') && (e.key === ' ' || e.key === 'Enter')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (view === 'days') {
+      // ← and → walk the days, showing each as it ended; Space or Enter plays the one shown
+      const fits = fitting();
+      const at = fits.indexOf(dsel);
+      const go = (k) => { const di = fits[Math.max(0, Math.min(k, fits.length - 1))]; if (di !== undefined && di !== dsel) showDays(di); };
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (S.days[dsel]) openPlayer(S.days[dsel].from, { playIt: true }); } else if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); } else if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); } else if (e.key === 'Home') { e.preventDefault(); go(0); } else if (e.key === 'End') { e.preventDefault(); go(fits.length - 1); }
+      return;
+    }
+    if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); return; }
+    if (part && !e.shiftKey && (e.key === '[' || e.key === ']' || e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+      e.preventDefault();
+      partGo(e.key === '[' || e.code === 'BracketLeft' ? -1 : 1);
+      return;
+    }
+    if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); skipSession(e.key === 'ArrowLeft' ? -1 : 1); return; }
+    if (!h) return;
+    const jump = Math.max(5000, total / 50);
+    if (e.key === 'ArrowLeft') { e.preventDefault(); seekClock(clock - jump); } else if (e.key === 'ArrowRight') { e.preventDefault(); seekClock(clock + jump); } else if (e.key === 'Home') { e.preventDefault(); seek(0); } else if (e.key === 'End') { e.preventDefault(); seek(steps.length); }
+  });
+
+  /* ---------- search: when a phrase came, went, or moved ---------- */
+
+  // The first pass (the day states) answers at once; the worker then looks
+  // inside the days that pass can't see into, and its findings replace
+  // the first pass's as they come (foundMore)
+  async function runFind(text) {
+    text = String(text || '').trim();
+    if (!text || !S.devices.length || !window.neo.recSearch) { clearFind(); return; }
+    if (find && find.within) window.neo.recSearchStop(bookId).catch(() => {});
+    const sid = ++historyFindSeq;
+    if (qIn.value.trim() !== text) qIn.value = text;
+    const phrase = { text, ...historyFindOpts };
+    find = { phrase, sid, findings: null, within: null, finished: false, stopped: false, error: false };
+    renderFind();
+    try {
+      const r = await window.neo.recSearch(bookId, phrase, sid);
+      if (!find || find.sid !== sid) return;
+      // (the worker's later findings can come before this answer does)
+      if (!find.finished && !find.stopped) {
+        find.findings = r.findings;
+        find.within = find.within || { done: 0, total: 0 };
+      }
+    } catch (err) {
+      if (!find || find.sid !== sid) return;
+      window.neo.logError('history search: ' + (err && err.stack || err));
+      find.error = true;
+    }
+    renderFind();
+    if (h) draw();
+  }
+
+  function foundMore(m) {
+    if (m.error) {
+      window.neo.logError('history search: ' + m.error);
+      find.within = null;
+      find.stopped = true;
+    } else if (m.findings) {
+      find.findings = m.findings;
+      find.finished = !!m.finished;
+      find.stopped = !m.finished;
+      find.within = null;
+    } else if (!find.stopped) find.within = { done: m.done, total: m.total };
+    renderFind();
+  }
+
+  function stopFind() {
+    if (!find || !find.within) return;
+    window.neo.recSearchStop(bookId).catch(() => {});
+    find.within = null;
+    find.stopped = true;
+    renderFind();
+  }
+
+  function clearFind() {
+    if (find && find.within) window.neo.recSearchStop(bookId).catch(() => {});
+    find = null;
+    qIn.value = '';
+    renderFind();
+    CSS.highlights.delete('neo-replay-find');
+  }
+
+  const FIND_KINDS = { first: tk('First written'), last: tk('Last written'), out: tk('Written out'), moved: tk('Moved') };
+  function renderFind() {
+    results.hidden = !find;
+    results.replaceChildren();
+    markFound();
+    if (!find) return;
+    const note = (text) => {
+      const p = document.createElement('div');
+      p.className = 'hs-find-note';
+      p.textContent = text;
+      results.appendChild(p);
+      return p;
+    };
+    if (find.error) { note(t('The history couldn’t be searched.')); return; }
+    const f = find.findings;
+    if (!f) { note(S.building ? t('Reading the history…') : t('Searching…')); return; }
+    const name = (ch) => (meta.chapterOrder.includes(ch) ? chapterLabel(ch, meta.chapterOrder) : goneLead(ch) || t('Untitled'));
+    const unsure = !find.finished;
+    const hit = (kind, x, sub) => {
+      const b = document.createElement('button');
+      b.className = 'hs-ch hs-hit';
+      b.innerHTML = '<span class="hs-ch-name"></span><span class="hs-ch-when"></span>';
+      b.firstChild.textContent = t(FIND_KINDS[kind]) + ' · ' + historyWhen(historyDayMs(x.day), HISTORY_DAY);
+      b.lastChild.textContent = sub;
+      b.title = historyWhen(historyDayMs(x.day), HISTORY_DATE);
+      b.addEventListener('click', () => goFind(kind, x));
+      results.appendChild(b);
+    };
+    if (f.first) hit('first', f.first, name(f.first.ch) + (unsure ? ' · ' + t('perhaps earlier') : ''));
+    if (f.last) hit('last', f.last, name(f.last.ch) + (unsure ? ' · ' + t('perhaps later') : ''));
+    if (f.out) hit('out', f.out, name(f.out.ch) + (unsure ? ' · ' + t('perhaps later') : ''));
+    for (const m of f.moved.slice(-20)) hit('moved', m, name(m.from) + ' → ' + name(m.to));
+    if (!f.first && !find.within) note(t('Never written in this history.'));
+    else if (f.first) note(f.total ? t('In the book now: {n} times', { n: f.total }) : t('Not in the book now.'));
+    if (find.within) {
+      const p = note(find.within.total ? t('Looking inside each day: {n} of {total}', { n: find.within.done, total: find.within.total }) : t('Looking inside each day…'));
+      const stop = document.createElement('button');
+      stop.className = 'hs-find-stop';
+      stop.textContent = t('Stop');
+      stop.addEventListener('click', stopFind);
+      p.appendChild(stop);
+    }
+  }
+
+  // the days the findings name, marked on the strip and beside the timeline
+  function markFound() {
+    const days = new Set();
+    const f = find && find.findings;
+    if (f) {
+      for (const x of [f.first, f.last, f.out]) if (x) days.add(x.day);
+      for (const m of f.moved) days.add(m.day);
+    }
+    for (const b of bd.querySelectorAll('.hs-tile')) b.classList.toggle('hs-found', days.has(b.dataset.day));
+  }
+
+  // A finding picked: its day in the player, stopped at the moment it
+  // means, in the chapter that moment was in
+  async function goFind(kind, x) {
+    const di = dayIndex(x.day);
+    if (di < 0 || !find) return;
+    const phrase = find.phrase;
+    let day;
+    try { day = await loadDay(di); } catch { openPlayer(S.days[di].from); return; }
+    if (!bd.isConnected || !find || find.phrase !== phrase) return;
+    const ev = Rec.phraseEvents(day, phrase);
+    const e = Rec.phrasePick(ev.events, ev.start, kind, x.to || null);
+    await openPlayer(S.days[di].from, { ch: (e && e.ch) || x.to || x.ch || null });
+    if (!e || e.step < 0 || h !== day) return;
+    let p = 0;
+    while (p < steps.length && steps[p] <= e.step) p++;
+    seek(p);
+  }
+
+  // The phrase on the sheets, with the Highlight API. While playing, at most
+  // a few times a second: a whole book's text is walked each time.
+  let findPainted = 0;
+  let findLater = 0;
+  function paintFind(now) {
+    clearTimeout(findLater);
+    if (!find || !find.findings) { CSS.highlights.delete('neo-replay-find'); return; }
+    if (now - findPainted < 250) { findLater = setTimeout(() => paintFind(performance.now()), 260); return; }
+    findPainted = now;
+    const { q, word, cs } = Rec.phraseQuery(find.phrase);
+    const hl = new Highlight();
+    for (const body of paper.querySelectorAll('.rp-body')) {
+      for (const el of body.children) {
+        const nodes = [];
+        let text = '';
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n; (n = walk.nextNode());) { nodes.push([n, text.length]); text += n.data; }
+        if (!text) continue;
+        const m = Rec.normMap(text, cs);
+        const point = (at) => {
+          let k = nodes.length - 1;
+          while (k > 0 && nodes[k][1] > at) k--;
+          return [nodes[k][0], Math.min(at - nodes[k][1], nodes[k][0].length)];
+        };
+        for (const at of Rec.phraseIn(m.s, q, word)) {
+          const r = document.createRange();
+          r.setStart(...point(m.from[at]));
+          r.setEnd(...point(m.to[at + q.length - 1]));
+          hl.add(r);
+        }
+      }
+    }
+    CSS.highlights.set('neo-replay-find', hl);
+  }
+
+  qIn.addEventListener('input', () => { if (!qIn.value && find) clearFind(); });
+
+  /* ---------- paragraphs picked: the times they changed ---------- */
+
+  // A click on the sheet picks the paragraph under it (a selection, the
+  // paragraphs it runs through); ‹ and › (or [ and ]) then go to the time
+  // before and the next time they changed, as each bout of changing them
+  // left them (Rec.partNext, Rec.partPrev), across days. In the days, a
+  // click opens the player at the day's end with the paragraph picked.
+  paper.addEventListener('click', (e) => {
+    if (!h || (view !== 'player' && view !== 'days')) return;
+    const body = e.target.closest('.rp-body');
+    if (!body || !body.parentElement.dataset.ch) return;
+    const sel = window.getSelection();
+    const spans = sel && !sel.isCollapsed && body.contains(sel.anchorNode) && body.contains(sel.focusNode);
+    pickPart(body.parentElement.dataset.ch, spans ? sel.anchorNode : e.target, spans ? sel.focusNode : e.target);
+  });
+
+  // the paragraphs of chapter ch from the one holding node `from` to the one holding `to`
+  function pickPart(ch, from, to = from) {
+    const st = shown[ch];
+    const c = chapters[ch];
+    if (!st || st.whole || !c) return; // (drawn whole: its paragraphs aren't told apart)
+    const pieceOf = (node) => st.nodes.findIndex((ns) => ns.some((x) => x === node || x.contains(node)));
+    let i = pieceOf(from);
+    let j = pieceOf(to);
+    if (i < 0 || j < 0) return;
+    if (i > j) [i, j] = [j, i];
+    ++partSeq;
+    ++probeSeq;
+    partNear = null;
+    part = { ch, a: c.startOf(i), b: c.startOf(j) + c.parts[j].length, h, n: nAt(pos) };
+    if (view === 'days') { const di = curDay(); if (S.days[di]) openPlayer(S.days[di].to - 1, { at: 'end' }); return; }
+    paintPart();
+    renderRestore();
+  }
+
+  function clearPart() {
+    ++partSeq;
+    ++probeSeq;
+    partNear = null;
+    if (!part) return;
+    part = null;
+    renderPart();
+    CSS.highlights.delete('neo-replay-part');
+    renderRestore();
+  }
+
+  // The part, carried to where the player is, and made whole paragraphs
+  // again. Where it isn't in the text (not written yet, or after its
+  // chapter went) it stays where it was last seen (`away`) and comes back
+  // when the player does.
+  function syncPart() {
+    if (!part || part.h !== h) return;
+    const n = nAt(pos);
+    if (part.n !== n) {
+      const q = Rec.partMove(h, { ch: part.ch, a: part.a, b: part.b }, part.n, n);
+      part.away = !!q.gone && (n < part.n || q.b > q.a); // (gone forward with nothing left: taken out, and shown so)
+      if (!part.away) Object.assign(part, { a: q.a, b: q.b, n });
+    }
+    const c = chapters[part.ch];
+    if (c && c.parts.length && part.b > part.a && !part.away) {
+      const i = c.find(part.a);
+      const j = c.find(part.b - 1);
+      part.a = c.startOf(i);
+      part.b = c.startOf(j) + c.parts[j].length;
+    }
+  }
+
+  // Another day in the player: the part goes with it when no day between
+  // the two changed its chapter (the next day played on into, ⇧→, a day
+  // either side); otherwise it's put down
+  function carryPart(from, to) {
+    if (!part || !from || part.h !== from || from === to) return;
+    const ch = part.ch;
+    const a = dayIndex(from.day);
+    const b = dayIndex(to.day);
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    if (a < 0 || b < 0 || a === b || S.days.slice(lo + 1, hi).some((d) => d.stats.chapters.includes(ch))) { clearPart(); return; }
+    const q = { ch, a: part.a, b: part.b };
+    let n = 0;
+    if (b > a) {
+      Rec.partMove(from, q, part.n, from.steps.length);
+      Rec.partSplices(q, Rec.splices(from.end[ch] || '', to.start[ch] || ''), 1);
+    } else {
+      Rec.partMove(from, q, part.n, 0);
+      Rec.partSplices(q, Rec.splices(to.end[ch] || '', from.start[ch] || ''), -1);
+      n = to.steps.length;
+    }
+    if (q.gone && q.b > q.a) { clearPart(); return; }
+    part = { ch, a: q.a, b: q.b, h: to, n };
+    partNear = null;
+  }
+
+  function renderPart() {
+    partEl.classList.toggle('hs-part-on', !!part);
+    const c = part && chapters[part.ch];
+    const name = !part ? t('Click a paragraph to step through its changes')
+      : part.away ? t('Not in the text at this moment')
+        : part.b <= part.a ? t('Taken out here')
+          : c && c.parts.length && c.find(part.a) !== c.find(part.b - 1) ? t('These paragraphs') : t('This paragraph');
+    const label = partEl.querySelector('.hs-part-name');
+    if (label.textContent !== name) label.textContent = name;
+    // ‹ and ›: off where there's nothing that way (once looked for)
+    const near = partNear && partNear.key === partKey() ? partNear : null;
+    for (const [way, b] of [['prev', partEl.querySelector('.hs-part-prev')], ['next', partEl.querySelector('.hs-part-next')]]) {
+      const off = !!near && near[way] === null;
+      if (b.disabled !== off) b.disabled = off;
+    }
+  }
+
+  // The part on the sheet, with the Highlight API: its paragraphs' nodes
+  function paintPart() {
+    renderPart();
+    const hl = new Highlight();
+    const st = part && part.h === h && !part.away && shown[part.ch];
+    const c = st && chapters[part.ch];
+    if (c && !st.whole && part.b > part.a && st.nodes.length === c.parts.length) {
+      const nodes = st.nodes.slice(c.find(part.a), c.find(part.b - 1) + 1).flat();
+      if (nodes.length) {
+        const r = document.createRange();
+        r.setStartBefore(nodes[0]);
+        r.setEndAfter(nodes[nodes.length - 1]);
+        hl.add(r);
+      }
+    }
+    CSS.highlights.set('neo-replay-part', hl);
+    probePart();
+  }
+
+  let partSaid = 0;
+  function partSay(text, ms = 1600) {
+    badgeEl.textContent = text;
+    badgeEl.hidden = false;
+    badgeUntil = performance.now() + ms;
+    clearTimeout(partSaid);
+    partSaid = setTimeout(() => { if (badgeUntil && performance.now() >= badgeUntil) { badgeEl.hidden = true; badgeUntil = 0; } }, ms + 50);
+  }
+
+  // where the part is, which what ‹ and › found from there is kept for
+  const partKey = () => (part && h ? [h.key, part.n, part.a, part.b].join(':') : '');
+
+  // The time before the part changed (dir -1), or the next time it did
+  // (1), from where it was last seen: in this day, then day by day through
+  // the days that changed its chapter. A day's start and the next day's
+  // (the cache's day states) say whether the day changed the part at all,
+  // so only a day that did is loaded and looked through. { x (the day's
+  // History), di, found } or null for none; undefined once stale() says a
+  // newer look made this one moot.
+  async function partFind(dir, stale) {
+    const ch = part.ch;
+    let x = h;
+    let di = curDay();
+    let p = { ch, a: part.a, b: part.b };
+    let found = dir > 0 ? Rec.partNext(x, p, part.n) : Rec.partPrev(x, p, part.n);
+    let cur = (dir > 0 ? x.end[ch] : x.start[ch]) || '';
+    const starts = new Map();
+    const startOf = async (d) => {
+      if (!starts.has(d)) starts.set(d, window.neo.recDayStart(bookId, S.days[d].day).then((r) => (r && r.page) || {}));
+      return (await starts.get(d))[ch] || '';
+    };
+    while (!found && !p.gone && di >= 0) {
+      let d = di + dir;
+      while (d >= 0 && d < S.days.length && !S.days[d].stats.chapters.includes(ch)) d += dir;
+      if (d < 0 || d >= S.days.length) break;
+      const st = await startOf(d);
+      if (stale() || !bd.isConnected) return undefined;
+      if (dir > 0) {
+        Rec.partSplices(p, Rec.splices(cur, st), 1); // (one day's end to the next's start: nothing, as a rule)
+        const q = { ...p };
+        const end = d + 1 < S.days.length ? await startOf(d + 1) : null;
+        if (stale() || !bd.isConnected) return undefined;
+        if (end !== null && !Rec.partSplices(q, Rec.splices(st, end), 1)) { p = q; cur = end; di = d; continue; }
+        x = await loadDay(d);
+        if (stale() || !bd.isConnected) return undefined;
+        found = Rec.partNext(x, p, 0);
+        cur = x.end[ch] || '';
+      } else {
+        const q = { ...p };
+        const list = Rec.splices(st, cur);
+        const texts = [];
+        list.reduce((html, s) => { const next = Rec.applyEdit(html, s.at, s.del, s.ins); texts.push(next); return next; }, st);
+        if (!Rec.partSplices(q, list, -1, (k) => texts[k])) { p = q; cur = st; di = d; continue; }
+        x = await loadDay(d);
+        if (stale() || !bd.isConnected) return undefined;
+        found = Rec.partPrev(x, p, x.steps.length, { strict: false });
+        cur = x.start[ch] || '';
+      }
+      di = d;
+    }
+    return found ? { x, di, found } : null;
+  }
+
+  // Once the player stops, ‹ and › look ahead, so a way with nothing is off
+  let partNear = null; // { key, prev, next }: each a partFind's answer
+  let probeSeq = 0;
+  let probeTimer = 0;
+  function probePart() {
+    if (!part || playing || view !== 'player' || !h) return;
+    const key = partKey();
+    if (partNear && partNear.key === key) return;
+    clearTimeout(probeTimer);
+    partNear = { key };
+    const mine = ++probeSeq;
+    probeTimer = setTimeout(async () => {
+      for (const way of ['prev', 'next']) {
+        let r;
+        try { r = await partFind(way === 'prev' ? -1 : 1, () => mine !== probeSeq); } catch { r = undefined; }
+        if (mine !== probeSeq || !partNear || partNear.key !== key || r === undefined) return;
+        partNear[way] = r;
+        renderPart();
+      }
+    }, 150);
+  }
+
+  async function partGo(dir) {
+    if (!part || !h || view !== 'player') return;
+    setPlaying(false);
+    syncPart();
+    const ch = part.ch;
+    const key = partKey();
+    const way = dir < 0 ? 'prev' : 'next';
+    let r = partNear && partNear.key === key ? partNear[way] : undefined;
+    if (r === null) return; // nothing that way: the button is off
+    const seq = ++partSeq;
+    if (r === undefined) {
+      const slow = setTimeout(() => partSay(t('Looking…'), 60000), 300);
+      try { r = await partFind(dir, () => seq !== partSeq); } catch (err) {
+        window.neo.logError('history part: ' + (err && err.stack || err));
+        if (seq === partSeq) partSay(t('The history couldn’t be read.'));
+        return;
+      } finally {
+        clearTimeout(slow);
+        if (badgeEl.textContent === t('Looking…')) { badgeEl.hidden = true; badgeUntil = 0; }
+      }
+      if (seq !== partSeq || !bd.isConnected || r === undefined) return;
+      if (!r) {
+        if (partNear && partNear.key === key) partNear[way] = null; else partNear = { key, [way]: null };
+        renderPart();
+        return;
+      }
+    }
+    const { x, di, found } = r;
+    if (h.key !== x.key) {
+      part = null; // (found where it is there: not carried)
+      await openPlayer(S.days[di].from);
+      if (seq !== partSeq || !h || h.key !== x.key) return;
+    }
+    part = { ch, a: found.part.a, b: found.part.b, h, n: found.n };
+    let q = 0;
+    while (q < steps.length && steps[q] < found.n) q++;
+    seek(q);
+  }
+
+  for (const [sel, label, key, go] of [['.hs-part-prev', t('The time before this changed'), '[', () => partGo(-1)],
+    ['.hs-part-next', t('The next time this changed'), ']', () => partGo(1)], ['.hs-part-x', t('Put it down'), 'Esc', clearPart]]) {
+    const b = partEl.querySelector(sel);
+    b.title = label + ' (' + key + ')';
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', () => go());
+  }
+  renderPart();
+
+  /* ---------- the list of chapters ---------- */
+
+  function renderList() {
+    list.innerHTML = '';
+    renderChapters();
+  }
+
+  const item = (label, sub, selected, onPick) => {
+    const b = document.createElement('button');
+    b.className = 'hs-ch';
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', String(selected));
+    b.innerHTML = '<span class="hs-ch-name"></span><span class="hs-ch-when"></span>';
+    b.firstChild.textContent = label;
+    b.lastChild.textContent = sub;
+    if (onPick) b.addEventListener('click', onPick);
+    else b.disabled = true; // a chapter with nothing recorded has nothing to play
+    list.appendChild(b);
+    return b;
+  };
+
+  function renderChapters() {
+    // each chapter the recording saw: the days it was first and last written, and whether it went
+    const seen = new Map();
+    for (const s of S.sessions) {
+      for (const [ch, c] of Object.entries(s.stats.chapters)) {
+        let x = seen.get(ch);
+        if (!x) { x = { ch, first: s.stats.start, last: s.stats.start, dropped: false }; seen.set(ch, x); }
+        x.last = s.stats.start;
+        x.dropped = !!c.gone;
+      }
+    }
+    const span = (c) => {
+      const a = historyWhen(c.first, HISTORY_DAY);
+      const b = historyWhen(c.last, HISTORY_DAY);
+      return a === b ? a : a + ' – ' + b;
+    };
+    item(t('The whole book'), S.sessions.length ? t('{n} sessions', { n: S.sessions.length }) : '', mode === 'book', () => setMode('book'));
+    for (const ch of meta.chapterOrder) {
+      const c = seen.get(ch);
+      item(chapterLabel(ch, meta.chapterOrder), c ? span(c) : t('Not recorded yet'), mode === ch, c ? () => setMode(ch) : null);
+    }
+    const elsewhere = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && !c.dropped);
+    const dropped = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && c.dropped);
+    for (const c of elsewhere) item(t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
+    if (dropped.length) {
+      const hd = document.createElement('div');
+      hd.className = 'hs-list-head';
+      hd.textContent = t('Deleted');
+      list.appendChild(hd);
+      for (const c of dropped) item(goneLead(c.ch) || t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
+    }
+  }
+
+  // the whole book, or one chapter: the overview marks it, the player plays only it
+  function setMode(m) {
+    const di = curDay();
+    mode = m;
+    if (part && m !== 'book' && part.ch !== m) clearPart();
+    // the days: the chapter, or the book, as it is now
+    if (view === 'days') {
+      following = true;
+      reindex();
+      return;
+    }
+    if (!h) return;
+    renderStrip();
+    const n = nAt(pos);
+    const atEnd = pos >= steps.length;
+    // a chapter this day didn't touch: the nearest day that did, before or after
+    if (m !== 'book' && !h.chapters().some((c) => c.ch === m)) {
+      const to = dayAfter(di, -1) >= 0 ? dayAfter(di, -1) : dayAfter(di, 1);
+      renderList();
+      if (to >= 0) openPlayer(S.days[to].from, { at: 'end' });
+      return;
+    }
+    renderDayline();
+    shown = {};
+    paper.innerHTML = '';
+    buildView();
+    // the same moment, in the new view
+    let p = 0;
+    if (atEnd) p = steps.length;
+    else while (p < steps.length && steps[p] < n) p++;
+    seek(p);
+    drawTimeline();
+    renderList();
+    if (m === 'book') scrollToChapter(caret && caret.chId);
+  }
+
+  function scrollToChapter(ch) {
+    const sec = ch && paper.querySelector(`.rp-chapter[data-ch="${CSS.escape(ch)}"]`);
+    if (!sec) return;
+    follow = false;
+    scroller.scrollTop = sec.offsetTop - 20;
+  }
+
+  /* ---------- the recording itself ---------- */
+
+  // Watch This Chapter Being Written: the first day it was written, playing
+  function startWatching() {
+    const i = S.sessions.findIndex((s) => s.stats.chapters[chId]);
+    if (i >= 0) openPlayer(i, { ch: chId, playIt: true }); else showDays(dsel);
+  }
+
+  // Every device's sessions, as one history: the devices that wrote it are
+  // named where a day or a session is
+  async function load() {
+    setPlaying(false);
+    loaded = { state: 'loading' };
+    h = null;
+    ++token;
+    dayLoads = new Map();
+    following = true;
+    Object.assign(S, { entries: [], open: [], days: [], sessions: [], frames: [], building: false, built: null, listed: false, error: null, done: 0, total: 0 });
+    setView('days');
+    let devices = [];
+    try {
+      if (rec.on && rec.bookId === bookId) rec.flush();
+      devices = ((await window.neo.recList(bookId)) || []).filter((d) => d.sessions.length);
+    } catch (err) {
+      window.neo.logError('history: ' + (err && err.stack || err));
+      S.error = String(err && err.message || err);
+    }
+    if (!bd.isConnected) return;
+    S.devices = devices;
+    S.names = {};
+    for (const d of devices) S.names[d.device] = d.mine ? t('{name} (this computer)', { name: d.name }) : d.name;
+    if (!devices.length) {
+      reindex();
+      return;
+    }
+    S.building = true;
+    try {
+      const r = await window.neo.recDays(bookId);
+      if (!bd.isConnected) return;
+      for (const e of r.entries || []) if (!S.entries.some((x) => x.day === e.day)) S.entries.push(e);
+      S.entries.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+    } catch (err) {
+      window.neo.logError('history: ' + (err && err.stack || err));
+      S.error = String(err && err.message || err);
+      S.building = false;
+      loaded = { state: 'failed', error: S.error };
+    }
+    if (!bd.isConnected) return;
+    S.listed = true;
+    if (S.built) built(); else reindex();
+  }
+  setPlaying(false);
+  setView('days');
+  paper.innerHTML = `<p class="hs-empty">${escHtml(t('Reading the history…'))}</p>`;
+  renderList();
+  resize.observe(scroller);
+  resize.observe(timeline);
+  await load();
+}
+
+/* ================================================================== */
 /*  EDITOR — open / render                                             */
 /* ================================================================== */
 
@@ -2507,8 +5518,13 @@ async function openBook(bookId) {
   sideCardsKey = '';
   currentChapterId = null; // never carry a chapter reference across books
   undoStack = [];
-  chapterHTML = html;
-  savedHTML = { ...html };
+  // Writing History: this book's session starts (the last one closes) once
+  // everything is read, before any of it becomes the open book
+  await rec.begin(bookId);
+  if (gen !== openGeneration) return;
+  chapterHTML = {};
+  for (const chId of Object.keys(html)) setChapterHTML(chId, html[chId], 'open');
+  savedHTML = { ...chapterHTML };
   for (const chId of Object.keys(html)) knowDisk(bookId, chId, html[chId]);
   diskStamps = {};
   savedMetaSig = metaSig(book); // what disk holds; NEO's own defaults don't count as edits
@@ -2516,9 +5532,12 @@ async function openBook(bookId) {
   darlings = sideDarlings;
   sidecarBase[bookId + '/stickies'] = JSON.stringify(stickies);
   sidecarBase[bookId + '/darlings'] = JSON.stringify(darlings);
+  await recOpenStreams(bookId);
+  if (gen !== openGeneration) return;
 
   $('#bookshelf-view').hidden = true;
   $('#editor-view').hidden = false;
+  if (window.neo.recState) window.neo.recState({ book: true });
   applyBright();
   document.execCommand('defaultParagraphSeparator', false, 'p');
 
@@ -2568,6 +5587,11 @@ async function openBook(bookId) {
     library.hintShown = true;
     writeLibrary(library);
     setTimeout(() => toast(t('Enter twice = section break · three times = new chapter · {key} shows everything else', { key: KHELP }), 7000), 800);
+  } else if (rec.on && !library.recordHintShown) {
+    // and on another opening, once, what Writing History is
+    library.recordHintShown = true;
+    writeLibrary(library);
+    setTimeout(() => toast(t('Like a painter’s timelapse, NEO keeps a replay of your writing. It stays with your book and is never sent anywhere. File → Keep a Replay of My Writing turns it off.'), 9000), 800);
   }
   spReportState();
 }
@@ -2749,6 +5773,7 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   // any piece of the story can leave on its own — to a beta reader, an
   // editor, a magazine — in any format the book can
   if (STORY_KINDS.includes(kind) && words > 0) items.push('-', { label: t('Export Chapter…'), value: 'export' });
+  if (historyCanOpen()) items.push('-', { label: t('Watch This Chapter Being Written'), value: 'history' });
   // one switch for the whole book, where the parts are: count chapters
   // from 1 again after each part
   if (kind === 'part') {
@@ -2757,6 +5782,10 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   items.push('-', { label: t('Delete'), value: 'delete', danger: true });
   const choice = await popMenu(x, y, items, { title: chapterName(chId), from: from || document.querySelector(`.nav-item[data-id="${chId}"] .n-row`) });
   if (!choice || choice === kind) return null;
+  if (choice === 'history') {
+    openHistory({ chId, play: true });
+    return null;
+  }
   if (choice === 'export') {
     const formats = [
       { label: t('Text (.txt)'), value: 'txt' }, { label: t('Markdown (.md)'), value: 'md' }, { label: t('HTML (.html)'), value: 'html' },
@@ -2785,7 +5814,7 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   setChapterKind(chId, choice);
   // a copyright page starts with what every copyright page says
   if (choice === 'copyright' && !chapterText(chId).trim()) {
-    chapterHTML[chId] = copyrightStarter();
+    setChapterHTML(chId, copyrightStarter(), 'kind');
     persistChapter(chId);
   }
   await saveMeta();
@@ -2814,6 +5843,8 @@ document.addEventListener('drop', () => { setTimeout(() => { dragFromInside = fa
 
 function wireChapterBody(body, chId) {
   body.addEventListener('focus', () => { currentChapterId = chId; updateCounters(); highlightNav(); });
+  // ahead of NEO's own handlers, which may change the page themselves
+  for (const type of ['keydown', 'beforeinput', 'paste']) body.addEventListener(type, () => rec.drift(chId, body));
 
   // ⌘Z takes back what was typed since the last pause, not a whole page of
   // it: a second of quiet closes the engine's undo run (the caret stays put).
@@ -2829,12 +5860,12 @@ function wireChapterBody(body, chId) {
       sel.collapse(sel.anchorNode, sel.anchorOffset);
     }, 1000);
   };
-  body.addEventListener('input', () => {
+  body.addEventListener('input', (e) => {
     sealUndoOnEdit(); // chapterHTML is still the text from before this edit
     breakRun = 0; // fresh typing: ⌘Z belongs to the engine again
     if (isScript()) scriptInput(body);
     markDialogueOpening(body);
-    chapterHTML[chId] = captureBody(body);
+    setChapterHTML(chId, captureBody(body), 'input', { inputType: e.inputType, hint: (html) => caretHtmlOffset(body, html) });
     wordCache[chId] = null;
     scheduleChapterSave(chId);
     if (spellOn) scheduleSpellRescan(chId, body);
@@ -2880,7 +5911,7 @@ function wireChapterBody(body, chId) {
         const caret = captureCaret();
         stripJunkSpans(body);
         restoreCaret(caret);
-        syncChapter(body, chId); // what's saved is the cleaned paragraph
+        syncChapter(body, chId, 'tidy'); // what's saved is the cleaned paragraph
       }
       reconcileMarks();
     } else if (text) {
@@ -3297,7 +6328,7 @@ function chapterStartBackspace(e, body, chId) {
     snapshotStructure('empty line removed');
     above.remove();
     placeCaret(block, 0);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -3325,10 +6356,10 @@ function chapterStartBackspace(e, body, chId) {
   const was = caretHeight();
   const prevCount = prevBody.querySelectorAll('p').length;
   const keepScroll = $('#paper-scroll').scrollTop;
-  chapterHTML[prevId] = captureBody(prevBody) + captureBody(body);
+  setChapterHTML(prevId, captureBody(prevBody) + captureBody(body), 'merge');
   persistChapter(prevId);
   for (const s of stickies) if (s.chapterId === chId) s.chapterId = prevId;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies, 'merge');
   for (const d of darlings) if (d.chapterId === chId) d.chapterId = prevId;
   writeSidecar(book.id, 'darlings', darlings);
   if (book.sectionNotes && book.sectionNotes[chId]) {
@@ -3339,7 +6370,8 @@ function chapterStartBackspace(e, body, chId) {
   if (book.chapterNotes) delete book.chapterNotes[chId];
   if (book.chapterKinds) delete book.chapterKinds[chId];
   book.chapterOrder = book.chapterOrder.filter((c) => c !== chId);
-  delete chapterHTML[chId];
+  dropChapterHTML(chId, 'merge');
+  rec.streams('merge');
   clearTimeout(saveTimers[chId]);
   delete saveTimers[chId];
   // on disk, in the order that can't lose a word: the chapter above with
@@ -3511,7 +6543,7 @@ function guardMarkerDelete(e, body, chId) {
       resolveSticky(adjacent.dataset.sid); // removes mark + its note, syncs
     } else {
       adjacent.remove();
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
     }
     return true;
   }
@@ -3532,7 +6564,7 @@ function guardMarkerDelete(e, body, chId) {
   caret.collapse(true);
   sel.removeAllRanges();
   sel.addRange(caret);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'break');
   return true;
 }
 
@@ -3578,10 +6610,10 @@ function splitChapterAt(body, chId, block, sel, was) {
     n = next;
   }
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'split');
   const idx = book.chapterOrder.indexOf(chId);
   const newId = createChapterAt(idx + 1);
-  chapterHTML[newId] = parts.join('') || '<p><br></p>';
+  setChapterHTML(newId, parts.join('') || '<p><br></p>', 'split');
   persistChapter(newId);
   renderChapters();
   focusChapterStart(newId);
@@ -3617,7 +6649,7 @@ function handleEnter(e, body, chId) {
       restoreCaret(caret);
     }
     document.execCommand('insertParagraph');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
   if (block.classList.contains('scene-break')) { e.preventDefault(); return true; } // Enter on a *** line: nothing
@@ -3632,7 +6664,7 @@ function handleEnter(e, body, chId) {
       block.classList.remove('poetry', 'flush');
       romanize(block);
       placeCaret(block, 0);
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
       resetNativeUndo();
       breakRun++;
       return true;
@@ -3645,7 +6677,7 @@ function handleEnter(e, body, chId) {
       if (wasPoetry) romanize(cur);
       placeCaret(cur, 0);
     }
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
   const prev = block.previousElementSibling;
@@ -3690,7 +6722,7 @@ function handleEnter(e, body, chId) {
       keep.collapse(true);
       sel.removeAllRanges();
       sel.addRange(keep);
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
       resetNativeUndo();
       // no input event follows a break made by hand, so the caret is kept in
       // sight here, as typing keeps it: a break near the window's foot pushed
@@ -3710,7 +6742,7 @@ function handleEnter(e, body, chId) {
       restoreCaret(caret);
     }
     document.execCommand('insertParagraph');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
 
@@ -3739,7 +6771,7 @@ function handleEnter(e, body, chId) {
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     if (!typewriterEnabled) revealCaret(); // (see the break above)
     breakRun++;
@@ -3824,7 +6856,7 @@ function handlePoetry(e, body, chId) {
       cur.classList.add('poetry');
       if (cur.textContent.trim() === '' && !cur.querySelector('i')) { italicize(cur); caretIntoStart(cur); }
     }
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     return true;
   }
 
@@ -3854,7 +6886,7 @@ function handlePoetry(e, body, chId) {
     block.after(line);
     caretIntoStart(line);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
   return true;
@@ -3878,7 +6910,7 @@ function handleFlush(e, body, chId) {
     document.execCommand('insertParagraph');
     const cur = caretBlock(body);
     if (cur) cur.classList.add('flush');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     return true;
   }
   const r = sel.getRangeAt(0);
@@ -3888,7 +6920,7 @@ function handleFlush(e, body, chId) {
   if (block.textContent.trim() === '' || head.toString().length === 0) {
     snapshotStructure('flush paragraph');
     block.classList.add('flush');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -3896,7 +6928,7 @@ function handleFlush(e, body, chId) {
   document.execCommand('insertParagraph');
   const cur = caretBlock(body);
   if (cur && cur !== block) cur.classList.add('flush');
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   return true;
 }
 
@@ -3918,7 +6950,7 @@ function poetryBackspace(e, body, chId) {
   if (block.classList.contains('poetry')) romanize(block);
   block.classList.remove('poetry', 'flush');
   placeCaret(block, 0);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
   return true;
@@ -3951,7 +6983,7 @@ function toggleParaKind(kind) {
     else if (wasPoetry) romanize(p);
   }
   caretIntoStart(ps[0]);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
 }
@@ -3965,7 +6997,7 @@ function poetryUnderHeading(body, chId) {
   body.prepend(line);
   body.focus();
   caretIntoStart(line);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
 }
@@ -3998,7 +7030,7 @@ function sceneBreakDelete(e, body, chId) {
     if (back && above) caretToEnd(above);
     else if (below) caretIntoStart(below);
     else if (above) caretToEnd(above);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -4015,7 +7047,7 @@ function sceneBreakDelete(e, body, chId) {
   e.preventDefault();
   snapshotStructure('section break removed');
   target.remove();
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'break');
   resetNativeUndo();
   breakRun++;
   return true;
@@ -4074,9 +7106,9 @@ function markDialogueOpening(body) {
   }
 }
 
-function syncChapter(body, chId) {
+function syncChapter(body, chId, cause = 'program') {
   markDialogueOpening(body);
-  chapterHTML[chId] = captureBody(body);
+  setChapterHTML(chId, captureBody(body), cause, { hint: (html) => caretHtmlOffset(body, html) });
   wordCache[chId] = null;
   scheduleChapterSave(chId);
   updateCounters();
@@ -5269,7 +8301,7 @@ document.addEventListener('keydown', (e) => {
 function createChapterAt(idx) {
   const chId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
   book.chapterOrder.splice(idx, 0, chId);
-  chapterHTML[chId] = '<p><br></p>';
+  setChapterHTML(chId, '<p><br></p>', 'new');
   persistChapter(chId);
   saveMeta();
   renderChapters();
@@ -5288,13 +8320,14 @@ async function deleteChapterQuiet(chId) {
   clearTimeout(saveTimers[chId]);
   delete saveTimers[chId];
   book.chapterOrder = book.chapterOrder.filter((c) => c !== chId);
-  delete chapterHTML[chId];
+  dropChapterHTML(chId, 'delete');
   delete wordCache[chId];
   if (book.sectionNotes) delete book.sectionNotes[chId];
   if (book.chapterNotes) delete book.chapterNotes[chId];
   if (book.chapterKinds) delete book.chapterKinds[chId];
   stickies = stickies.filter((s) => s.chapterId !== chId);
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies, 'delete');
+  rec.streams('delete');
   const bookId = book.id;
   renderChapters();
   renderStickies();
@@ -5923,7 +8956,7 @@ function spAfterChange(p) {
   const body = spBodyOf(p);
   if (!body) return;
   spLastPara = p;
-  syncChapter(body, spChapterOf(p));
+  syncChapter(body, spChapterOf(p), 'script');
   spSchedule();
   spRefreshGhost();
   spShowElement();
@@ -6462,7 +9495,7 @@ function spMoveScene(k, to) {
     if (target) target.before(n); else dest.appendChild(n);
   }
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
-  for (const b of new Set([body, dest])) syncChapter(b, b.closest('.chapter').dataset.id);
+  for (const b of new Set([body, dest])) syncChapter(b, b.closest('.chapter').dataset.id, 'script');
   breakRun++;
   spRepaginate();
   renderNav();
@@ -6501,7 +9534,7 @@ async function deleteSceneToDarlings(cell, quiet = false) {
   for (const n of nodes) n.remove();
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
   if (cell.dataset.sid && book.sceneNotes) delete book.sceneNotes[cell.dataset.sid];
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'darling-out');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('scene delete: ' + (err && err.message || err)));
@@ -6608,7 +9641,7 @@ function spPaste(e, body, chId) {
   for (const p of body.querySelectorAll('p')) {
     for (const a of ['style']) if (p.getAttribute(a) && !/text-align/.test(p.getAttribute(a))) p.removeAttribute(a);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   spSchedule();
   return true;
 }
@@ -6667,7 +9700,7 @@ document.addEventListener('beforeinput', (e) => {
   // element and "int." never became a heading (#359)
   if (!lower.textContent.trim()) spSetClass(lower, body.children.length === 1 ? 'action' : upperType);
   placeCaret(lower, 0);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   breakRun++;
   spAfterChange(lower);
 }, true);
@@ -6715,7 +9748,7 @@ function spPasteMany(lines, body, chId) {
   p.after(frag);
   if (!p.textContent.trim() && !p.querySelector('.ph-mark')) p.remove();
   spCaretToEnd(last);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   resetNativeUndo();
   breakRun++;
   spSchedule();
@@ -6999,10 +10032,10 @@ function insertPlaceholder() {
   sel.addRange(range);
 
   stickies.push({ id: sid, chapterId: currentChapterId, text: '', resolved: false });
-  writeSidecar(book.id, 'stickies', stickies);
-  chapterHTML[currentChapterId] = captureBody(document.querySelector(
+  writeStickies(book.id, stickies);
+  setChapterHTML(currentChapterId, captureBody(document.querySelector(
     `.chapter[data-id="${currentChapterId}"] .chapter-body`
-  ));
+  )), 'mark');
   scheduleChapterSave(currentChapterId);
   renderStickies();
   scheduleNavRefresh();
@@ -7086,15 +10119,21 @@ function scheduleStickiesSave() {
   clearTimeout(saveTimers.stickies);
   saveTimers.stickies = setTimeout(() => {
     delete saveTimers.stickies;
-    writeSidecar(bookId, 'stickies', list);
+    writeStickies(bookId, list);
   }, 600);
+}
+
+// stickies.json, and its text in the recording
+function writeStickies(bookId, list, cause = 'edit') {
+  if (book && book.id === bookId && list === stickies) rec.streams(cause, [Rec.STREAMS.stickies]);
+  return writeSidecar(bookId, 'stickies', list);
 }
 
 function flushStickiesSave() {
   if (!saveTimers.stickies || !book) return;
   clearTimeout(saveTimers.stickies);
   delete saveTimers.stickies;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
 }
 
 // Pair every mark in the manuscript with a note: pasted duplicates get their
@@ -7128,7 +10167,7 @@ function reconcileMarks() {
     seen.add(sid);
   }
   if (changed) {
-    writeSidecar(book.id, 'stickies', stickies);
+    writeStickies(book.id, stickies);
     renderStickies();
     renderNav();
   }
@@ -7151,11 +10190,11 @@ function resolveSticky(sid) {
     }
     const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
     try { body.normalize(); } catch { /* fine */ }
-    chapterHTML[chId] = captureBody(body);
+    setChapterHTML(chId, captureBody(body), 'mark');
     scheduleChapterSave(chId);
   }
   stickies = stickies.filter((s) => s.id !== sid);
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
   renderStickies();
   scheduleNavRefresh();
 }
@@ -7349,7 +10388,7 @@ function addEntry(at, kind) {
   justAddedEntry = chId;
   book.chapterOrder.splice(at, 0, chId);
   setChapterKind(chId, kind);
-  chapterHTML[chId] = kind === 'copyright' ? copyrightStarter() : '<p><br></p>';
+  setChapterHTML(chId, kind === 'copyright' ? copyrightStarter() : '<p><br></p>', 'new');
   persistChapter(chId);
   saveMeta();
   renderChapters();
@@ -7590,7 +10629,7 @@ if (!NO_HOVER) {
 /*  TABS — Manuscript / Notes / Outline / Darlings                     */
 /* ================================================================== */
 
-$$('.tab').forEach((tab) => {
+$$('.tab[data-tab]').forEach((tab) => {
   tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   tab.addEventListener('dblclick', async () => {
     const kind = tab.dataset.tab;
@@ -7606,6 +10645,11 @@ $$('.tab').forEach((tab) => {
     writeLibrary(library);
   });
 });
+
+// History, after the tabs: the Writing History, scrolled to the chapter the caret is in
+const historyBtn = $('.tab.history-btn');
+historyBtn.hidden = !historyCanOpen();
+historyBtn.addEventListener('click', () => openHistory());
 
 // Darlings tab is a drop target for selected text
 const darlingsTab = $('.tab.darlings');
@@ -7735,7 +10779,7 @@ async function moveSelectionToDarlings(html, text) {
   if (chId) {
     const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
     if (body) {
-      chapterHTML[chId] = captureBody(body);
+      setChapterHTML(chId, captureBody(body), 'darling-out');
       wordCache[chId] = null;
     }
   }
@@ -7797,7 +10841,7 @@ async function migrateDarlingAnchors() {
     const chapter = span.closest('.chapter');
     span.remove();
     if (body && chapter) {
-      chapterHTML[chapter.dataset.id] = captureBody(body);
+      setChapterHTML(chapter.dataset.id, captureBody(body), 'heal');
       wordCache[chapter.dataset.id] = null;
       scheduleChapterSave(chapter.dataset.id);
     }
@@ -7827,6 +10871,7 @@ let tabPlaces = {};
 
 let auxLoad = 0; // which Notes read is the current one
 function switchTab(name) {
+  if (book && name !== currentTab) rec.context('tab:' + name);
   closeCardEditor();
   auxLoad++;
   $('#editor-view').classList.remove('board-on');
@@ -7841,7 +10886,7 @@ function switchTab(name) {
   currentTab = name;
   queueSideCards();
   applyBright();
-  $$('.tab').forEach((t) => {
+  $$('.tab[data-tab]').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === name);
     t.setAttribute('aria-selected', t.dataset.tab === name ? 'true' : 'false');
   });
@@ -7908,7 +10953,9 @@ function switchTab(name) {
     const pending = auxPending[bookId + '/' + name];
     (pending ? Promise.resolve(pending.html) : window.neo.readAux(bookId, name)).then((html) => {
       if (load !== auxLoad || !book || book.id !== bookId || currentTab !== name) return;
+      if (name === 'notes') recNotesRead(html || '', bookId);
       auxEditor.innerHTML = html || '';
+      recNotesShown = name === 'notes' ? auxEditor.innerHTML : null;
       auxEditor.dataset.kind = name;
       auxEditor.dataset.book = bookId;
       auxEditor.contentEditable = 'true';
@@ -8088,7 +11135,7 @@ function outlineLine(kind, chId, secId, index, label, text) {
           const next = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
           book.chapterOrder.splice(book.chapterOrder.indexOf(cur) + 1, 0, next);
           cur = next;
-          chapterHTML[cur] = '<p><br></p>';
+          setChapterHTML(cur, '<p><br></p>', 'new');
           book.chapterNotes[cur] = it.text;
           persistChapter(cur);
           secAt = 0;
@@ -8294,7 +11341,7 @@ function syncGhosts(chId) {
     }
     placeGhost(body, sec, before);
   });
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'ghost');
 }
 
 // where the section holding el begins: its *** (or the body's first line)
@@ -8942,7 +11989,7 @@ function saveCard(cell, val) {
     list.push(sec);
     placeGhost(body, sec, next ? (next.brk || next.ps[0]) : null);
     orderSectionNotes(chId);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'outline');
     scheduleMetaSave();
     delete cell.dataset.new;
     cell.dataset.sec = sec.id;
@@ -8967,7 +12014,7 @@ function saveCard(cell, val) {
   anchor.dataset.secId = sec.id;
   list.push(sec);
   orderSectionNotes(chId);
-  syncChapter(chapterBodyEl(chId), chId);
+  syncChapter(chapterBodyEl(chId), chId, 'outline');
   scheduleMetaSave();
   cell.dataset.sec = sec.id;
 }
@@ -9356,7 +12403,7 @@ async function deleteSectionToDarlings(chId, segIdx, quiet = false) {
   liftSegment(body, seg);
   if (seg.id) book.sectionNotes[chId] = (book.sectionNotes[chId] || []).filter((s) => s.id !== seg.id);
   orderSectionNotes(chId);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'darling-out');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('section delete: ' + (err && err.message || err)));
@@ -9413,7 +12460,7 @@ function repointStickies(ps, chId) {
       if (s && s.chapterId !== chId) { s.chapterId = chId; changed = true; }
     }
   }
-  if (changed) { writeSidecar(book.id, 'stickies', stickies); renderStickies(); }
+  if (changed) { writeStickies(book.id, stickies); renderStickies(); }
 }
 
 // to = { ch, before }: before is a section's index in that chapter, or null for the end
@@ -9439,9 +12486,9 @@ function moveSection(fromCh, segIdx, to) {
   }
   orderSectionNotes(fromCh);
   if (fromCh !== to.ch) orderSectionNotes(to.ch);
-  syncChapter(fromBody, fromCh);
+  syncChapter(fromBody, fromCh, 'outline');
   if (fromCh !== to.ch) {
-    syncChapter(toBody, to.ch);
+    syncChapter(toBody, to.ch, 'outline');
     // the chapter it lands in is saved before the one it left, so a save
     // that fails never leaves the section in neither
     clearTimeout(saveTimers[fromCh]);
@@ -9473,7 +12520,7 @@ function sectionToChapter(chId, segIdx) {
   if (!body || !seg) return;
   snapshotStructure('card to chapter');
   liftSegment(body, seg);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   const note = seg.id ? sectionNote(chId, seg.id) : null;
   if (seg.id) book.sectionNotes[chId] = book.sectionNotes[chId].filter((s) => s.id !== seg.id);
   const prose = seg.ps.filter((p) => !p.classList.contains('ghost'));
@@ -9481,11 +12528,11 @@ function sectionToChapter(chId, segIdx) {
   const html = prose.length ? prose.map((p) => p.outerHTML).join('') : '<p><br></p>';
   const newId = newEntryId();
   book.chapterOrder.splice(book.chapterOrder.indexOf(chId) + 1, 0, newId);
-  chapterHTML[newId] = html;
+  setChapterHTML(newId, html, 'outline');
   book.chapterNotes = book.chapterNotes || {};
   if (note && note.text) book.chapterNotes[newId] = note.text;
   for (const s of stickies) if (prose.some((p) => p.querySelector(`.ph-mark[data-sid="${s.id}"]`))) s.chapterId = newId;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
   // the new chapter's file, then book.json naming it, and only then the
   // chapter it came out of: a failed save never leaves the words nowhere
   clearTimeout(saveTimers[chId]);
@@ -9549,7 +12596,7 @@ async function writtenSectionToLoose(chId, seg) {
   liftSegment(body, seg);
   if (seg.id) book.sectionNotes[chId] = book.sectionNotes[chId].filter((s) => s.id !== seg.id);
   orderSectionNotes(chId);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   saveMeta().then(() => persistChapter(chId))
     .catch((err) => window.neo.logError('section to loose: ' + (err && err.message || err)));
@@ -9580,7 +12627,7 @@ function looseToSection(looseId, to) {
       setSegmentDown(body, ps, null, target);
     }
     orderSectionNotes(to.ch);
-    syncChapter(body, to.ch);
+    syncChapter(body, to.ch, 'outline');
     // the chapter with the words is saved before the card leaves book.json
     clearTimeout(saveTimers[to.ch]);
     persistChapter(to.ch).then(() => saveMeta())
@@ -9592,7 +12639,7 @@ function looseToSection(looseId, to) {
   (book.sectionNotes[to.ch] = book.sectionNotes[to.ch] || []).push(sec);
   if (sec.text) placeGhost(body, sec, target ? (target.brk || target.ps[0]) : null);
   orderSectionNotes(to.ch);
-  syncChapter(body, to.ch);
+  syncChapter(body, to.ch, 'outline');
   scheduleMetaSave();
   renderLooseCards();
 }
@@ -9637,10 +12684,11 @@ async function joinChapter(chId, intoCh) {
   delete book.sectionNotes[chId];
   if (!hasLines && sec.text) placeGhost(into, sec, null);
   orderSectionNotes(intoCh);
-  syncChapter(into, intoCh);
+  syncChapter(into, intoCh, 'outline');
   // the words are safe in the other chapter before this one's file goes
   try { await persistChapter(intoCh); } catch (err) { window.neo.logError('join: ' + (err && err.message || err)); return null; }
   if (book.chapterTitles) delete book.chapterTitles[chId];
+  rec.streams('outline');
   await deleteChapterQuiet(chId);
   updateCounters();
   return sec.id;
@@ -10132,7 +13180,7 @@ function insertScene(k, slug) {
     if (last && !last.textContent.trim() && spType(last) === 'action' && body.children.length > 1) last.remove();
     body.append(h, a);
   }
-  syncChapter(body, body.closest('.chapter').dataset.id);
+  syncChapter(body, body.closest('.chapter').dataset.id, 'outline');
   breakRun++;
   spRepaginate();
   return h;
@@ -10151,7 +13199,7 @@ function saveSceneCard(cell, note, slug) {
       const id = newSceneId();
       (book.sceneNotes = book.sceneNotes || {})[id] = note;
       h.dataset.sceneId = id;
-      syncChapter(spBodyOf(h), spChapterOf(h));
+      syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
       scheduleMetaSave();
     }
     renderNav();
@@ -10182,7 +13230,7 @@ function saveSceneCard(cell, note, slug) {
     scheduleMetaSave();
   }
   if (changed) {
-    syncChapter(spBodyOf(h), spChapterOf(h));
+    syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
     spRepaginate();
     renderNav();
   }
@@ -10199,7 +13247,7 @@ function looseToScene(looseId, before) {
     const id = newSceneId();
     (book.sceneNotes = book.sceneNotes || {})[id] = card.text;
     h.dataset.sceneId = id;
-    syncChapter(spBodyOf(h), spChapterOf(h));
+    syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
   }
   scheduleMetaSave();
   renderLooseCards();
@@ -10373,7 +13421,7 @@ async function chapterToLoose(chId) {
   const body = chapterBodyEl(chId);
   if (body && body.querySelector('.ph-mark')) { toast(t('That chapter has a placeholder in it. Move the placeholder first.')); return; }
   snapshotStructure('card to loose');
-  if (body) syncChapter(body, chId);
+  if (body) syncChapter(body, chId, 'outline');
   const kind = chapterKind(chId);
   const card = {
     id: 'lc-' + Date.now().toString(36),
@@ -10402,7 +13450,7 @@ function looseToChapter(looseId, index) {
   snapshotStructure('loose card placed');
   const chId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
   book.chapterOrder.splice(Math.max(0, Math.min(index, book.chapterOrder.length)), 0, chId);
-  chapterHTML[chId] = card.html || '<p><br></p>';
+  setChapterHTML(chId, card.html || '<p><br></p>', 'outline');
   if (card.title) (book.chapterTitles = book.chapterTitles || {})[chId] = card.title;
   if (card.text) (book.chapterNotes = book.chapterNotes || {})[chId] = card.text;
   if (card.notes && card.notes.length) (book.sectionNotes = book.sectionNotes || {})[chId] = card.notes;
@@ -10439,7 +13487,7 @@ async function sceneToLoose(cell) {
   for (const n of nodes) n.remove();
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
   if (cell.dataset.sid && book.sceneNotes) delete book.sceneNotes[cell.dataset.sid];
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('scene to loose: ' + (err && err.message || err)));
@@ -10473,7 +13521,7 @@ function heldSceneBack(card, before) {
   for (const n of nodes) { if (target) target.before(n); else dest.appendChild(n); }
   book.looseCards = book.looseCards.filter((c) => c.id !== card.id);
   const chId = dest.closest('.chapter').dataset.id;
-  syncChapter(dest, chId);
+  syncChapter(dest, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('loose to scene: ' + (err && err.message || err)));
@@ -10733,8 +13781,9 @@ window.addEventListener('resize', queueWalkNote);
 
 let auxDirty = false;
 $('#aux-editor').addEventListener('keydown', (e) => { if (styleKeepScroll(e)) return; smartKeys(e, e.currentTarget); });
-$('#aux-editor').addEventListener('input', () => {
+$('#aux-editor').addEventListener('input', (e) => {
   auxDirty = true;
+  if (e.currentTarget.dataset.kind === 'notes') recNotesInput(e);
   scheduleAuxSave();
   if (spellOn) {
     const key = 'aux-' + ($('#aux-editor').dataset.kind || 'notes');
@@ -10761,6 +13810,7 @@ const auxPending = {};
 function flushAux() {
   const ed = $('#aux-editor');
   if (auxDirty && ed.dataset.kind && ed.dataset.book) {
+    if (ed.dataset.kind === 'notes' && rec.bookId === ed.dataset.book) rec.reconcile(Rec.STREAMS.notes, ed.innerHTML);
     const key = ed.dataset.book + '/' + ed.dataset.kind;
     auxPending[key] = { bookId: ed.dataset.book, kind: ed.dataset.kind, html: ed.innerHTML, inFlight: false };
     auxDirty = false;
@@ -10850,7 +13900,7 @@ function renderDarlings() {
         const body = anchor.closest('.chapter-body');
         const chId = anchor.closest('.chapter').dataset.id;
         anchor.remove();
-        syncChapter(body, chId);
+        syncChapter(body, chId, 'darling-delete');
       }
       darlings = darlings.filter((x) => x.id !== d.id);
       await writeSidecar(book.id, 'darlings', darlings);
@@ -10899,7 +13949,7 @@ async function restoreDarling(id) {
           // inline content: slot it right where the caret was
           at.insertNode(document.createRange().createContextualFragment(d.html || d.text));
         }
-        syncChapter(body, d.chapterId);
+        syncChapter(body, d.chapterId, 'darling-in');
         // the chapter holding it again is saved before Darlings lets it go
         if (!(await savedBeforeLettingGo(d.chapterId))) return;
         darlings = darlings.filter((x) => x.id !== id);
@@ -10919,7 +13969,7 @@ async function restoreDarling(id) {
   const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
   const frag = d.html ? d.html : '<p>' + d.text.replace(/\n+/g, '</p><p>') + '</p>';
   body.insertAdjacentHTML('beforeend', frag);
-  chapterHTML[chId] = captureBody(body);
+  setChapterHTML(chId, captureBody(body), 'darling-in');
   if (!(await savedBeforeLettingGo(chId))) return;
   darlings = darlings.filter((x) => x.id !== id);
   await writeSidecar(book.id, 'darlings', darlings);
@@ -11139,6 +14189,7 @@ const chapterChain = {};
 function persistChapter(chId, html) {
   if (!book) return Promise.resolve(false);
   if (html === undefined) html = chapterHTML[chId] || '';
+  rec.reconcile(chId, html);
   const bookId = book.id;
   const key = bookId + '/' + chId;
   savedHTML[chId] = html;
@@ -11186,7 +14237,8 @@ async function keepOtherDeviceVersion(bookId, chId, disk) {
     book.chapterOrder.splice(idx < 0 ? book.chapterOrder.length : idx + 1, 0, twinId);
     book.chapterTitles = book.chapterTitles || {};
     book.chapterTitles[twinId] = twinChapterTitle(book.chapterTitles[chId]);
-    chapterHTML[twinId] = disk;
+    setChapterHTML(twinId, disk, 'disk-twin');
+    rec.streams('disk-twin');
     await persistChapter(twinId, disk);
     await saveMeta();
     const caret = captureCaret();
@@ -11246,6 +14298,7 @@ function scheduleMetaSave() {
 async function saveMeta() {
   if (!book || shelfExport) return;
   const bookId = book.id;
+  rec.streams('edit', [Rec.STREAMS.titles, Rec.STREAMS.outline]); // what book.json holds of the writing
   const sig = metaSig(book);
   const stamp = await writeBookMeta(bookId, book);
   // the answer belongs to the book that was saved; another one may be open now
@@ -11293,6 +14346,7 @@ function flushAllSaves(e) {
   flushStickiesSave();
   flushSidecars();
   if (moved || metaSig(book) !== savedMetaSig) saveMeta();
+  rec.flush(); // the recording since the last flush
 }
 
 /* ================================================================== */
@@ -11831,21 +14885,22 @@ async function restoreSnapshot(chId) {
       if ((meta.chapterTitles || {})[chId]) book.chapterTitles[chId] = meta.chapterTitles[chId];
       if ((meta.chapterKinds || {})[chId]) book.chapterKinds[chId] = meta.chapterKinds[chId];
     }
-    chapterHTML[chId] = byId[chId];
+    setChapterHTML(chId, byId[chId], 'snapshot');
   } else {
     gone = book.chapterOrder.filter((c) => !meta.chapterOrder.includes(c));
     book.chapterOrder = [...meta.chapterOrder];
     for (const c of book.chapterOrder) {
-      chapterHTML[c] = byId[c];
+      setChapterHTML(c, byId[c], 'snapshot');
       if ((meta.chapterTitles || {})[c] !== undefined) book.chapterTitles[c] = meta.chapterTitles[c]; else delete book.chapterTitles[c];
       if ((meta.chapterKinds || {})[c] !== undefined) book.chapterKinds[c] = meta.chapterKinds[c]; else delete book.chapterKinds[c];
     }
   }
   wordCache = {};
+  rec.streams('snapshot');
   for (const c of chId ? [chId] : book.chapterOrder) await persistChapter(c);
   await saveMeta();
   // chapters added since: out of the book, their words in the snapshot just taken
-  for (const c of gone) { delete chapterHTML[c]; await window.neo.deleteChapter(book.id, c); }
+  for (const c of gone) { dropChapterHTML(c, 'snapshot'); await window.neo.deleteChapter(book.id, c); }
   showDarlingsAgain();
   switchTab('manuscript');
   renderChapters();
@@ -11997,7 +15052,7 @@ async function refreshFromDisk() {
       if (!mine || order.length !== book.chapterOrder.length) {
         for (const chId of order) {
           if (!(chId in incoming)) continue;
-          chapterHTML[chId] = incoming[chId];
+          setChapterHTML(chId, incoming[chId], 'disk-new');
           savedHTML[chId] = incoming[chId];
           knowDisk(bookId, chId, incoming[chId]);
         }
@@ -12006,6 +15061,7 @@ async function refreshFromDisk() {
         } else {
           book = { ...meta, chapterOrder: order, lastPosition: book.lastPosition };
           savedMetaSig = metaSig(meta);
+          rec.streams('disk-adopt'); // their titles and outline
         }
         if (metaSig(book) !== savedMetaSig) scheduleMetaSave();
         if (!book.chapterOrder.includes(currentChapterId)) currentChapterId = null;
@@ -12031,6 +15087,7 @@ async function refreshFromDisk() {
       sideChanged = true;
     }
     if (sideChanged) {
+      rec.streams('disk-adopt'); // their stickies
       renderStickies();
       if (currentTab === 'darlings') renderDarlings();
     }
@@ -12063,7 +15120,7 @@ async function refreshFromDisk() {
             date: new Date().toISOString()
           });
         }
-        chapterHTML[chId] = disk;
+        setChapterHTML(chId, disk, 'disk-adopt');
         savedHTML[chId] = disk;
         knowDisk(bookId, chId, disk);
         wordCache[chId] = null;
@@ -12076,7 +15133,8 @@ async function refreshFromDisk() {
         book.chapterOrder.splice(idx + 1, 0, twinId);
         book.chapterTitles = book.chapterTitles || {};
         book.chapterTitles[twinId] = twinChapterTitle(book.chapterTitles[chId]);
-        chapterHTML[twinId] = disk;
+        setChapterHTML(twinId, disk, 'disk-twin');
+        rec.streams('disk-twin');
         persistChapter(twinId, disk);
         persistChapter(chId);
         scheduleMetaSave();
@@ -12142,7 +15200,7 @@ document.addEventListener('visibilitychange', () => {
   else if (book) flushAllSaves(); // iOS may end a backgrounded app without warning
 });
 
-window.addEventListener('beforeunload', flushAllSaves);
+window.addEventListener('beforeunload', () => { flushAllSaves(); rec.end(); });
 // flush whenever focus leaves NEO, and every 20 seconds
 window.addEventListener('blur', () => { if (book) flushAllSaves(); });
 setInterval(() => { if (book) flushAllSaves('tick'); }, 20000);
@@ -12150,6 +15208,7 @@ setInterval(() => { if (book) flushAllSaves('tick'); }, 20000);
 async function backToShelf() {
   if (reading) stopReadAloud(false);
   flushAllSaves();
+  rec.end();
   tabPlaces = {};
   book = null;
   showWindowTitle();
@@ -12161,6 +15220,7 @@ async function backToShelf() {
   undoStack = [];
   $('#editor-view').hidden = true;
   $('#bookshelf-view').hidden = false;
+  if (window.neo.recState) window.neo.recState({ book: false });
   applyBright();
   spEditorMode(); // a script's pane, page and title page go
   spReportState();
@@ -12353,7 +15413,8 @@ async function structuralUndo() {
   }
   book.chapterOrder = snap.chapterOrder;
   book.chapterKinds = snap.chapterKinds;
-  chapterHTML = restored;
+  for (const chId of Object.keys(chapterHTML)) if (!(chId in restored)) dropChapterHTML(chId, 'undo-structural');
+  for (const [chId, html] of Object.entries(restored)) setChapterHTML(chId, html, 'undo-structural');
   for (const { chId, html } of displaced) {
     const holder = document.createElement('div');
     holder.innerHTML = html;
@@ -12375,13 +15436,15 @@ async function structuralUndo() {
   // removed since stays that way (the displaced text above included)
   darlings = mergeSidecar(after.darlings, snap.darlings, darlings, true);
   stickies = mergeSidecar(after.stickies, snap.stickies, stickies, false);
+  rec.streams('undo-structural');
   // resurrect any chapter files the action may have deleted
   for (const chId of book.chapterOrder) {
+    if (chapterHTML[chId] === undefined) setChapterHTML(chId, '<p><br></p>', 'undo-structural');
     await persistChapter(chId, chapterHTML[chId] || '<p><br></p>');
   }
   // (a list that can't be written now stays queued, and is tried again)
   await writeSidecar(book.id, 'darlings', darlings).catch(() => {});
-  await writeSidecar(book.id, 'stickies', stickies).catch(() => {});
+  await writeStickies(book.id, stickies, 'undo-structural').catch(() => {});
   await saveMeta();
   currentChapterId = book.chapterOrder.includes(currentChapterId) ? currentChapterId : null;
   renderChapters();
@@ -12442,7 +15505,7 @@ function rejoinAtCaret() {
     sel.removeAllRanges();
     sel.addRange(r);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'undo-structural');
 }
 
 document.addEventListener('keydown', (e) => {
@@ -12789,7 +15852,7 @@ function replaceCurrent() {
     runSearch();
     return;
   }
-  if (chapter) syncChapter(chapter.querySelector('.chapter-body'), chapter.dataset.id);
+  if (chapter) syncChapter(chapter.querySelector('.chapter-body'), chapter.dataset.id, 'replace');
   const oldIdx = searchState.idx;
   runSearch();
   if (searchState.matches.length) gotoMatch(Math.min(oldIdx, searchState.matches.length - 1));
@@ -12817,7 +15880,7 @@ function replaceAllMatches() {
         touched = true;
       }
     }
-    if (touched) syncChapter(body, chId);
+    if (touched) syncChapter(body, chId, 'replace-all');
   }
   if (n === 0) undoStack.pop(); // nothing changed, nothing to undo
   else breakRun++; // ⌘Z from inside the text reaches this undo too
@@ -14010,7 +17073,7 @@ function applyAlign(value) {
     else p.style.textAlign = value;
     if (!p.getAttribute('style')) p.removeAttribute('style');
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'format');
   reportViewState(); // the Format menu's alignment tick
 }
 
@@ -14631,7 +17694,7 @@ async function printPaperback() {
     const chId = newEntryId();
     book.chapterOrder.splice(at < 0 ? 0 : at, 0, chId);
     setChapterKind(chId, 'dedication');
-    chapterHTML[chId] = `<p>${escHtml(opts.dedication)}</p>`;
+    setChapterHTML(chId, `<p>${escHtml(opts.dedication)}</p>`, 'new');
     await persistChapter(chId);
     await saveMeta();
     renderChapters();
@@ -15995,7 +19058,7 @@ window.neo.onMenu(async (msg) => {
   if ($('#keyboard-shortcuts') && msg.type !== 'help') return;
   // a window the menu opens (⌘, for Goals, say) never stacks on one that's
   // already open: pressing it again used to pile up overlays
-  const WINDOWS = ['stats', 'about', 'emailSettings', 'coverArt', 'reshelve', 'checkUpdate'];
+  const WINDOWS = ['stats', 'about', 'emailSettings', 'coverArt', 'reshelve', 'checkUpdate', 'history'];
   if (WINDOWS.includes(msg.type) && document.querySelector('.modal-backdrop:not([hidden])')) {
     if (msg.type === 'checkUpdate' && updateDialog) updateDialog.focus();
     return;
@@ -16020,7 +19083,7 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'emailDraft') doEmailDraft();
   if (msg.type === 'snapshot' && book && !$('#editor-view').hidden) snapshotNow();
   if (msg.type === 'emailSettings') emailSettings();
-  if (msg.type === 'find') openSearch();
+  if (msg.type === 'find') { if (historyShown) historyShown.focusFind(); else openSearch(); }
   if (msg.type === 'spellcheck') toggleSpellcheck();
   if (msg.type === 'spellLanguage') changeSpellLanguage(msg.value);
   if (msg.type === 'reshelve') reshelveBook();
@@ -16030,6 +19093,8 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'focusCycle') cycleFocus();
   if (msg.type === 'import') importBooks();
   if (msg.type === 'stats') openStats();
+  if (msg.type === 'recordWriting') setRecordWriting(msg.checked);
+  if (msg.type === 'history' && book && !$('#editor-view').hidden) openHistory();
   if (msg.type === 'chapterStep') gotoChapter(msg.value);
   if (msg.type === 'writingStyle') {
     library.writingStyle = msg.value;

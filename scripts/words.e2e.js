@@ -374,6 +374,9 @@ async function main() {
     let win;
     while (!(win = BrowserWindow.getAllWindows()[0])) await tick(50);
     wc = win.webContents;
+    // a window behind another one, or minimized, gets no animation frames
+    // and slowed timers: keep it running unseen
+    wc.setBackgroundThrottling(false);
     while (!(await js(`typeof library !== 'undefined' && !!library`).catch(() => false))) await tick(50);
     await tick(300);
     await js(`(async () => {

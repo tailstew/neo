@@ -30,6 +30,22 @@ contextBridge.exposeInMainWorld('neo', {
   readJSON: (bookId, name, fallback) => ipcRenderer.invoke('json:read', bookId, name, fallback),
   writeJSON: (bookId, name, data) => ipcRenderer.invoke('json:write', bookId, name, data),
 
+  // Writing History (recording.js): one device's own folder in the book
+  recStart: (bookId) => ipcRenderer.invoke('rec:start', bookId),
+  recChunk: (bookId, session, first, text) => ipcRenderer.invoke('rec:chunk', bookId, session, first, text),
+  recRollup: (bookId, session) => ipcRenderer.invoke('rec:rollup', bookId, session),
+  recClose: (bookId, session) => ipcRenderer.invoke('rec:close', bookId, session),
+  recList: (bookId) => ipcRenderer.invoke('rec:list', bookId),
+  recRead: (bookId, device, session) => ipcRenderer.invoke('rec:read', bookId, device, session),
+  recDays: (bookId) => ipcRenderer.invoke('rec:days', bookId),
+  recDayStart: (bookId, day) => ipcRenderer.invoke('rec:dayStart', bookId, day),
+  recSearch: (bookId, phrase, sid) => ipcRenderer.invoke('rec:search', bookId, phrase, sid),
+  recSearchStop: (bookId) => ipcRenderer.invoke('rec:searchStop', bookId),
+  recDelete: (bookId) => ipcRenderer.invoke('rec:delete', bookId),
+  recTrack: (bookId, day, part, from) => ipcRenderer.invoke('rec:track', bookId, day, part, from),
+  onRecProgress: (cb) => ipcRenderer.on('rec:progress', (_e, msg) => cb(msg)),
+  recState: (st) => ipcRenderer.send('rec:state', st),
+
   exportSave: (payload) => ipcRenderer.invoke('export:save', payload),
   emailDraft: (payload) => ipcRenderer.invoke('email:draft', payload),
   logError: (msg) => ipcRenderer.invoke('log:error', msg),

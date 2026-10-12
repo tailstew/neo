@@ -160,6 +160,8 @@
 
   <script src="jszip.min.js"></script>
   <script src="i18n.js"></script>
+  <script src="recording.js"></script>
+  <script src="recording-files.js"></script>
   <script src="pocket-bridge.js"></script>
   <script src="covers.js"></script>
   <script src="app.js"></script>
@@ -238,6 +240,8 @@
           : '') +
         (script ? '' : tick(t('Flush paragraph') + '  ⇧Enter', st.flush, { type: 'flush' }) +
         tick(t('Poetry paragraph') + '  Ctrl+⇧Enter', st.poetry, { type: 'poetry' })) +
+        // the File menu's Keep a Replay of My Writing (Writing History)
+        (window.neo.recStart ? tick(t('Keep a replay of my writing'), lib.recordWriting !== false, { type: 'recordWriting', checked: lib.recordWriting === false }) : '') +
         (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios' ? '' :
           `<div class="pm-row"><span class="pm-label">${t('On-screen keyboard')}</span><span class="pm-seg"><button data-act="keyboard">${onOff(!(window.pocketSoftKeyboardOn && !window.pocketSoftKeyboardOn()))}</button></span></div>`) +
         (typeof book !== 'undefined' && book

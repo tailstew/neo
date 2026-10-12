@@ -488,6 +488,134 @@ button { font: inherit; cursor: pointer; }
 .ps-paper .tp-a { margin-top: 40px; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; }
 .ps-paper .tp-field:empty::before { content: attr(data-ph); color: #b9b4a8; font-style: italic; letter-spacing: 0; text-transform: none; }
 body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empty::before { color: #5f5b52; }
+
+/* ---------------- Writing History: the dialog and its player ---------------- */
+.ps-paper.kind-history {
+  aspect-ratio: auto; width: min(1180px, calc(100vw - 32px)); height: calc(100vh - var(--kb, 0px) - 90px);
+  padding: 0; overflow: hidden; background: var(--bg); color: #ddd; font-family: inherit; font-size: 13px; line-height: 1.4;
+  display: grid; grid-template: "list main" 1fr "foot foot" auto / 210px 1fr;
+}
+.hs-side { grid-area: list; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid #2a2a2a; }
+.hs-list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 8px 14px; }
+/* search: a field at the top of the side pane, what it found below it */
+.hs-find { padding: 12px 8px 0; }
+.hs-q {
+  width: 100%; box-sizing: border-box; background: transparent; border: 1px solid #333; border-radius: 6px;
+  color: #ddd; font: inherit; font-size: 12px; padding: 5px 8px; outline: none;
+}
+.hs-q:focus { border-color: var(--accent); }
+.hs-q::placeholder { color: #77736b; }
+/* its options, inside the field's right end: shown on hover or focus, and
+   whenever one is set the other way from its default */
+.hs-qbox { position: relative; }
+.hs-qbox .hs-q { padding-right: 50px; }
+.hs-opt {
+  position: absolute; top: 3px; bottom: 3px; width: 22px; padding: 0; border: 1px solid transparent; border-radius: 4px;
+  background: none; color: #77736b; font: inherit; font-size: 11px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s;
+}
+.hs-opt[data-opt="cs"] { right: 26px; }
+.hs-opt[data-opt="word"] { right: 3px; }
+.hs-qbox:hover .hs-opt, .hs-qbox:focus-within .hs-opt,
+.hs-opt[data-opt="cs"][aria-pressed="true"], .hs-opt[data-opt="word"][aria-pressed="false"] { opacity: 1; }
+.hs-opt:hover { color: #ddd; }
+.hs-opt[aria-pressed="true"] { color: var(--accent); border-color: #3a3a3a; background: rgba(255,255,255,0.05); }
+.hs-opt:focus-visible { outline: 1px solid var(--accent); outline-offset: 0; }
+.hs-opt-word { display: inline-block; padding: 0 2px 1px; border: 1px solid currentColor; border-top: none; line-height: 0.9; }
+.hs-results { margin-top: 6px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a; max-height: 45vh; overflow-y: auto; }
+.hs-find-note { padding: 6px 10px; font-size: 11px; color: #a9a294; }
+.hs-find-stop {
+  margin-left: 8px; background: none; border: 1px solid #3a3a3a; border-radius: 4px; color: #a9a294;
+  font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer;
+}
+.hs-find-stop:hover { border-color: var(--accent); color: var(--accent); }
+.hs-ch {
+  display: block; width: 100%; text-align: left; background: none; border: none; border-radius: 6px;
+  padding: 7px 10px; color: #c9c3b8; cursor: pointer; font: inherit;
+}
+.hs-ch:hover { background: #232323; }
+.hs-ch[aria-selected="true"] { background: #262626; color: var(--accent); }
+.hs-ch:disabled { cursor: default; background: none; color: #77736b; }
+.hs-ch-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-ch-when { display: block; font-size: 11px; color: #77736b; }
+.hs-list-head { margin: 16px 10px 4px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #77736b; }
+/* the sheet above, the days or the player's controls below it: nothing covers the text */
+.hs-main { grid-area: main; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.hs-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 30px 0 40px; }
+.hs-paper { width: min(var(--page-w), calc(100% - 48px)); margin: 0 auto; }
+.hs-paper .sheet { min-height: 0; padding: 60px 64px 80px; margin-bottom: 30px; }
+.hs-paper .chapter-head { user-select: none; }
+.hs-empty { margin: 120px auto; max-width: 420px; text-align: center; color: #8a857a; font-size: 14px; line-height: 1.6; }
+/* the player's caret, the editor's own: the ink's colour, and no width of its own, so the line sets as it did */
+.rp-caret { display: inline-block; width: 0; height: 1.2em; vertical-align: -0.25em; border-left: 1px solid currentColor; margin-right: -1px; animation: rp-blink 1.1s steps(1) infinite; }
+@keyframes rp-blink { 50% { border-left-color: transparent; } }
+::highlight(neo-replay-sel) { background: rgba(201, 168, 106, 0.35); }
+.hs-badge {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: #262626; border: 1px solid #3a3a3a; border-radius: 12px; padding: 3px 12px; font-size: 11px; color: #c9c3b8;
+}
+.hs-bottom { flex: none; position: relative; padding: 10px 18px 10px; border-top: 1px solid #2a2a2a; }
+.hs-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.hs-controls button {
+  background: transparent; border: 1px solid #3a3a3a; border-radius: 5px; color: #c9c3b8; font-size: 12px; padding: 3px 9px; cursor: pointer;
+}
+.hs-controls button:hover { border-color: var(--accent); color: var(--accent); }
+.hs-controls button:disabled { opacity: 0.4; cursor: default; }
+.hs-play { min-width: 40px; }
+.hs-speeds { display: flex; gap: 4px; }
+.hs-speeds button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.hs-skip { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a9a294; cursor: pointer; }
+.hs-when { margin-left: auto; font-size: 12px; color: #a9a294; white-space: nowrap; }
+/* paragraphs picked on the sheet: the times they changed */
+.hs-part { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #8a857a; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hs-controls .hs-part button { padding: 3px 7px; }
+.hs-part:not(.hs-part-on) button { display: none; }
+.hs-part.hs-part-on { color: #c9c3b8; }
+::highlight(neo-replay-part) { background: rgba(122, 167, 217, 0.2); }
+/* the player: the day before, its timeline, the day after */
+.hs-dayline { display: flex; align-items: center; gap: 12px; }
+.hs-prevday, .hs-nextday { flex: none; width: 62px; }
+.hs-timeline { position: relative; flex: 1; min-width: 0; height: 48px; cursor: pointer; border-radius: 4px; }
+.hs-timeline:focus-visible { outline: 1px solid var(--accent); }
+.hs-timeline canvas { display: block; width: 100%; height: 100%; }
+.hs-head { position: absolute; top: 12px; bottom: 0; width: 2px; margin-left: -1px; background: var(--paper); box-shadow: 0 0 0 1px rgba(0,0,0,0.35); pointer-events: none; }
+/* the days: a tile for each, its date and a map of where it changed the text */
+.hs-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; }
+.hs-strip-empty { padding: 24px 4px; font-size: 12px; color: #77736b; }
+.hs-strip-more { flex: none; align-self: center; padding: 0 8px; white-space: nowrap; animation: hs-reading 1.6s ease-in-out infinite alternate; }
+@keyframes hs-reading { from { opacity: 0.45; } to { opacity: 1; } }
+.hs-tile {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; width: 62px; padding: 6px 2px 4px;
+  background: none; border: 1px solid #333; border-radius: 6px; color: #a9a294; font: inherit; font-size: 10px; cursor: pointer;
+}
+.hs-tile canvas { display: block; width: 46px; height: 46px; }
+.hs-tile span { white-space: nowrap; }
+.hs-tile:hover { border-color: #5a5650; color: #ddd; }
+.hs-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+.hs-tile.hs-found { box-shadow: inset 0 -3px 0 rgba(201, 168, 106, 0.85); }
+.hs-tip {
+  position: absolute; bottom: 54px; padding: 4px 9px; border-radius: 5px; background: #262626; border: 1px solid #3a3a3a;
+  font-size: 11px; color: #ddd; white-space: nowrap; pointer-events: none;
+}
+.hs-foot { grid-area: foot; display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-top: 1px solid #2a2a2a; }
+.hs-keep { display: flex; align-items: center; gap: 7px; color: #c9c3b8; white-space: nowrap; cursor: pointer; }
+.hs-desc { font-size: 11px; color: #77736b; line-height: 1.4; }
+.hs-delete {
+  margin-left: auto; flex: none; background: transparent; border: none; color: #77736b; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
+}
+.hs-delete:hover, .hs-delete:focus-visible { color: #d9776b; }
+/* restore: the moment on the sheet back in the book */
+.hs-restore {
+  position: absolute; top: 12px; right: 22px; z-index: 2; background: #262626; border: 1px solid #3a3a3a; border-radius: 14px;
+  padding: 5px 13px; font-size: 12px; color: #c9c3b8; cursor: pointer; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hs-restore:hover:not(:disabled), .hs-restore:focus-visible { border-color: var(--accent); color: var(--accent); }
+.hs-restore:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 720px) {
+  .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
+  .hs-side { display: none; }
+  .hs-desc { display: none; }
+}
 @media (max-width: 560px) {
   .ps-paper { padding: 44px 26px 36px; }
   .ps-paper.kind-acknowledgments, .ps-paper.kind-about { padding-top: 60px; }
@@ -551,6 +679,18 @@ body.light .print-modal select, body.light .print-modal textarea { background: #
   font-size: 14px; padding: 8px 10px; cursor: pointer;
 }
 .btn-quiet:hover { color: #bbb; }
+/* a yes or no that says what will happen (confirmModal), above any sheet */
+.confirm-modal { z-index: 960; }
+.cm-points { margin: 4px 0 14px 18px; padding: 0; font-size: 14px; line-height: 1.5; }
+.cm-points li { margin-bottom: 8px; }
+.modal p.cm-type { font-size: 13px; margin: 4px 0 0; }
+.cm-type strong { color: #d97b6c; font-weight: 600; }
+.btn-danger {
+  background: #b5503f; border: none; border-radius: 6px;
+  padding: 8px 20px; color: #fff; font-size: 14px; cursor: pointer;
+}
+.btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-danger:disabled { opacity: 0.4; cursor: default; }
 .fr-choices { display: flex; gap: 12px; }
 #fr-sample {
   background: var(--paper); color: var(--ink); border-radius: 6px;
@@ -609,8 +749,8 @@ body.night .sheet, body.night #aux-paper { box-shadow: 0 4px 30px rgba(0,0,0,0.7
 body.night .chapter-head, body.night #aux-paper h2 { color: #918b7d; }
 body.night #tp-subtitle { color: #a09a8c; }
 body.night #tp-author { color: #918b7d; }
-body.night .chapter-body p.scene-break { color: #7d7768; }
-body.night .chapter-body p.ghost { color: #6f6a5e; }
+body.night :is(.chapter-body, .rp-body) p.scene-break { color: #7d7768; }
+body.night :is(.chapter-body, .rp-body) p.ghost { color: #6f6a5e; }
 body.night [contenteditable][data-ph]:empty::before,
 body.night #aux-editor:empty::before,
 body.night .darlings-empty { color: #5f5b52; }
@@ -636,6 +776,7 @@ body.night #aux-editor * { color: inherit; }
 /* Search highlights — no DOM mutation, no focus theft */
 ::highlight(neo-search) { background: rgba(201, 168, 106, 0.35); }
 ::highlight(neo-search-current) { background: #c9a86a; color: #1c1c1c; }
+::highlight(neo-replay-find) { background: rgba(201, 168, 106, 0.45); }
 /* the sentence Read Aloud is on (⌘⇧U) */
 ::highlight(neo-speak) { background: rgba(201, 168, 106, 0.28); }
 
@@ -722,7 +863,7 @@ body.focus-mode:not(.no-dropcap) .chapter-body.focus-cap:not(.cap-off):not(.no-c
    the "add a title" prompt stays in view until it has one */
 .chapter-head.no-number .ch-num, .chapter-head.no-number .ch-sep { display: none; }
 .chapter-head.no-number .ch-title:empty::before { opacity: 1; }
-.chapter-body {
+:is(.chapter-body, .rp-body) {
   font-family: var(--body-font);
   font-size: calc(var(--editor-size, 17px) * var(--page-zoom, 1)); line-height: 1.75;
   outline: none;
@@ -731,30 +872,30 @@ body.focus-mode:not(.no-dropcap) .chapter-body.focus-cap:not(.cap-off):not(.no-c
 .sheet ::selection, #aux-paper ::selection { background: rgba(201, 168, 106, 0.35); }
 /* pre-wrap keeps spaces literal, so the engine's space-collapsing repair
    pass (the source of duplicated characters on delete) never runs */
-.chapter-body p { text-indent: 2em; margin: 0; white-space: pre-wrap; }
+:is(.chapter-body, .rp-body) p { text-indent: 2em; margin: 0; white-space: pre-wrap; }
 #aux-editor p { white-space: pre-wrap; }
 /* the chapter's opening paragraph: the first with words that isn't poetry
    (marked data-first in app.js) */
-.chapter-body p[data-first] { text-indent: 0; }
+:is(.chapter-body, .rp-body) p[data-first] { text-indent: 0; }
 /* Poetry paragraphs (⇧Enter): a quote, a stanza, a POV name, a dateline —
    pulled in from both margins, italic, no first-line indent, never a drop
    cap. Consecutive lines make one block; the block breathes above and below.
    The italic is real markup, laid in when the paragraph is made, so ⌘I
    takes it off any word the writer wants roman. */
-.chapter-body p.poetry { margin: 0 2.5em; text-indent: 0; }
+:is(.chapter-body, .rp-body) p.poetry { margin: 0 2.5em; text-indent: 0; }
 /* Flush paragraphs (⇧Enter): prose with no first-line indent — a report,
    a list, an email inside the story */
-.chapter-body p.flush { text-indent: 0 !important; }
+:is(.chapter-body, .rp-body) p.flush { text-indent: 0 !important; }
 /* a poetry paragraph is one italic; emphasis inside it stands upright, as
    typesetters set it (and as every export does, see paraRuns in app.js) */
-.chapter-body i i { font-style: normal; }
-.chapter-body i i i { font-style: italic; }
-.chapter-body p:not(.poetry) + p.poetry { margin-top: 0.9em; }
-.chapter-body p.poetry + p:not(.poetry) { margin-top: 0.9em; }
+:is(.chapter-body, .rp-body) i i { font-style: normal; }
+:is(.chapter-body, .rp-body) i i i { font-style: italic; }
+:is(.chapter-body, .rp-body) p:not(.poetry) + p.poetry { margin-top: 0.9em; }
+:is(.chapter-body, .rp-body) p.poetry + p:not(.poetry) { margin-top: 0.9em; }
 /* cap-off while the caret is in the first paragraph: the rule must stop
    MATCHING entirely — a matching first-letter rule, even styled to nothing,
    makes the engine split the text internally, which corrupts deletes */
-body:not(.no-dropcap) .chapter-body:not(.cap-off):not(.no-cap):not(.opens-dialogue) p[data-first]::first-letter {
+body:not(.no-dropcap) :is(.chapter-body, .rp-body):not(.cap-off):not(.no-cap):not(.opens-dialogue) p[data-first]::first-letter {
   font-size: 3.4em; float: left; line-height: 0.8;
   padding: 4px 8px 0 0; font-family: var(--dropcap-font);
 }
@@ -784,19 +925,19 @@ body.bright .spell-menu button { color: #eee; }
 /* Section breaks: Enter twice for ***, three times for a new chapter */
 /* (always centered: an alignment a break picked up from the paragraph it
    was made in, justified most of all, would set it flush left) */
-.chapter-body p.scene-break {
+:is(.chapter-body, .rp-body) p.scene-break {
   text-align: center !important; text-indent: 0 !important;
   letter-spacing: 8px; color: #888;
   margin: 1.6em 0; user-select: none;
 }
-.chapter-body p.scene-break + p { text-indent: 0; }
+:is(.chapter-body, .rp-body) p.scene-break + p { text-indent: 0; }
 /* …except a line of dialogue, there and at a story's opening: it keeps its
    indent, in line with the speech that follows (marked in app.js). Pages
    that aren't stories (no-cap) set their lines their own way. */
-.chapter-body.opens-dialogue:not(.no-cap) p[data-first]:not([style*="text-align"]),
-.chapter-body:not(.no-cap) p.scene-break + p[data-speech]:not([style*="text-align"]) { text-indent: 2em; }
+:is(.chapter-body, .rp-body).opens-dialogue:not(.no-cap) p[data-first]:not([style*="text-align"]),
+:is(.chapter-body, .rp-body):not(.no-cap) p.scene-break + p[data-speech]:not([style*="text-align"]) { text-indent: 2em; }
 /* centered/right paragraphs drop the first-line indent; justified keep it */
-.chapter-body p[style*="text-align"]:not([style*="justify"]) { text-indent: 0; }
+:is(.chapter-body, .rp-body) p[style*="text-align"]:not([style*="justify"]) { text-indent: 0; }
 /* Invisible anchors marking where a darling was cut from */
 .darling-anchor {
   display: inline-block; width: 0; height: 0; overflow: hidden;
@@ -808,34 +949,34 @@ body.bright .spell-menu button { color: #eee; }
 }
 
 /* --- The pages a book carries, in the manuscript, set as they'll print --- */
-.chapter.bookpage { display: flex; flex-direction: column; }
-.chapter.bookpage .chapter-body { position: relative; }
-.chapter.bookpage .chapter-body p { text-indent: 0; }
+:is(.chapter, .rp-chapter).bookpage { display: flex; flex-direction: column; }
+:is(.chapter, .rp-chapter).bookpage :is(.chapter-body, .rp-body) { position: relative; }
+:is(.chapter, .rp-chapter).bookpage :is(.chapter-body, .rp-body) p { text-indent: 0; }
 /* a page that isn't headed in print wears its name faintly, for the writer */
-.chapter.kind-copyright .chapter-head, .chapter.kind-dedication .chapter-head, .chapter.kind-epigraph .chapter-head {
+:is(.chapter, .rp-chapter).kind-copyright .chapter-head, :is(.chapter, .rp-chapter).kind-dedication .chapter-head, :is(.chapter, .rp-chapter).kind-epigraph .chapter-head {
   font-size: calc(11px * var(--page-zoom, 1)); letter-spacing: 3px; color: #c4beb0; margin-bottom: 0;
 }
-.chapter-body.blank::before {
+:is(.chapter-body, .rp-body).blank::before {
   content: attr(data-ph); position: absolute; left: 0; right: 0; top: 0;
   color: #b9b4a8; font-style: italic; pointer-events: none;
 }
-.chapter-body p[data-attr] { font-style: normal; font-size: 0.72em; letter-spacing: 1.5px; margin-top: 0.9em; }
-.chapter.kind-copyright .chapter-body {
+:is(.chapter-body, .rp-body) p[data-attr] { font-style: normal; font-size: 0.72em; letter-spacing: 1.5px; margin-top: 0.9em; }
+:is(.chapter, .rp-chapter).kind-copyright :is(.chapter-body, .rp-body) {
   margin-top: auto; font-size: calc(var(--editor-size, 17px) * 0.66 * var(--page-zoom, 1)); line-height: 1.6;
 }
-.chapter.kind-copyright .chapter-body p:not(:first-child) { margin-top: 0.9em; }
-.chapter.kind-dedication .chapter-body, .chapter.kind-epigraph .chapter-body {
+:is(.chapter, .rp-chapter).kind-copyright :is(.chapter-body, .rp-body) p:not(:first-child) { margin-top: 0.9em; }
+:is(.chapter, .rp-chapter).kind-dedication :is(.chapter-body, .rp-body), :is(.chapter, .rp-chapter).kind-epigraph :is(.chapter-body, .rp-body) {
   margin: auto 0; padding-bottom: 14vh; text-align: center; font-style: italic;
 }
-.chapter.kind-epigraph .chapter-body { margin: auto 3em; font-size: calc(var(--editor-size, 17px) * 0.92 * var(--page-zoom, 1)); }
-.chapter.kind-dedication .chapter-body i, .chapter.kind-epigraph .chapter-body i,
-.chapter.kind-part .chapter-body p:not(:first-child) i { font-style: normal; }
-.chapter.kind-part .chapter-head { margin: auto 0 22px; }
-.chapter.kind-part .chapter-body { margin-bottom: auto; padding-bottom: 12vh; text-align: center; font-style: italic; }
-.chapter.kind-part .chapter-body p { margin: 0 2em; }
-.chapter.kind-part .chapter-body p:first-child { font-style: normal; font-size: 1.55em; line-height: 1.3; margin: 0 0 0.9em; }
-.chapter.kind-part .chapter-body.blank::before { font-size: 1.55em; line-height: 1.3; }
-.chapter.kind-acknowledgments .chapter-body p:not(:first-child), .chapter.kind-about .chapter-body p:not(:first-child) { text-indent: 2em; }
+:is(.chapter, .rp-chapter).kind-epigraph :is(.chapter-body, .rp-body) { margin: auto 3em; font-size: calc(var(--editor-size, 17px) * 0.92 * var(--page-zoom, 1)); }
+:is(.chapter, .rp-chapter).kind-dedication :is(.chapter-body, .rp-body) i, :is(.chapter, .rp-chapter).kind-epigraph :is(.chapter-body, .rp-body) i,
+:is(.chapter, .rp-chapter).kind-part :is(.chapter-body, .rp-body) p:not(:first-child) i { font-style: normal; }
+:is(.chapter, .rp-chapter).kind-part .chapter-head { margin: auto 0 22px; }
+:is(.chapter, .rp-chapter).kind-part :is(.chapter-body, .rp-body) { margin-bottom: auto; padding-bottom: 12vh; text-align: center; font-style: italic; }
+:is(.chapter, .rp-chapter).kind-part :is(.chapter-body, .rp-body) p { margin: 0 2em; }
+:is(.chapter, .rp-chapter).kind-part :is(.chapter-body, .rp-body) p:first-child { font-style: normal; font-size: 1.55em; line-height: 1.3; margin: 0 0 0.9em; }
+:is(.chapter, .rp-chapter).kind-part :is(.chapter-body, .rp-body).blank::before { font-size: 1.55em; line-height: 1.3; }
+:is(.chapter, .rp-chapter).kind-acknowledgments :is(.chapter-body, .rp-body) p:not(:first-child), :is(.chapter, .rp-chapter).kind-about :is(.chapter-body, .rp-body) p:not(:first-child) { text-indent: 2em; }
 /* the contents: the book's own shape, each line a way there */
 .toc-list {
   list-style: none; margin: 0 1.5em; padding: 0;
@@ -847,9 +988,9 @@ body.bright .spell-menu button { color: #eee; }
 .toc-list li.t-part { margin-top: 0.9em; letter-spacing: 2px; font-variant-caps: all-small-caps; font-size: 1.1em; }
 .toc-list li.t-part:first-child { margin-top: 0; }
 .toc-list li:not(.t-page) + li.t-page { margin-top: 1.1em; }
-body.night .chapter.kind-copyright .chapter-head, body.night .chapter.kind-dedication .chapter-head,
-body.night .chapter.kind-epigraph .chapter-head { color: #5f5b52; }
-body.night .chapter-body.blank::before { color: #5f5b52; }
+body.night :is(.chapter, .rp-chapter).kind-copyright .chapter-head, body.night :is(.chapter, .rp-chapter).kind-dedication .chapter-head,
+body.night :is(.chapter, .rp-chapter).kind-epigraph .chapter-head { color: #5f5b52; }
+body.night :is(.chapter-body, .rp-body).blank::before { color: #5f5b52; }
 
 /* --- Aux paper (Notes / Outline / Darlings) --- */
 #aux-paper h2 {
@@ -1102,10 +1243,10 @@ body.light #editor-view.board-on #outline-board-hint { color: #6a665e; }
 body.focus-mode .walk-note { opacity: 0.6; }
 
 /* Ghost paragraphs: outline notes waiting in the manuscript to become prose */
-.chapter-body p.ghost {
+:is(.chapter-body, .rp-body) p.ghost {
   color: #a9a294; font-style: italic; text-indent: 0 !important;
 }
-.chapter-body p.ghost::first-letter { font-size: inherit; float: none; padding: 0; }
+:is(.chapter-body, .rp-body) p.ghost::first-letter { font-size: inherit; float: none; padding: 0; }
 
 .darling {
   border: 1px solid #e3ddcf; border-left: 3px solid var(--accent);
@@ -1298,6 +1439,7 @@ body.full-screen.focus-mode #bottombar:not(:hover):not(.attn) { opacity: 0; }
 .tab.active { color: var(--accent); background: #232323; }
 .tab.darlings { margin-left: 18px; }
 .tab.drag-over { background: var(--accent); color: var(--bg); }
+.tab.history-btn { margin-left: 18px; }
 #counters { display: flex; gap: 18px; font-size: 12px; color: var(--muted); }
 #counters span { cursor: pointer; user-select: none; }
 #counters span:hover { color: #ddd; }
@@ -1636,6 +1778,33 @@ body.light .page-sheet .ps-name { color: #3f3b35; }
 body.light .page-sheet .ps-done { border-color: #a39d92; color: #2b2926; background: rgba(255,255,255,0.55); }
 body.light .page-sheet .ps-done:hover { border-color: var(--accent); color: var(--accent); }
 body.light .ps-paper { box-shadow: 0 20px 60px rgba(0,0,0,0.22); }
+body.light .ps-paper.kind-history { color: #2b2926; }
+body.light .hs-list, body.light .hs-foot { border-color: #dcd7ce; }
+body.light .hs-ch, body.light .hs-keep, body.light .hs-controls button { color: #3f3b35; }
+body.light .hs-ch:hover { background: rgba(0,0,0,0.04); }
+body.light .hs-ch[aria-selected="true"] { background: rgba(0,0,0,0.06); color: var(--accent); }
+body.light .hs-ch-when, body.light .hs-list-head, body.light .hs-desc, body.light .hs-ch:disabled { color: #8a857a; }
+body.light .hs-skip, body.light .hs-when { color: #6a665e; }
+body.light .hs-part { color: #8a857a; }
+body.light .hs-part.hs-part-on { color: #3f3b35; }
+body.light .hs-bottom { border-color: #dcd7ce; }
+body.light .hs-tile { border-color: #dcd7ce; color: #6a665e; }
+body.light .hs-tile:hover { border-color: #b9b4a8; color: #2b2926; }
+body.light .hs-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+body.light .hs-q { border-color: #cfcac0; color: #2b2926; }
+body.light .hs-q:focus { border-color: var(--accent); }
+body.light .hs-opt { color: #8a857c; }
+body.light .hs-opt:hover { color: #2b2926; }
+body.light .hs-opt[aria-pressed="true"] { color: var(--accent); border-color: #cfcac0; background: rgba(0,0,0,0.04); }
+body.light .hs-results { border-color: #dcd7ce; }
+body.light .hs-find-note, body.light .hs-find-stop { color: #6a665e; }
+body.light .hs-find-stop { border-color: #cfcac0; }
+body.light .hs-controls button { border-color: #cfcac0; }
+body.light .hs-head { background: #1c1a17; box-shadow: 0 0 0 1px rgba(255,255,255,0.5); }
+body.night .hs-head { background: #f4f1ea; }
+body.light .hs-restore { background: #fbfaf8; border-color: #dcd7ce; color: #3f3b35; }
+body.light .hs-delete { color: #8a857a; }
+body.light .hs-badge, body.light .hs-tip { background: #fbfaf8; border-color: #dcd7ce; color: #2b2926; }
 
 /* dialogs */
 body.light .modal-backdrop { background: rgba(60,55,45,0.28); }

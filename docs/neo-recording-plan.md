@@ -1,0 +1,703 @@
+# NEO Writing History: a keystroke-level, replayable, lossless record of how a book was written
+
+A plan to build inside NEO (`hughhowey/neo`, local checkout `projects/neo-authorship`). It is written so a fresh session can start from it with no other context. Read NEO's `AGENTS.md` first; every rule there still applies.
+
+## The idea in one line
+
+**A timelapse for writers.** Painters and illustrators film their work, from blank canvas to finished piece, and post the timelapse. It has become the ordinary way to show that a person made the picture: viewers see the sketch, the false starts, the layers painted over. Writing has had nothing like it, because a finished page hides how it was made. NEO can record the writing the way a camera records the canvas, and play it back. Use this framing everywhere a writer or Hugh meets the feature: the dialog, the setting, the hint, the exported page, the README.
+
+The analogy also sets honest expectations. A timelapse is convincing because faking hours of real painting is far more work than painting. It is still not proof: someone could trace, or copy a reference stroke by stroke. A writing replay is the same: strong evidence because faking months of real composition is expensive, and judgement, not proof, about whose ideas they were.
+
+## What we want
+
+1. **Replay.** Watch a chapter being written, keystroke by keystroke, the way PostHog replays a browser session: the caret moving, words appearing, lines deleted and rewritten, pauses shown (and skippable), pastes, other-device syncs and time away from the app marked on a timeline.
+2. **Lossless history.** Any chapter can be taken back to any moment, in whole or in part, and that text put back into the book.
+3. **A historical record.** How a book actually came to be, kept as long as the book.
+4. **Evidence of human involvement.** A record detailed enough that how the text was made can be judged: rhythm, hesitation, revision and non-linear composition. Someone retyping a finished text tends to go in a straight line. A writer doubles back. When the writer chooses, that record can be fixed in time by independent timestamp services.
+
+## The shape: two patches to NEO
+
+The work goes to Hugh as two separate patches (pull requests), so the first one never depends on the second being accepted.
+
+| | Patch 1: Writing History | Patch 2: Proof of when I wrote |
+|---|---|---|
+| What it does | Records every chapter edit, keystroke, caret move and paste. A history dialog with replay. Restore any moment | Signs the recording, has it timestamped by independent services, reports on the evidence, exports a replay page others can check |
+| Default | **On**, recording stays local | **Off**, the writer opts in |
+| Network | None | Sends a 32-byte fingerprint (never words) to timestamp services |
+| Dependencies | None (Node/Electron built-ins only) | None (`crypto`, `https` built-ins; RFC 3161 and OpenTimestamps code written in-house) |
+| Stands on | Benefits to every NEO writer (see The case for Hugh) | Writers who need to show their work is theirs |
+
+`proof.js`, the module patch 2 adds, is self-contained: it takes recording files and a signing key and returns seals and timestamp tokens. **If Hugh declines patch 2**, the same module ships in a slimmed-down NEO Witness that only seals `recording/` and does nothing else, and nothing in patch 1 changes. Otherwise NEO Witness is retired.
+
+## The case for Hugh
+
+The short version for Hugh: **painters show a timelapse to prove they made the painting; this gives writers the same thing, and the writer gets their history back for free.**
+
+AGENTS.md sets the bar: "A change that helps someone finish a book belongs here. A change that adds a panel, a prompt, or a dependency usually does not." Patch 1 meets it without any appeal to proof.
+
+1. **It makes NEO's first rule fully true: words are never lost.** Today NEO has native ⌘Z for the current session, Darlings, a structural undo stack, and 14 daily zips. With patch 1, every chapter can go back to any moment it has ever been in, including chapters since deleted.
+2. **It helps Hugh debug data loss.** NEO's code and history show a lot of care spent on lost-words cases (#219, the both-sides-changed sync logic, "an empty read must not wipe a chapter"). A writer who reports missing words can show a replay of exactly what happened: a sync adoption, a merge, a healing pass. The check before each save (see Capture) also catches recorder gaps nobody has reported yet.
+3. **Watching your own book being written** is a delightful feature in itself.
+4. **It adds no dependency, no prompt and no panel.** zlib and crypto are built in. The history opens in a dialog from the menus and footer, like the shelf's bound pages, and is otherwise invisible.
+5. **Patch 2 meets a need authors have right now.** Writers are being accused of using AI on work they wrote themselves, and AI detectors often wrongly flag human writing. Artists answer the same accusation with a timelapse of the painting; writers have had no equivalent. NEO is a tool built by an author for authors. Proof of human writing, quiet and opt-in, with no Bitcoin unless asked for, fits that pitch.
+
+## Why this goes inside NEO
+
+NEO Witness watches the library from outside, so all it ever sees is the saved files. NEO saves 800 ms after a pause and flushes every 20 s, so every save lumps together up to half a minute of typing, deleting and caret movement. Everything the witness reports is inferred from those lumps:
+
+| Witness has to infer | From inside the editor we know it exactly |
+|---|---|
+| "Typed": new words within ~3 words/s of save timing | Every key, its timing, and the change it made |
+| "Arrived at once": a big run of new words | A `paste` event and how long it was, or a sync adoption, or a drop |
+| "Moved": the run was already in the book or was cut this session | The cut and the paste, matched by a hash of what was on the clipboard |
+| "Restored": the run matches an earlier version | The restore action itself, naming the moment it came from |
+| A word finished across two saves (`coa` → `cocked`) | Never comes up: we see the letters arrive |
+| Words written while the witness wasn't running | Never comes up: NEO is the recorder |
+
+Keystrokes, the caret and the causes of changes exist only inside the editor, so capture must live in NEO whatever happens to proof. Keep what the witness got right: plain files, no text ever sent anywhere, signed seals chained by hash, independent timestamps, and an honest table of what can and cannot be claimed.
+
+## Lessons from NEO Witness (carry these forward)
+
+1. **Record the effect, not only the intent.** Keystrokes alone can't rebuild the text: autocorrect, smart quotes (`--` → `—`, `...` → `…`), IME composition, dictation, native undo, drag-drop and NEO's own healing (`stripJunkSpans`, `markDialogueOpening`) all change text that no key accounts for. Record **what changed in the chapter** (authoritative, lossless) **and what caused it** (key, paste, input type).
+2. **One door.** NEO already learned this with `persistChapter`: "One door for chapter writes, so NEO always knows what is on disk." The recorder needs the same: one function every chapter change goes through, plus a safety net that catches anything that slipped past it.
+3. **Close the loop with what's on disk.** Each witness seal names the exact bytes it covers. The recorder should log the SHA-256 of every chapter write, so replaying the recording **must** reproduce the saved file byte for byte at every save. That one check is both the test suite and the proof.
+4. **Say what you don't know.** Text that existed before recording began is a *baseline*. Changes made while NEO wasn't recording (another device, a text editor) are *catch-up*. Neither is ever counted as witnessed. Anything the recorder sees change without seeing why is logged as `unobserved`, never guessed at.
+5. **Classify from facts, report judgement as judgement.** Keep the "What it can and cannot claim" table. A human copying AI text by hand still produces human keystrokes. The recording raises the cost of faking a manuscript a lot. It does not read minds.
+6. **Don't fight sync.** Libraries sync over iCloud and Syncthing. The witness had to avoid NEO's `.tmp`/rename saves (EPERM on Windows). The recorder writes **only its own files**, each device to its own folder, so no two devices ever write the same file and nothing can conflict.
+7. **Keep derived data out of the library.** The witness rebuilt `versions/<folder>.js` from history. Replay keyframes and indexes are caches, so they belong in `userData` and can always be rebuilt. Only the primary record goes in the library.
+8. **Keys belong in the OS keystore.** The witness's known gap was a PEM file with user-only permissions. NEO already uses `safeStorage` for the cover-art key. Use it for the signing key too.
+9. **Restore natively.** The witness offered copy and paste, then guessed that a paste was a restore. Do restores as an action in NEO, recorded as one event naming the source moment, with the displaced text sent to Darlings ("words are never discarded").
+10. **Only fingerprints leave the computer.** Timestamp services receive a hash, never text. A seal folder can be published without revealing anything.
+11. **Many devices from the start.** The witness was one device per history. Here each device writes its own stream, and a chapter's history is all the streams merged by time, with sync adoptions as the joins.
+12. **Count words properly.** The witness split on spaces, so Chinese, Japanese and Thai counted badly. Analysis should use `Intl.Segmenter` with `granularity: 'word'`.
+13. **Monotonic time, anchored to wall time.** Use `performance.now()` deltas inside a session, and write wall-clock checkpoints regularly so sleep, suspend and clock changes show up as gaps and not as fake speed.
+14. **Timestamps prove "by", not "who" or "how".** A timestamp stops backdating, so a recording faked in a weekend can only be stamped in that weekend. It doesn't stop someone faking in real time for months, and it doesn't show who held the key. Say so wherever proof is offered.
+
+## How NEO works, the parts that matter here
+
+From `AGENTS.md` and `app.js` / `main.js` / `preload.js` at 1.2.10:
+
+- Plain JS Electron app. No bundler, no framework. `contextIsolation: true`. **The renderer never touches the filesystem.** A new capability takes an `ipcMain.handle` in `main.js`, a method on `window.neo` in `preload.js`, and a call site in `app.js`. IPC names are grouped (`library:`, `book:`, `chapter:`, `aux:`, `json:`, `cover:`); add `rec:` (and `proof:` in patch 2).
+- Every name goes through `libName()`. Every library write goes through `writeFileDurable` (tmp, fsync, rename). There is no append. The recording keeps to that: it writes small files that never change and rolls them up into bigger ones (see Storage).
+- Each chapter is its own `contenteditable` `.chapter-body` inside `#chapters`. `wireChapterBody(body, chId)` in **EDITOR — typing** wires `input`, `paste`, `keydown`, `compositionstart/end` and `beforeinput`. On every `input`: `chapterHTML[chId] = captureBody(body)`. That is the natural hook, and `captureBody` already runs on every keystroke, so the recorder gets the new HTML for free.
+- `captureBody` strips screen-only attributes (`data-attr`, `data-speech`, `data-first`), so `chapterHTML` is the canonical saved form. Record against it.
+- `captureCaret()` / `restoreCaret()` (**STRUCTURAL UNDO**) address the caret as `{ chId, pIdx, off }`: the index of the `<p>` among the body's `p` elements and the text offset within it. Use the same addressing for selections.
+- `chapterHTML[...]` is set in about 18 places. Besides typing there is: book open, chapter split (triple Enter, ~3025), merge into the chapter above (~2789), new/blank chapters (4509, 4918), deletes (2803, 4528), sticky marks (4593, 4743), darlings (5303, 5355), outline ghosts (5847), and refresh from disk (6221, 6267, 6279: adopt the disk text, or keep both by adding a twin chapter). Every one of them needs a cause.
+- `smartKeys` / `replaceBefore` / paste use `document.execCommand('insertText'|'insertHTML'|'delete')`, so those changes still arrive as `input` events with an `inputType`.
+- Native ⌘Z covers typing. A structural undo stack covers big moves (`structuralUndo`).
+- `flushAllSaves` runs every 20 s and on blur, hide and close. `refreshFromDisk` runs on focus, on visibility, and every 30 s.
+- `dailyBackup` zips the whole library, skipping only `Backups/` and `Exports/`, and keeps 14 days. There are no restore instructions anywhere; restoring means opening a zip by hand.
+- NEO already makes network calls: update checks (`electron-updater`) and cover painting (OpenAI, opt-in with a key). Patch 2 adds the third, also opt-in.
+- `pocket/` runs the same `app.js` with `pocket-bridge.js` standing in for `window.neo`. CI copies `app.js`, `covers.js`, `styles.css`, `i18n.js`, `fonts/` and `locales/` into Pocket, so a new shared JS file has to be added to that list. (Since 4e it also copies `recording.js`, `recording-files.js` and `history-worker.js`.)
+- Tests: `node --test scripts/*.test.js` loads `app.js` in `vm`. `npm run test:words` is an Electron end-to-end test (`scripts/words.e2e.js`). Use it as the pattern for an end-to-end recorder test.
+- Upstream hand-off: pull requests to `hughhowey/neo` from the fork (`tailstew/neo-authorship`), as other contributors' work goes in. The git bundle in `AGENTS.md` ("Handing changes to Hugh", `npm run bundle`) is how Hugh's own agents hand him work; it isn't how outside contributions arrive.
+
+# Patch 1: Writing History
+
+## Overview
+
+```
+ chapter-body events ──► Recorder (app.js, renderer)
+   keydown                  │  buffer of compact lines, typing kept as runs
+   beforeinput/input        │  flushed as a chunk by flushAllSaves (every 20 s, blur, hide, close)
+   selectionchange          ▼
+   paste/copy/cut      window.neo.recChunk(bookId, session, text)
+   focus/blur/visibility    │
+ setChapterHTML(…, cause)   ▼
+ persistChapter ─► rec   main.js  rec:chunk → writeFileDurable, a new file each flush
+                            │      rec:rollup every 10 min, rec:close at the end
+                            ▼
+              NEO Library/book-…/recording/<device>/<session>/c-….jsonl, s-….jsonl.gz
+                            │      then, once closed, <session>.jsonl.gz
+                            │
+           recording.js (pure, shared): parse · verify · replay · day stats
+                            │
+     history worker (utilityProcess): builds each day's end state and stats,
+                            │                and each session's stats, into userData
+                            │
+              Writing History dialog: the days · one day's replay · search · restore
+```
+
+## Capture (renderer)
+
+New section in `app.js`: `/*  RECORDING  */`. Small and dependency-free. The parsing and replay logic lives in a separate `recording.js` (see below).
+
+**The one door.** Add `setChapterHTML(chId, html, cause)` and route all ~18 `chapterHTML[...] =` assignments and the `delete chapterHTML[...]` sites through it. It updates `chapterHTML`, then calls `rec.change(chId, html, cause)`. Typing calls it with `cause = 'input'` and the current `inputType`. The others pass a structural cause: `split`, `merge`, `new`, `delete`, `darling-out`, `darling-in`, `replace-all`, `undo-structural`, `disk-adopt`, `disk-twin`, `mark`, `ghost`, `restore`, `open`, and `tidy` (the cleanup a typed key carries, split from it).
+
+**The safety net.** At the top of `persistChapter`, call `rec.reconcile(chId, html)`. If the recorder's model of the chapter isn't `html`, it logs the difference as an `unobserved` change before logging the write. The end-to-end test fails on any `unobserved`. In the field they are rare, labelled, and still lossless.
+
+**Turning a change into an edit.** Keep `model[chId]` (the last HTML recorded). On change, do a common prefix/suffix scan of old against new to get one splice `{ at, del, ins }`. (A change made all at once, such as a catch-up, Replace All or an Outline move, gets one splice per run of paragraphs it changed instead, under its one `x`: 4b, decision 14.) A splice that is one typed character, inserted where the last edit ended, joins the current typing run instead of becoming a line of its own. That's O(n) on a string the engine has just serialized anyway: well under 1 ms for a 100 KB chapter. Repeated characters make the splice ambiguous (typing `a` into `a|a`). Settle it with the caret: move the splice so its end lands where the caret is. The text comes out the same either way, so replay is lossless whatever is chosen; the caret only makes the *position* honest.
+
+Several disjoint changes in one event (replace-all, a heal pass that touches several paragraphs) become several splices under one cause.
+
+**Keys.** On `keydown` in a chapter body, record `e.code` (the physical key), modifiers as a bitmask, `repeat`, and whether `e.isTrusted` was false, with the gap since the previous keydown to the millisecond. The pauses between keys, where they fall (inside a word, at a sentence, before a revision) and what is edited after them are what show a writer thinking as they type. Modifier keys (Shift, Ctrl, Alt, Meta) aren't recorded on their own; they show as the modifiers of the key pressed with them. Most keys cost almost nothing, because ordinary typing is written as runs (see Event format): a key that types one character adds that character and its gap to a run, and its physical key comes from a layout table written once per session.
+
+**Not hold times.** How long each key is held down (keydown to keyup) is deliberately not recorded. It adds little reassurance: it catches only naive automation, which a forger defeats with a few random numbers, and a format this open tells them to. It says nothing about composing against retyping, since retyping is human hands too. It does harm: per-key hold times are a strong biometric that identifies a typist and has been studied as a signal of fatigue and motor conditions, and they would travel with any exported replay. And it introduces doubt where there should be none: phone keyboards (Pocket), remote desktop, Sticky Keys and some input methods report holds that are missing or meaningless, so honest writers would have odd-looking data to explain.
+
+**Caret and selection.** On `selectionchange` inside a chapter body, record `{pIdx, off}` for anchor and focus, using `captureCaret`'s addressing. Leave out the selection after an edit when it's just where the edit leaves the caret (the end of the insertion), which saves most selection lines. Tag each selection with its cause: `key` (arrows, Home/End, and so on), `pointer` (mousedown seen) or `program` (NEO moved it).
+
+**Clipboard.** On `copy` and `cut`, record the length and the SHA-256 of the plain text, and keep the last ~50 hashes in memory. On `paste`, record the length, the flavour (`html`/`text`) and the hash, plus `internal: true` when the hash matches something copied or cut inside NEO this session. That makes "moved" a fact, not a guess. The pasted text itself is already in the edit that follows.
+
+**Context.** Window `focus`/`blur`, `visibilitychange`, tab switches (manuscript, notes, outline, darlings), book open and close, `compositionstart`/`end`, and an `idle` line after 60 s with no input (so replay can compress the gap without guessing). Every 5 minutes, and on focus, write a wall-clock line `["T", iso]`, so sleep and clock changes are visible.
+
+**Viewport (optional, small).** While scrolling, at most 2 per second, record the chapter and paragraph at the top of the view. Replay mostly follows the caret; this lets it follow a writer who is reading back.
+
+**Not recorded:** mouse movement, the caret anywhere but a chapter body, anything outside the chapters before 4f (notes, the outline, chapter titles and stickies are streams since 4f), and clipboard contents not pasted into NEO.
+
+## Event format
+
+A session is a sequence of lines: one JSON object (the header), then one compact JSON array per line. Plain text, readable in any editor. On disk the lines are spread over several files while the session is open and joined into one when it closes (see Storage); the format doesn't change with the file boundaries.
+
+The format is built around one observation: most of a recording is ordinary typing, one character after another where the last one went. That case is written as a **run**, one line holding the characters and their timings, with no chapter, no position and no key name repeated. Everything else falls back to general lines that spell everything out.
+
+```jsonc
+{"neoRec":1,"session":"2026-10-06T09-14-03Z-k3f9","device":"d-7c1e…","app":"1.3.0","platform":"MacIntel","book":"book-mur5yihq-kva2p",
+ "startedAt":"2026-10-06T09:14:03.120Z","tz":"Europe/London","prev":"<last h of this device's previous session for this book>"}
+[0,"b","ch-mur5yiiu-u1cv","<p>…full HTML…</p>","hash…","baseline"]    // first sight of a chapter never recorded before
+[0,"b","ch-mur5yiiu-u1cv",null,"hash…","continue"]                 // or: as the last recording left it (hash only)
+[0,"ch","ch-mur5yiiu-u1cv"]                                         // the chapter the lines that follow apply to
+[0,"K","a","KeyQ",0]                                                // layout: "a" is typed with KeyQ (only when not the usual key)
+[1840,"r","The door ",[112,95,130,2210,88,101,97,140]]              // a typing run: text, gap before each later key
+[310,"rd",3,[120,98]]                                               // three backspaces, one character each
+[2400,"k","Enter",0]                                                // any other key: code, mods
+[2,"e",1834,0,"</p><p>","iP"]                                       // any other edit: at, delLen, ins, inputType code
+[190,"s",4,17]                                                      // caret {pIdx, off}; 4 numbers = a selection
+[400,"n","LLL*l",[93,36,203,3],[[3,4,14,4,13]]]                      // caret keys, and the moves that weren't one letter along
+[2210,"c","paste",1203,"text","hash…",false]                        // clipboard
+[1,"x","split"]                                                     // a cause for the edits/bases that follow
+[800,"w","hash…"]                                                   // current chapter written to disk: hash of the exact bytes (a chapter id after it: another chapter)
+[60000,"f","blur"]                                                  // focus/visibility/tab/idle
+[0,"T","2026-10-06T09:20:03.551Z"]                                  // wall-clock checkpoint
+[0,"h",42,"hash…"]                                                  // hash chain, ends every chunk (see Hash chain)
+[5,"end",{"keys":5312,"edits":4870,"unobserved":0}]
+```
+
+**Format and hashes.** The header's `neoRec` is the format. A change to what any line means takes the next number, and a reader leaves a session in a format it doesn't know unread (`replay` reports it as a `format` problem). A reader never stops knowing a format: `READS` in `recording.js` lists every one this NEO plays, and a new format keeps the old number there with its own branch wherever a line means something else. `scripts/recording-format.test.js` replays frozen sessions of each format (`scripts/fixtures/recording-v<N>/`) and fails when today's code reads them differently, counts a caret differently, or draws a class they hold without a rule. The player has its own number, `PLAYER`, in the key of every cached keyframe, so a change to what the player makes of the same lines rebuilds the cache instead of using it. The header's `platform` is `navigator.platform`: keys are physical codes and Ctrl or Meta as pressed, so the same shortcut reads differently from a Mac and a PC. The HTML, the hashes and the replay are the same on every platform. A hash is SHA-256 cut to its first 128 bits and written as 22 base64url characters (`digest` in `recording.js`): plenty to check that a replay matches a file or that a chain is whole, at a third of the hex length. Hashes are random bytes that gzip can't shrink; written in full hex they were half of a closed session.
+
+**One clock.** Every line starts with `dt`: milliseconds since the previous event, from `performance.now()`. Small integers keep files small. A run is several events: its line `dt` is the gap before its first key, its array holds the gap before each later key (one fewer than the characters), and the clock moves through all of them. The next line's `dt` counts from the run's last keydown. Replay expands a run with `t += dt[i]` and shows character `i` at `t`, the same loop as one line per key, so seeking, skipping inactivity and the timeline need no special case for runs.
+
+**The current chapter.** `ch` sets the chapter that `r`, `rd`, `e`, `s` and `x` lines apply to, and a `b` line sets it too. It's written only when the chapter changes: the caret moves into another chapter body, or a structural change touches two chapters. `d` lines name their chapter, because drops happen to chapters that aren't the current one; a `w` line names one only when it isn't the current chapter.
+
+**Runs.**
+
+- `r`: `[dt, "r", text, [dt…]]` inserts `text` where the last edit in the current chapter ended, one character per key. An explicit position is appended (`[…, at]`) only when a run starts somewhere else, which a caret move already shows.
+- `rd`: `[dt, "rd", n, [dt…]]` is `n` presses of Backspace, each deleting one character before the caret. When the run holds anything else, `n` is a string with a letter per key: `B` Backspace, `D` Delete (one character after the caret, which stays put), small for an auto-repeat, so holding Backspace down is `"Bbbbbbbb"`. A position, when there is one, is where the caret was before the first key. Held-down Backspace was most of the lines in a measured editing session.
+- A key joins a run only when its splice is exactly one character of text, inserted (or, for `rd`, removed) at the caret, with no escaping in the HTML. Anything else is written as a `k` line and an `e` line: `&` (saved as `&amp;`), Enter (`</p><p>`), a Backspace that joins two paragraphs, `--` turning into `—`, a key that moves the caret.
+- `n`: `[dt, "n", keys, [dt…], [moves…]]` is caret keys, one letter each: `L` `R` `U` `D` for the arrows, `H` `E` for Home and End, `P` `N` for Page Up and Down; small with Shift, followed by `*` for an auto-repeat. The `s` line each key caused is left out where it's one letter along from the caret before (Left and Right; with Shift, only the focus moves). `moves` lists the others as `[i, pIdx, off]` (or with four numbers, a selection), and `[i]` for a key that didn't move the caret. The `dt` array holds the gap before each later key and, last, how long after the last key its `s` came; the other `s` lines are placed at their key's moment, a few milliseconds early. A caret key with Ctrl, Alt or Meta, or a script's, is a `k` line, and an `s` with a cause (`p` pointer, `n` NEO) ends the run. In a measured session, arrows and their caret lines were nearly a third of the bytes.
+- A run ends when the next key doesn't qualify, when the caret moves, or when any other line has to be written (blur, `idle`, a `T` checkpoint, a selection, a `w` write, a flush). That keeps every line in time order. **Runs aren't split by pauses**: a pause is just a large number in the `dt` array, recorded as exactly as any other gap.
+**The layout table.** `["K", char, code, mods]` says which physical key and modifiers type a character. It's left out for the usual key (a letter on its `Key`, with Shift for a capital; a digit on its `Digit`; space on `Space`). Otherwise it's written the first time a character is typed in a session and again if a different key types it later (the number row and the keypad both type `5`); from then on, run characters take their key from it. The table is needed because the physical key can't be worked out from the character: on AZERTY, `KeyQ` types `a`, and smart quotes turn the `Quote` key into `“` or `”`.
+
+**General lines.** `k` (`[dt, "k", code, mods]`) is any key outside a run: shortcuts, Enter, Delete. `e` (`[dt, "e", at, del, ins, input]`) is any splice outside a run, at an absolute offset into the chapter's HTML. Several disjoint changes in one event become several `e` lines.
+
+- Short `inputType` codes (`iT` insertText, `iP` insertParagraph, `dB` deleteContentBackward, `hU` historyUndo, `iFP` insertFromPaste, `iRT` insertReplacementText, `iC` insertCompositionText, `iFD` insertFromDrop, …) map 1:1 to the DOM names in `recording.js`. An `e` line under a structural `x` cause leaves the code out.
+- An edit with no `k` line just before it, and a cause of `input`, came from something other than a key (dictation, OS autocorrect, a tool) and is shown that way.
+
+**Baseline, continue and catch-up.** On the first change to a chapter in a session:
+
+- A chapter never recorded before gets a `b` line with its full HTML and cause `baseline`.
+- A chapter whose HTML is exactly where this device's last recording left it gets a `b` line with `null` for the HTML and the hash, cause `continue`. (Its own device's: what other devices did to the chapter since is the catch-up that follows. 4d merges devices on replay, not in the recording.) A long chapter edited every day doesn't put its whole text in every session.
+- A chapter that changed while nothing was recording gets `["x", "catch-up"]` and the `e` splice from the last recorded state to the present one, so it costs the changed text, not the chapter. If the last recorded state isn't available, it gets a full `b` line with cause `catch-up`.
+- A chapter edited enough since its last full `b` (200,000 characters, or four times its length if that is more) gets a full `b` line with cause `anchor` in place of `continue` (see Anchors, under Days, seeking and search).
+
+Either way it records honestly that the text changed while nothing was watching.
+
+**Volume.** Measured on a generated session (3,000 words, 18,000 keystrokes, with typos, backspaces, pauses and caret jumps): about 100 KB raw and 14 KB gzipped, under 0.8 bytes per key. The plan's earlier format (a key line and an edit line for every key, with hold times) took 1.2 MB raw and 154 KB gzipped on the same session. A binary encoding (measured while hold times were still in) was about a fifth smaller after gzip, which isn't worth losing a format anyone can read: the gap before each key is real information, and it sets the floor. That generator was too kind. A real session's gaps between keys are spread wider (median 197 ms, 95% under 550, 8.6 bits each), and its typing runs take about 2.5 bytes a key gzipped; the `h` and `w` hashes, two every 20 s of writing, add a fifth again. 4a measured a year on that basis: a novelist's day of 18,000 keys is about 60 KB gzipped and 120 KB raw, and a year on a novel 14 MB (see Measured, under Days, seeking and search).
+
+## Hash chain (local, no network)
+
+Part of patch 1 because it costs almost nothing, catches corruption, and is what patch 2 seals.
+
+Every chunk ends with `["h", n, H]`, where `n` is the number of lines in the session so far and `H = digest(H_prev ‖ bytes of every line since the previous h)`, with `H_prev` as its 16 bytes. A line's bytes are its UTF-8 text and the `\n` after it, exactly as written. The first `H_prev` is the hash of the header line. The header's `prev` names the last `H` of this device's previous session for the book, so sessions chain together too. Rollups and closing join files by concatenating their bytes, never by re-serializing, so the chain doesn't depend on how the lines are spread over files. Together with the `w` lines, this lets anyone holding the book and its recording confirm that the replayed text *is* the book, and that the recording hasn't been edited since it was written. It can't say *when* it was written; that is patch 2.
+
+## Storage
+
+Plain files, inside the book folder (so sync, backups, Pocket and moving to the trash all treat them as part of the book), and nothing NEO already writes is changed.
+
+```
+NEO Library/
+  book-<slug>-<id>/
+    book.json, chapters/, darlings.json, …      unchanged, never written by the recorder
+    recording/
+      README.txt                                written once: what this folder is
+      <deviceId>/
+        device.json                             device name, created, NEO version (+ public key, patch 2)
+        2026-10-06T09-14-03Z-k3f9/              the open session
+          s-000001-000411.jsonl.gz              a rollup of the chunks before it
+          c-000412.jsonl                        a chunk: one flush, named by its first line number
+          c-000498.jsonl
+        2026-10-05T20-02-11Z-a81b.jsonl.gz      a finished session, one file
+        seals/                                  patch 2 only
+```
+
+- **Device id**: random, made once, kept in `userData/settings.json`. Never in the library.
+- **One writer per file**: only the device that made a folder writes in it, so iCloud and Syncthing can't produce conflicts. Other devices only read.
+- **No append. Every file is written once and never changed.** Each flush writes a new chunk through `writeFileDurable` (tmp, fsync, rename), under a `libName()` check on every segment of the path, so NEO's rule that every library write is durable holds without exception. A chunk is all there or not there at all, so readers never meet a torn line. Sync uploads each small file once, where a file appended every second would be uploaded again on every change (iCloud sends whole files).
+- **Flushes.** In `flushAllSaves` (every 20 s, and on blur, hide and close), when a session closes, and when Writing History opens: at most three chunks a minute. (The first build flushed before every chapter write too, one chunk per 800 ms save; a real session made 411 chunks.) A chunk keeps only the last `w` of each chapter, so a chapter saved again and again within 20 s is checked once; the dt of a `w` it leaves out goes to the next line that isn't `K`, `ch`, `o` or `h`. The cost: a crash can leave a chapter on disk up to 20 s ahead of the recording. At the next start the chapter isn't where the recording left it, so its first change gets `catch-up`: the words are kept, and only those seconds' keys are lost.
+- **Rollups.** Every 10 minutes while a session has chunks, `rec:rollup` concatenates them in line order and writes `s-<first>-<last>.jsonl.gz` durably, reads it back and checks its last `h`, and only then deletes the chunks it covers. The rollup holds the same bytes, so deleting them loses nothing. Rollups are new files too; no rollup is ever rewritten.
+- **Closing.** At book close, app quit, or when the writer's day ends (so a session is at most a day), write `end` and flush. The writer's day is the one the goals already use (`writingDay()`, rolling over at `library.dayEndsAt`), so a session that runs past midnight belongs to the night it began. The header names it: `"day":"2026-10-05"`. (Phases 0 to 2 roll over at local midnight and have no `day`; a reader takes the local date of `startedAt` in the header's `tz`.) `rec:close` joins the session's rollups and chunks into one `<session>.jsonl.gz`, written durably and checked, then removes the session folder. A finished book holds one file per session.
+- **Crashes.** At the next start, a session folder with no closed file belonged to a session that crashed. It is closed with `["end",{"crashed":true}]` and joined the same way. A crash between writing a rollup and deleting its chunks leaves both: readers order everything by line number and skip lines a rollup already holds. A chunk that won't parse whole is a break in the chain, reported as one.
+- **Reading another device's open session.** Its chunks can disappear into a rollup while being read. A reader that finds a file gone lists the folder again. Readers ignore `.tmp` files.
+- **Leave `recording/` alone in NEO's other code.** `readChapter`, `chapterStamps`, `refreshFromDisk` and `rebuildBookMeta` only look at `chapters/`. Check that the import, export and `book:delete` paths don't trip over the new folder. Deleting a book takes its recording to the trash with it, which is right.
+- **Backups.** A daily zip is the right copy of things that change: it is the book as it was that day. A closed session never changes, so a zip a day would hold the same bytes fourteen times, and a recording already holds every earlier version of its chapters. So `dailyBackup` leaves every book's `recording/` out of the zip and mirrors the recordings instead:
+  - `Backups/recordings/<book folder>/<device>/` holds a copy of each closed `<session>.jsonl.gz` and the `device.json` beside it, in the same layout as the book. Every copy goes through `writeFileDurable`, and its bytes are checked against the original before it counts. A file is written once and never rewritten, and nothing is pruned on a timer.
+  - **When.** `rec:close` mirrors a session as soon as it has written the closed file, so a writer who leaves NEO open for weeks is still covered. `dailyBackup` (which runs only when NEO starts) sweeps up anything missed, such as a session closed after a crash, and a copy that failed is tried again there.
+  - **Who.** The mirror lives in the synced library, so each device's copies reach every other device the way its recording does, and every library ends up with every device's mirror. A device mirrors its own sessions. Two devices writing the same path can leave a conflict copy even when the bytes match (iCloud and Syncthing don't compare them), so a device mirrors **another** device's session only when it closed more than 7 days ago and the mirror still lacks it: by then its own device isn't coming back (a retired laptop) or can't (Pocket before 4e). Two devices filling the same gap at once is rare, and costs only a stray conflict copy; readers ignore any name in the mirror that isn't a session name, as they ignore `.tmp`.
+  - Open sessions aren't mirrored: they are at most a day old, still being written, and become a closed file when the day ends.
+  - When a book goes to the trash, its mirror folder goes too (`shell.trashItem`), so the recording is still recoverable from the trash, as the book is.
+  - `dailyBackup` writes `Backups/README.txt` once, and again when its text changes: to get text back, open a zip and copy the book or chapter you want into the library; to get a recording back, copy `recordings/<book folder>/` into that book's `recording/` folder (names never clash, and a file in both places is the same bytes). Each zip holds `_recordings.txt` saying the recordings are in `Backups/recordings/`. Nothing else documents restoring today (README.md only says the zips are kept for two weeks).
+  - Restoring text from a zip leaves the recording alone, which is right: it already holds the older versions. The restored chapter no longer matches where the recording left it, so the next session records a `catch-up`, and the history shows the text going back.
+  - Size: one copy of each session instead of fourteen, and it doesn't multiply over the years. The zips go back to about their size before recordings.
+  - The daily zips stay. A recording only covers the writing, and only since recording began, and only while it is on: the chapters, and since 4f the notes, chapter titles, the outline's notes and stickies; the rest of `book.json`, Darlings, covers and `library.json` aren't in it, and a zip can be opened and read without NEO. Whether the zips can shrink once the recording covers the whole book is a question for after 4f.
+- **Nothing but the lines.** The recorder writes no index, summary or other derived file into the library. Search and the strip of days read the cache (see Days, seeking and search). A per-session summary beside the session was considered and deferred (decision 11): it can be added later without a new `neoRec`, because it is derived from the lines and a session closed without one would get one built into the cache.
+- **Derived caches** (each day's end state and stats, keyframes) live in `userData/recording-cache/<bookId>/`, are keyed by what they were built from and by `PLAYER`, and can always be rebuilt.
+
+## `recording.js`: the pure engine
+
+A new top-level file with no DOM and no Node APIs, loaded by the window (`<script src="recording.js">`, exposing `window.NeoRecording`) and `require`-able by `main.js`, the tests and scripts, the same pattern as `i18n.js`. Add it to the Pocket CI copy list. It holds:
+
+- `joinParts(parts)` → the session's lines in order, from a closed file or from an open session's rollups and chunks, skipping lines a rollup already holds and reporting gaps
+- `parseSession(text)` → `{ header, lines }`
+- `encodeRuns` / `expandRuns` → between per-key events and `r`/`rd` lines with the layout table, so everything above this layer sees one event per key on one clock
+- `verifyChain(session)` → where the verified part ends, and any breaks
+- `applyEdit(html, at, del, ins)` and `stateAt(sessions, chId, t)` → HTML at time t
+- `replayCheck(sessions)` → for every `w` line, does the replayed HTML hash to it? (the core invariant)
+- `keyframes(sessions, every = 2000 lines)` → for seeking within one day
+- `dayStats(sessions, startState)` → a day's numbers for its tile: time writing, words added and removed, chapters touched
+- `normText(text)` → the text search matches against: case-folded, NFC, `’` as `'`, runs of whitespace as one space
+- `findPhrase(html, phrase)` → where a phrase is in a chapter's text, within one paragraph (see Days, seeking and search)
+- `Page` (4d): every device's sessions as one page. Each device plays onto its own copies; the page shows, chapter by chapter, the copy of the device that last changed it. Joins between devices are where one device's change takes the page over (Days, seeking and search; Phases, 4d).
+- `stats(sessions)` → the measures for the evidence report (patch 2) and the dialog's chapter list, words counted with `Intl.Segmenter`
+- `textOf(html)`: the same paragraph rules as the witness's `htmlToParagraphs` (ghost paragraphs and `⚑` marks aren't prose)
+
+## Where the history opens
+
+One dialog, **Writing History**, built on NEO's existing full-window sheet (`sheetBackdrop` in `app.js`, the one bound-shelf pages use). It opens on a book, and on a chapter when the way in names one. Esc in the player goes back to the days, on the day the player was in; Esc on the days, or the backdrop from either, closes the dialog and puts the caret back where it was. A dialog opened straight into the player (**Watch This Chapter Being Written**) goes back to the days the same way. It can be reached four ways, each matching how NEO already does things:
+
+| Way in | Where it goes in the code | Opens on |
+|---|---|---|
+| **History** in the footer, after **Darlings** | A fifth element in `#tabs` (`index.html`). It isn't a real tab: a click opens the dialog and the current tab stays selected. Styled like the tabs and hidden with them until hover | The book, scrolled to the chapter the caret is in |
+| **File → Writing History…** | `buildMenu()` in `main.js`, sending `{ type: 'history' }`. Handled on `window.neo.onMenu`. Disabled on the shelf | The book, current chapter |
+| **Writing history…** on a book's right-click menu, with the other book settings on the shelf | The `options` list in the book cover `contextmenu` handler (`app.js`, BOOKSHELF), with a `desc` line like its neighbours | That book (opened read-only, no need to open it in the editor) |
+| **Watch this chapter being written** on a chapter's right-click menu | `chapterMenu()` | That chapter |
+
+Pocket has no File menu, so there it's the footer button and the book menu.
+
+The dialog has four parts: the days, the text as it is above a tile for each writing day, which the dialog opens on (see Days, seeking and search), with a search field; the player (below); a list of the book's chapters, including deleted ones, with when each was first and last written; and a footer with **Keep a replay of my writing** (the on/off setting). Patch 2 adds **Prove when I wrote**, the evidence report and **Export replay…** to that footer.
+
+## Replay (the player)
+
+The controls follow NEO's rule: hidden until hover.
+
+- A read-only sheet styled exactly like the manuscript (same CSS, `.chapter-body` without `contenteditable`), so the replay looks like the book.
+- The caret drawn as NEO's caret. A selection shows as a selection. Text appears and goes exactly as it did in the editor: no tint on new text, no strikethrough on deleted text. Overlays use the CSS Highlight API, as NEO already does for search and spellcheck, so they never get into HTML.
+- **A timeline across the bottom** for the day being played: an activity density strip (keys per second), with markers for pastes (internal or external), syncs from another device, catch-up, time away (blur/hidden), restores and structural moves (split, merge, darlings). Session boundaries are labelled. Either side of it, the day before and the day after, as tiles.
+- **Speed**: 1×, 2×, 4×, 8×, 32×, plus *skip inactivity*: gaps over 3 s shrink to 0.5 s, with a small "paused 4 min" badge so the pause is visible, not hidden.
+- **Seeking**: within the day, the nearest keyframe, then replay forward; to another day, that day's start state from the cache, then the same. Budgets are under Days, seeking and search.
+- **Earlier and later sessions**: ⇧← and ⇧→ (beside the fixed jumps of ← and →), go to the start of the previous or next session. Pressed in the first second of a session, ⇧← goes to the start of the one before, as a music player's back button does. A session on another day loads that day first, so the skip crosses days as play does. In one-chapter mode they skip to sessions that changed that chapter, found from the session stats, so writing elsewhere in the book is passed over. Going back to the days lands on the day the player was in.
+- **Scope**: one chapter, or the whole book (chapters appear in their order at that moment, following `o` order lines).
+- **Merged devices**: segments from another device show their device name, and replay jumps across sync adoptions.
+
+## Days, seeking and search
+
+Phase 2's player reads every session on opening and makes one step per key for all of them. That is fine for a week and not for a year, and the worst case is a screenplay, because a whole script is one chapter.
+
+**What a year costs today** (the estimates the plan started from; Measured, below, has the numbers). A novelist writing 1,500 words a day on 250 days types about 18,000 keys a day with revisions: 4.5 million steps a year. At roughly 100 bytes a step, that is about 450 MB before anything plays. Keyframes every 2,000 steps hold every chapter, sharing the unchanged strings, so each costs the chapters that changed: about 2,250 keyframes of a 30 KB chapter is 70 MB for a novel. A 120-page script is one chapter of about 300 KB, so the same keyframes cost about 700 MB, and every step of the replay makes a new 300 KB string.
+
+**The day is the unit.** A session already ends with the writer's day (see Storage), so every session belongs to exactly one day, and a day is the sessions that share its `day`. The dialog shows days. It plays one day at a time and never loads the year:
+
+- **Opening** shows the chapter the caret is in (or the whole book) as it is now, with no replay, above the strip of days (below). The days come from the session headers' `day`; their numbers and the tiles' maps come from the day and session stats in the cache, and fill in as the worker builds it.
+- **A day** is loaded when it's picked: its sessions, its steps and keyframes every 2,000 steps, starting from the day's start state. A day of 18,000 steps is about 2 MB in memory, and a script's day nine keyframes of 300 KB.
+- **Play runs on** into the next day, which is loaded while the current one plays. Skip pauses works as it does now.
+- **The start state** of a day is the end state of the day before. The cache keeps one file a day, `days/<day>.json.gz`, holding the end state of each chapter that day changed, and holds most of them as **paragraph diffs**: the chapter's paragraphs as runs copied from its state before (`[from, count]`) and the paragraphs that are new, whole. A chapter's state is kept whole on the first day it has one, and again once the diffs since its last whole state add up to more than the whole state would, so rebuilding any state reads at most about two whole states of that chapter. Whole chapters would cost 30 MB a year for a novel, because revising touches about 19 of its 33 chapters on a writing day; diffs cost 5 MB (4a). The start state of day N is, for each chapter, its last whole state before N with the diffs after it. The cache's index of days says which days those are.
+- **Day stats** are written into the cache with each day's end state: `dayStats` of that day's sessions, a few hundred bytes a day. Beside them go the **session stats** the tiles draw from (`sessionStats`, below).
+- **The cache is built by a worker,** a `utilityProcess` like the spellchecker (`history-worker.js`), oldest day first, so the window never waits on it. It uses Node's native SHA-256, and while building it checks one hash per chapter per day, the replayed chapter against the day's last `w` for it, not every `w`; `replayCheck` and `scripts/verify-recording.js` still check them all. A device opening a long history for the first time can play the most recent days only once the build reaches them, so the dialog says it is still reading the history.
+- **Anchors.** The first time a session touches a chapter that has been edited enough since its last full `b`, it writes a full `b` line with cause `anchor` instead of `continue`. Enough is 200,000 characters inserted and deleted, or four times the chapter's length when that is more (decision 13). That's a new cause, not a new format. An anchor is part of the recording (in `recording/`, in the hash chain), not the cache, because its job is to survive what the cache can't: it bounds any build of a chapter to the edits since its last anchor, and it is where replay picks up again after damage. A chapter nobody touches gets no anchors; it has nothing to replay.
+  - **By volume, not by time.** What an anchor bounds is how much writing has to be replayed, and what damage can cost: the writing between a broken session and the next anchor can't be shown. Both are amounts of writing, so the rule counts writing, and the bound is the same for a writer who types 4,000 keys a day as for one who types 50,000. An anchor every 60 days cost a slow writer 15% of their recording for chapters that hardly changed, and let a fast one go a megabyte of edits between anchors (4a).
+  - **The multiple is for long chapters.** An anchor costs the whole chapter. A fixed 200,000 characters would write a 300 KB script again for every 200 KB edited, a fifth of its recording; four times its length keeps that to 4%. For a chapter under 50 KB, which is every novel chapter, the fixed figure is the one that counts.
+  - The recorder counts each chapter's edits since its last full `b` beside where the recording left it (`known.json`), and the count resets with any full `b` (`baseline`, `new`, `split`, a full `catch-up`, `anchor`). Readers see only the cause, so the rule can change later without a new `neoRec`.
+  - The bound is the rule's figure plus one session's edits to that chapter, because the check is made when a session first touches it: in 4a the longest replay was 89 KB of edits for a slow writer, 221 KB at the usual pace and 284 KB at three times it, and 1.2 MB in the script.
+- **Damage.** A session file missing or broken, or a chain that doesn't verify, is read from the backup mirror instead (`Backups/recordings/`, see Storage) when the mirror holds it and its first `h` chains from the session before. It is read only: nothing is copied back into the book, so a device never writes in another device's folder. Failing that, it stops the replay of the chapters it touched. The build picks each one up again at its next full `b` (an anchor or a full `catch-up`), and the player shows the days between as a gap with what's missing named, never as continuous writing. Days before the gap still play.
+- **Scripts are too slow** with a chapter held as one string (4a measured it: building a year takes 8½ minutes, and a seek 168 ms on average). That changes the player's model of a chapter, not the format: the HTML is held as an array of paragraphs with their lengths summed in a Fenwick tree, so a splice finds its paragraph in log time and copies only that paragraph.
+
+**Search.** A search field in the dialog takes a word or a phrase ("John", "John's boat"). It reads the recording and the cache, never a file of its own: search is rare, and a slow search is better than an index to keep in the library. It needs the day states, so on a device whose cache is still being built it waits for the build.
+
+- **Matching.** The chapter's text (`textOf`) through `normText`: case-folded, NFC, `’` as `'`, whitespace as one space, so formatting inside a phrase doesn't stop it matching. A phrase matches within one paragraph, never across a break. Script character cues are text like any other, so "when did JOHN first get a line" works.
+- **The results** name moments, each a day, a chapter and a step:
+  - **First written**: the first moment the phrase is anywhere in the book.
+  - **Last written**: the last moment a new occurrence of it appeared. When the phrase is still in the book, this is the one people usually mean.
+  - **Written out**: the moment it left the book for good, if it has.
+  - **Moved**: a day it left one chapter and came into another.
+
+It is answered in two passes:
+
+1. **The day states (fast).** One walk through the day files, oldest first, keeping each chapter's paragraphs as it goes and how often the phrase is in each. A phrase never crosses a paragraph, so only a day's new paragraphs can add an occurrence and only the paragraphs it dropped can take one away: the walk tests just those. A day where a chapter's count changes is a result's day, and the one walk answers First written, Last written, Written out and Moved together. 4a measured the walk's reading and testing at 270 ms for a novel's year and 230 ms for a script's (2.8 s over whole chapters, one file each). These results are shown at once, and picking one loads the day and finds its moment (below).
+2. **Within days (slow, in the worker).** The day states miss a phrase that came and went inside one day, never there when a day ended. For First written, the worker then replays the days before the first pass's answer, oldest first, checking at every `w`; it stops at the first day where the phrase appears, which moves First written earlier. Last written and Written out replay the days after their answer the same way, newest first. In the worst case this is as long as the cache's first build (30 s for a novel, 2 min for a script). The dialog shows how far it has got and the search can be cancelled; until it finishes, the first pass's results stand, marked as possibly not the earliest (or latest).
+
+**The moment.** Picking a result loads that day and finds the first step after which the phrase is there (or gone) in that chapter: it checks the keyframes to find the interval, then steps through it, testing only the paragraph each splice touched. The player stops there with the phrase highlighted (the Highlight API, as NEO's own find does).
+
+**Adding an index later.** If search turns out to be wanted often, or too slow somewhere (Pocket, where building a year's cache on a phone may be slow, is the likeliest), a per-session summary of the words that came and went can be added beside each session. It is derived from the lines, so it needs no new `neoRec`; sessions recorded before it get one built into the cache. It would speed up single words only: a phrase can come and go on a day when each of its words was already there and stayed, so phrases would still need the passes above.
+
+**The dialog by day.** (As built on 2026-10-10. 4b first built an overview of the whole book as a map, one session at a time, with a year strip as its seek bar and a list of days beside it; in use it said less than the days themselves, and it went.)
+
+- **The days.** The dialog opens on the chapter the caret is in, or the whole book, as it is now. Below it is a strip of tiles, one per writing day, oldest at the left and today at the right. A tile shows the date and a map of where that day changed the text: for one chapter a grid read like a page, for the book a column per chapter. ← and → move through the days and show each as it ended, Space or Enter plays the one shown, and a tile clicked plays its day. With a chapter picked, only the days that touched it are there.
+- **The side pane** lists the chapters, with the whole book first and deleted chapters under their own heading. A chapter picked there is what the days show and the player plays.
+- **The player** shows one day: the page, the controls below it (back to the days, play, speeds, Skip pauses, the moment), and the day's typing timeline with the day before and the day after as tiles either side of it. Play runs on into the next day. Esc goes back to the days. **Watch This Chapter Being Written** goes straight to the player.
+- **The day is the unit,** of showing as of loading (decision 10). A day spent reading leaves no tile, because a session that changes nothing is never written. A day holds every device's sessions, their lines interleaved in wall-clock order (4d).
+- **Session stats** (`sessionStats` in `recording.js`, built by the worker as it builds each day): for each chapter the session changed, the words added and removed and the chapter's **bins**, plus the chapter order at the session's end (from `o` lines) and each chapter born (with the cause on its `b` line: split, new, from another device) or deleted.
+- **Bins scale with the chapter**: one per 500 words of the chapter's length at the session's end, at least 8 and at most 64. A 3,500-word novel chapter gets 8 bins of about a page and a half each, and a 120-page script (one chapter) about 40 of three pages each. Each bin counts the characters the session's splices inserted and deleted there, placed by the splice's offset as a share of the chapter's length when it was made. Counting splices rather than diffing the session's start and end shows the work: a paragraph written and thrown away in one sitting is seen. Only chapters a session changed are stored. A novel's year (500 sessions touching about 3 chapters each) is about 25 KB, and a script's about 40 KB, against the cache budgets below.
+- **Colour.** The map is a picture of the book, not its text, so it marks text added in one colour and deleted in another, and a bin with both reads as edited. This is deliberately unlike the player, where the replayed page is never tinted. Marks from earlier sessions fade over the next few frames, so a run of sessions in one place shows as a trail.
+- **Colour.** A tile's map is a picture of the text, not the text, so it marks text added in one colour and deleted in another, and a cell with both reads as edited. This is deliberately unlike the player, where the replayed page is never tinted.
+- Search results (4c) mark their days on the strip. The days, like the player, show every device's writing (4d); a day's tile names the devices that wrote it.
+
+**Budgets**, for a year on a mid-range 2020 laptop, checked by `scripts/benchmark-history.js` against a generated year: a novel (100,000 words, 30 chapters) and a script (120 pages), 250 writing days of one to three sessions with revisions, pastes, splits and Darlings, and the edits that make recordings awkward (How representative, below):
+
+| | Novel | Script |
+|---|---|---|
+| Dialog open to the chapter as it is, with the strip of days | 300 ms | 300 ms |
+| A day ready to play, cached | 500 ms | 800 ms |
+| Seek within the day | 50 ms | 100 ms |
+| Jump to another cached day | 300 ms | 500 ms |
+| Search: the day states, cached | 1 s | 2 s |
+| Search: the moment | 1 s | 2 s |
+| Search: within days, worst case | 30 s | 2 min |
+| First build of the cache, in the worker | 30 s | 2 min |
+| Window memory while playing | 150 MB | 250 MB |
+| Cache on disk | 10 MB | 25 MB |
+
+The benchmark also prints the recording's size per day, so a change that makes recordings bigger shows up as a number.
+
+**Measured** (4a, 2026-10-09, and again on 2026-10-10 with the edits under How representative: `node scripts/benchmark-history.js` on an i7-9750H laptop of 2019, Node 24). The generated years are made line for line as the recorder writes them, and each computer's replay ends exactly where its recording left every chapter. The novel: 250 writing days over a year, 416 sessions, 4.7 million keys, ending at 31 chapters and 625 KB. The script: 400 sessions, 3.0 million keys, ending at 293 KB, its full length from the 150th day and rewritten after. On about one day in seven the writer works on a second computer. The same novel was also written at a quarter of the pace (1.3 million keys) and at three times it (14 million), with `--pace`. Today's player, with no DOM, playing the first computer's sessions (about 85% of the year; 4d plays both):
+
+| | Novel | Budget | Script | Budget |
+|---|---|---|---|---|
+| Open, cached (the whole year: there are no days yet) | 7.3 s | 300 ms | 6.9 s | 300 ms |
+| Seek, mean / worst | 6 / 125 ms | 50 ms | 170 / 576 ms | 100 ms |
+| First build, in the window | 23 s | 30 s | 407 s | 2 min |
+| Memory while playing | 1.2 GB | 150 MB | 1.1 GB | 250 MB |
+| Cache on disk (keyframes) | 91 MB | 10 MB | 102 MB | 25 MB |
+| Day states, whole chapters / paragraph diffs | 31 / 5.9 MB | 10 MB | 16 / 3.9 MB | 25 MB |
+| Search over day states, whole chapters / diffs | 3.1 s / 300 ms | 1 s | 0.7 s / 320 ms | 2 s |
+
+At three times the pace the novel's year is 13 million steps on the first computer: today's player needs 4 GB and 65 s to open it and 161 s to build it, its diffs come to 11 MB, and searching them takes 0.8 s.
+
+| Size | Novel | Script |
+|---|---|---|
+| Recording per writing day, gzipped (median / largest) | 69 / 162 KB | 44 / 120 KB |
+| Recording for the year, gzipped (as text) | 16.9 MB (36 MB) | 11.3 MB (25 MB) |
+| `Backups/` today, the recording in 14 zips: after 1 year / 3 | 240 / 719 MB | 159 / 478 MB |
+| With 4g, zips: after 1 year / 3 | 3.8 / 11 MB | 1.3 / 3.8 MB |
+| With 4g, the mirror: after 1 year / 3 | 17 / 51 MB | 11 / 34 MB |
+
+(Three years means writing one such book a year.) Anchors, as a share of the year's recording, and the most edits a chapter needed replayed from its last full `b` on one computer:
+
+| Anchor rule | Novel, a quarter the pace | Novel | Novel, three times | Script |
+|---|---|---|---|---|
+| Every 60 days | 21.5%, 60 KB | 9.3%, 278 KB | 3.1%, 788 KB | 5.6%, 1.8 MB |
+| 4× the chapter edited | 2.2%, 88 KB | 8.0%, 274 KB | 7.3%, 553 KB | 7.4%, 1.3 MB |
+| 100K characters edited | 0, 88 KB | 6.8%, 138 KB | 6.5%, 241 KB | 53%, 457 KB |
+| 200K characters edited | 0, 88 KB | 3.2%, 220 KB | 3.5%, 330 KB | 32%, 457 KB |
+| 400K characters edited | 0, 88 KB | 1.2%, 424 KB | 1.7%, 451 KB | 18%, 632 KB |
+| **200K, or 4× the chapter if more** | 0, 88 KB | 3.0%, 271 KB | 2.5%, 534 KB | 7.3%, 1.3 MB |
+
+A change made all at once (a catch-up, Replace All, an Outline move), recorded as today's recorder does, one splice from its first change to its last, and as 4b's does, a splice per run of paragraphs it changed (`--one-splice` measures today's):
+
+| | Novel | Script |
+|---|---|---|
+| Recording for the year: one splice / a splice per change | 22.3 / 16.9 MB | 15.0 / 11.3 MB |
+| Largest day | 308 / 162 KB | 252 / 120 KB |
+| Anchors, by the chosen rule | 8.5% / 3.0% | 16.2% / 7.3% |
+| Longest replay, by the chosen rule | 458 / 271 KB | 1.7 / 1.3 MB |
+
+Five Replace Alls renaming a character through the novel changed 6.7 KB of names; as one splice a chapter they put 1.5 MB of HTML in the recording.
+
+What it decides:
+
+- **Days are needed.** Today's player holds the whole year in the window (1.2 GB, 4 GB for a fast writer) and takes 7 seconds to open with everything cached. One day is about a 250th of that.
+- **The paragraph model is needed for scripts.** Every step copies the 300 KB script: a year takes 7 minutes to build, more than three times the budget, and a seek misses its budget before days come into it. The novel's 20 KB chapters keep its seeks inside their budget, and its first build (23 s for one computer's sessions) is inside its 30 s only until the second computer's are added. One model for every chapter keeps one code path.
+- **Anchors by volume: 200,000 characters, or four times the chapter if that is more** (decision 13). 3% of a novel's recording at the usual pace, and nothing for a slow writer, whose chapters never need one; the multiple keeps a script's anchors to 7%. Every 60 days is the worst of both: 21% for the slow writer, 800 KB of replay for the fast one. The second computer raises every rule's share (from 1.8% for the novel and 4.2% for the script in the first measure, which had one computer): each computer counts and anchors on its own, and its catch-ups count as edits it replays.
+- **A change made all at once is a splice per run of paragraphs it changed** (decision 14). One splice from the first change to the last made the novel's recording a third bigger and nearly tripled its anchors.
+- **The keyframe cache goes.** It is 91 to 102 MB for a year; day states replace it.
+- **Day states are paragraph diffs, one file a day.** Whole chapters break the novel's 10 MB budget (31 MB, because revising touches about 20 chapters a day) and search over one file per chapter and day takes 3.1 s. Diffs are 5.9 MB, and searching them 300 ms. The day with the most diffs (180 KB) is a Replace All's: every paragraph holding the name is new that day.
+- **Recordings are about three and a half times the size the plan expected** (17 MB a year, not 2 to 5): real gaps between keys don't compress as the first generator's did, the chain's hashes are a fixed cost of every 20 s, and a second computer's work comes again in the first's recording as catch-ups (7 MB of edits a year in the novel). Still small beside a day's zip of it, and 4g takes it out of the zips: `Backups/` after a year goes from 240 MB to 21 MB.
+
+**Measured (4b)**, 2026-10-10, the same laptop and the same generated years, now recorded as 4b's recorder writes them (anchors, a splice per run of paragraphs): the player by day, with no DOM, on the first computer's sessions. The first build is `history-worker.js`'s, in its own process; memory is the window's heap with the index and the busiest day loaded.
+
+| | Novel | Budget | Script | Budget |
+|---|---|---|---|---|
+| Dialog open, cached (the index and the overview's frames) | 47 ms | 300 ms | 24 ms | 300 ms |
+| A day ready to play, cached, mean / worst | 56 / 103 ms | 500 ms | 37 / 65 ms | 800 ms |
+| Seek within the busiest day, mean / worst | 0.8 / 5.3 ms | 50 ms | 1.7 / 5.8 ms | 100 ms |
+| Jump to another cached day | 56 ms | 300 ms | 37 ms | 500 ms |
+| First build of the cache | 26.6 s | 30 s | 57.6 s | 2 min |
+| Memory while playing | 6 MB | 150 MB | 5 MB | 250 MB |
+| Cache on disk | 5.3 MB | 10 MB | 3.4 MB | 25 MB |
+| Search over the day files (4c's first pass) | 343 ms | 1 s | 312 ms | 2 s |
+
+The novel's recording is 17.3 MB for the year, 2.9% of it anchors (50 of them, the longest replay 280 KB of edits); the script's 12.0 MB, 7.0% anchors (16, the longest 1.2 MB). Every day ends where the recording left every chapter, on both computers. The novel's first build is the one figure near its budget, and it plays one computer's sessions: 4d's merged days add the second computer's (about a sixth more).
+
+**Measured (4d)**, 2026-10-10, the same laptop and generated years, now both computers' sessions as one page (`BookDays`; the first build is every day of both). Each figure is the whole book's:
+
+| | Novel | Budget | Script | Budget |
+|---|---|---|---|---|
+| Dialog open, cached | 56 ms | 300 ms | 17 ms | 300 ms |
+| A day ready to play, cached, mean / worst | 82 / 178 ms | 500 ms | 54 / 119 ms | 800 ms |
+| Seek within the busiest day, mean / worst | 0.6 / 5.2 ms | 50 ms | 1.3 / 6.8 ms | 100 ms |
+| First build of the cache | 11.4 s | 30 s | 9.1 s | 2 min |
+| Memory while playing | 8 MB | 150 MB | 7 MB | 250 MB |
+| Cache on disk | 5.7 MB | 10 MB | 3.6 MB | 25 MB |
+| Search over the day files (first pass) | 698 ms | 1 s | 729 ms | 2 s |
+| Search inside the days, at its worst | 10.6 s | 30 s | 13.5 s | 2 min |
+
+The page ends as the book's chapter files did, each computer's copies end where its recording left them, and days played from the cache end where the next begins. With both computers, and before the two fixes in 4d, the novel's first build took 35 s and the script's 74 s: each session's word stats bagged every word of every chapter it changed (two-thirds of the novel's build, and most of the script's, where the chapter is 300 KB), and every `w` was hashed for a check the build never reads. Search's first pass is slower than 4c's (450 ms) because the day files now hold each computer's chapters beside the page's.
+
+**Measured (4e)**, 2026-10-10, the same laptop and years, played as Pocket plays them (`node scripts/benchmark-history.js --pocket`): every file through a promise, as the page answers Pocket's worker, and `recording.js`'s own SHA-256 instead of Node's. It doesn't count Capacitor's own trip across the bridge or base64, and a phone is slower than this laptop, perhaps two to four times.
+
+| | Novel | Budget | Script | Budget |
+|---|---|---|---|---|
+| Dialog open, cached | 39 ms | 300 ms | 22 ms | 300 ms |
+| A day ready to play, cached, mean / worst | 50 / 292 ms | 500 ms | 42 / 232 ms | 800 ms |
+| Seek within the busiest day, mean / worst | 0.5 / 3.5 ms | 50 ms | 1.0 / 4.5 ms | 100 ms |
+| First build of the cache | 12.1 s | 30 s | 8.9 s | 2 min |
+| Memory while playing | 38 MB | 150 MB | 27 MB | 250 MB |
+| Search over the day files (first pass) | 265 ms | 1 s | 239 ms | 2 s |
+| Search inside the days, at its worst | 8.5 s | 30 s | 10.4 s | 2 min |
+
+The async files cost little: the figures are the desktop's, give or take. Memory is higher because Pocket keeps the day files it read ahead. Even four times slower, the first pass of a search is about a second, and the second pass shows its progress and can be stopped, so **no per-session index yet**: it waits for a figure from a real phone.
+
+**How representative the generated year is.** The decisions above come from gaps of three to ten times between a measure and its budget, which depend on how many keys a year has and how long its chapters are, not on what the words are. Figures near a budget depend on what the generator guesses.
+
+- **From a real recording:** the gaps between keys (log-normal, median 190 ms, 95% under 520 ms), from the one real session there was in 4a, and from it, about 2.5 bytes a key for typing runs, gzipped. One session by one writer.
+- **Made up:** the words (6,000 invented ones with a long tail, which gzip to 0.39 of their size, as English prose does), the paragraph lengths, the mix of drafting, revising and cutting, and how often each edit below comes.
+- **Written by the generator,** in the novel's year: 450 words set in italic or bold (`<i>` and `<b>` inside paragraphs, which every edit then has to step around), 130 scene breaks, dialogue in smart quotes, 4,900 dashes typed as two hyphens, Romanian letters typed with AltGr (so `K` layout lines), 120 Ctrl+Z on typing and 390 on Darlings, 5 Replace Alls renaming one of the cast, pasted drafts of 5 to 30 KB, 1,300 selections deleted across a paragraph break, 11 Outline moves (21 in the script, each a scene), and a second computer on 15% of days, whose changes the first meets as 1,450 catch-ups.
+- **Not written yet:** composition (IME, dead keys), autocorrect beyond dashes and quotes, a spellcheck pass, pasting from Word with its spans and styles, poetry, characters outside the BMP, a paragraph of tens of KB, both computers open on the book at once (`disk-adopt`, `disk-twin`), crashes and the catch-ups after them, and Notes.
+- **Checked against real writing as it comes in:** bytes per key, chapters touched a day, paragraph sizes, splice sizes and catch-up sizes, from the writer's own recordings and, later, Hugh's writers'. 4b gives the benchmark a mode that prints these from a real book's `recording/` beside the generated year's.
+
+## Restore (lossless history in use)
+
+From any moment in the player:
+
+- **Restore this chapter as it was**: the current chapter text goes to Darlings, labelled "before restoring to 5 Oct, 21:14" (words are never discarded), and the chapter becomes the old HTML. Push it on the structural undo stack so ⌘Z takes it back. Recorded as `["x", "restore", <session>, <line>]` plus the edit. Say in the UI where the replaced words went.
+- **Copy from this moment**: select text in the paused replay and copy it. A paste of that text in NEO is matched by clipboard hash and recorded as `internal`, with the source moment kept alongside.
+- **Restore a deleted chapter**: the dialog lists chapters that existed at some point; one can be put back as a new chapter after where it used to be.
+
+## Turning it off and deleting
+
+- **Keep a replay of my writing** is on by default, stored in `library.json` beside the other writer settings. Its description: "Like a painter's timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays on this computer." The once-per-library hint names it the same way. Turning it off stops recording at once and closes the open session. Nothing already recorded is touched.
+- **Delete this book's writing history** moves `recording/` to the system trash (`shell.trashItem`), never deletes it outright, and says what is lost: replay, restore, and any proof sealed from it.
+- The recording holds every deleted word, including drafts the writer may regret. In patch 1 nothing ever leaves the computer.
+
+# Patch 2: Proof of when I wrote
+
+Opt-in. Off until the writer turns on **Prove when I wrote** in the Writing History dialog. It's never offered mid-writing. The setting's description says exactly what happens: "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time."
+
+## `proof.js`: the module
+
+A main-process module with no Electron imports. It takes the recording folder, a signing key and a clock, and writes seals and timestamp tokens. NEO injects a `safeStorage`-backed key; a fallback witness would inject its own. Everything below lives in it.
+
+## Device key and seals
+
+- **Device key.** Ed25519, made when proof is first turned on, the private half encrypted with `safeStorage` in `userData` (the witness's gap closed). The public half goes in `recording/<device>/device.json`. Port `neo-witness/lib/keys.js` (canonical JSON signing).
+- **Seals**: at most hourly while something changed, and at session close: `seals/NNNNNN.json` = `{ seq, at, device, publicKey, after, heads: { <session file>: <last h> }, prev: <hash of previous seal>, sig }`.
+- **The session in progress is sealed too.** `heads` takes the latest `h` line of every session that changed since the last seal, *including the one still open*. A writing session six hours long is then anchored hour by hour, not only once it ends. Flush the recorder (so a fresh `h` line exists) before taking the heads.
+- **A lower bound: `after`.** A timestamp proves only "existed by". To prove "written after", a seal includes something nobody could know in advance: the latest round of the [drand](https://drand.love) public randomness beacon (the League of Entropy's `quicknet`, a new value every 3 s, run by Cloudflare, Protocol Labs, universities and others; no blockchain). `after: { beacon: "drand-quicknet", round, randomness }`. Each seal is then pinned between the beacon round and its timestamp, usually seconds to minutes apart. When OpenTimestamps is also on, add the newest Bitcoin block hash as a second `after`. If no beacon answers, leave `after` out; never hold a seal back for it. Verifiers check the round against drand's API (or its BLS signature, offline).
+
+## Timestamps
+
+Every seal is stamped by **two RFC 3161 timestamp authorities**, and optionally by OpenTimestamps too.
+
+**RFC 3161 (the default).** The standard behind timestamped PDF signatures, signed software and e-contracts, familiar to lawyers and publishers. NEO POSTs a `TimeStampReq` (`application/timestamp-query`: version 1, SHA-256 of the seal, a random nonce, `certReq: true`, about 60 bytes of DER) and stores the `TimeStampResp` as `seals/NNNNNN.<tsa>.tsr`.
+- **Which authorities**: two of DigiCert (`http://timestamp.digicert.com`), Sectigo (`https://timestamp.sectigo.com`), GlobalSign and FreeTSA (`https://freetsa.org/tsr`), with a third tried if one fails. **Before shipping, check each one's terms for this use** (several are meant for code signing) and their rate limits. Hourly seals from one writer are a handful of requests a day.
+- **Checking in NEO**: a small DER reader (about 200–300 lines, in-house, no dependency) that checks the status, the hash, the nonce, `genTime`, and the CMS signature over the signed attributes with the TSA certificate's key (`crypto.verify`), chained to a bundled list of the chosen authorities' roots. Anyone can check without NEO: `openssl ts -verify -data <seal> -in <tsr> -CAfile <root>`.
+- **Why two**: backdating would need two unrelated companies to collude. One is a company to trust; two is a much harder story to argue with.
+- **Keeping it valid for decades**: TSA certificates expire, often after ten years or more. Once a year NEO re-timestamps the newest seal's tokens (stamping a hash of the old tokens), so every older token is covered by a newer, still-valid one (the "archive timestamp" idea from RFC 4998).
+
+**OpenTimestamps (optional extra: "Also anchor in Bitcoin").** For writers who want proof that depends on no company. Port `neo-witness/lib/ots.js` (~340 lines, no dependencies, tested against the reference fixture), stamp each seal, upgrade pending proofs every few hours, store `seals/NNNNNN.ots`. NEO sends a 32-byte hash over HTTPS to the public calendars; each calendar puts one transaction per round into Bitcoin covering everyone's hashes and pays its fee itself. NEO has no wallet, holds no Bitcoin keys and pays nothing. Upgrading and checking are read-only. Anyone can check with `ots verify` against their own Bitcoin node, trusting no one.
+
+**Offline**: seals wait and get stamped when the network returns, as the witness's `upgradeProofs` did. Stamps are quiet and never shown while typing.
+
+## What the timestamps prove, and what they don't
+
+Put this in the writer-facing docs and in the exported replay page.
+
+| Claim | RFC 3161 (two authorities) | + OpenTimestamps |
+|---|---|---|
+| The sealed recording existed by this time | Yes, trusting that two independent timestamp companies didn't collude. Accurate to seconds | Yes, trusting no one. Accurate to a couple of hours |
+| It was sealed after this time (`after`) | Yes, from the drand round | Also from the Bitcoin block |
+| It hasn't been changed since | Yes (hash chain, signature, timestamp) | Yes |
+| A recording faked in a weekend can claim to be months old | No: its stamps would all fall in that weekend | No |
+| Someone faking in real time for months (a typing bot, AI text retyped by hand) is caught | **No.** Timestamps can't tell. Only the evidence report speaks to this, and it is judgement | **No** |
+| Who held the key | **No.** A key shows one device signed consistently, not who sat at it | **No** |
+
+## Evidence of human involvement
+
+Computed by `recording.js stats` and shown as a short, plain report per chapter and per book, from the Writing History dialog. Facts first, judgements labelled as judgements. It works without timestamps (the time rows then say "not sealed").
+
+| Measure | What it suggests |
+|---|---|
+| Gaps between keys (their spread, not just the average) | Human rhythm. Scripted typing tends to be too even |
+| Pauses before sentences and paragraphs, against pauses inside words | Thinking happens at boundaries. Copying pauses wherever the eye lost its place |
+| Revision: share of typed characters later deleted, backspace bursts, typo-then-fix within a second | Composing, not transcribing |
+| Non-linearity: caret jumps back to earlier text, then edits there | The strongest sign of composing. A straight run from top to bottom is what retyping looks like |
+| Pastes from outside NEO, their size and share of the final text, and any blur followed within seconds by a big paste | Text that came from elsewhere |
+| Edits with no key (dictation, OS autocorrect, tools) and untrusted events | Not typing. Labelled, not hidden |
+| Wall-clock spread: days, sessions, hours | A book that grew over months |
+| Time cover: for each stretch of writing, the gap to its nearest timestamp; each seal's `after` → stamp window; any stretch over 24 h with no timestamp, with its words | How much of the timeline is pinned in time. Gaps are listed plainly (offline for a week, proof turned on late, a stamp that failed), never smoothed over. Words written in a gap say "timestamped later, on <date>": written *by* that date, nothing earlier proven |
+| Baseline and catch-up words | Text that came before the recording, or changed outside it: never counted |
+
+**What it can and cannot claim** overall:
+
+| Claim | Strength |
+|---|---|
+| The final text is exactly the result of these recorded edits | Checkable by anyone: replay and compare hashes |
+| The recording existed by a given time and hasn't been altered since | Cryptographic, given the timestamps above |
+| These words were typed, key by key, over these hours | Strong: real key events with human timing, recorded inside the app |
+| The writer composed, rather than copied by hand | **Judgement**: non-linearity and revision make it likely, but don't prove it |
+| The writer thought of the words | **Not claimable** |
+
+The recorder runs on the writer's own computer, so a determined forger could script an Electron build. What stays expensive is months of irregular, revising, human-timed composition, timestamped as it happened.
+
+## Sharing
+
+- **Export replay…**: one self-contained `.html` file (player, `recording.js`, and the chosen chapters' sessions inlined as gzip + base64), written through the existing `export:save`, that a publisher, agent or prize can open in any browser. It opens with one plain sentence ("This is a timelapse of how this book was written, keystroke by keystroke, recorded by NEO as it happened") before any technical detail. It checks the hash chain and Ed25519 signatures with WebCrypto, shows each seal's `after` round and timestamp times, and explains how to check the tokens independently (`openssl ts -verify`, `ots verify`). Without proof turned on, the page still replays and checks the chain, and says plainly that nothing fixes it in time.
+- **Privacy**: exports cover only the chapters the writer picks. Partial disclosure (proving one chapter's sessions belong to a sealed whole without revealing the rest) is a later step: seals over a Merkle tree of session heads, not one flat list.
+
+# Phases
+
+Each phase leaves NEO working. The order is 0, 1, 2, 4, 3: phase 4 comes before the first pull request, because the player has to cope with a year of writing (and a year-long script) before Hugh's writers record one. The first pull request was to be phases 0, 1, 2 and 4 together, with restore (phase 3) as its own; on 2026-10-12 the writer chose to send everything, phase 3 included, as one pull request.
+
+**Patch 1: Writing History**
+
+- **Phase 0: spike (1 session).** Wire `setChapterHTML` through all the mutation sites and log edits to the console, with an `unobserved` counter. Drive the editor through typing, smart quotes, triple-Enter splits, merges, darlings, replace-all, ⌘Z, paste, IME (if available) and a sync adoption. Done when `unobserved` stays at 0 and replaying the in-memory log reproduces `chapterHTML` exactly. **Done 2026-10-06** on branch `recording-phase-0` (`npm run test:recording`). It records only in memory, so it isn't sent upstream on its own: it goes in the same pull request as phase 1. Its log is still the earlier one-line-per-edit shape, with the chapter on every line; phase 1 moves it to the Event format above (runs, `ch` lines, the layout table).
+- **Phase 1: recorder and storage, no UI.** `rec:chunk` / `rec:rollup` / `rec:close` / `rec:list` / `rec:read` in `main.js`, the `preload.js` methods, the device id, session lifecycle, chunks, 10-minute rollups, joining and gzip on close, crash recovery, baseline/continue/catch-up, typing runs and the layout table, `w` lines, the hash chain. `recording.js` with `joinParts`, `parseSession`, `encodeRuns`/`expandRuns`, `verifyChain`, `applyEdit`, `replayCheck`. Tests: unit tests for the diff and its caret bias; runs round-tripping to per-key events, including keys that must break a run (`&`, Enter, a Backspace joining paragraphs, a key from a different layout entry); joining chunks and rollups, including a crash between a rollup and its deletes; and `replayCheck` on generated sessions; an end-to-end test (after `words.e2e.js`) that types, pastes, splits and saves, then asserts every `w` hash replays exactly. The setting, on by default, and the hint. All strings through `t()`. `AGENTS.md` updated. **Done 2026-10-06** on branch `recording-phase-0`, together with phase 0 (`recording.js`, `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+  - `K` lines for characters a run types for the first time are written just before the run, so a new character doesn't end it; only a character that a *different* key typed before ends a run.
+  - `rd`'s explicit position is the caret before the first Backspace. A Backspace that removes two UTF-16 units (an emoji) isn't a run key.
+  - An `e` line from the engine with no key down carries a trailing `0` (`[dt,"e",at,del,ins,"iT",0]`), so "came from something other than a key" never depends on what the line before was. The first edit a key makes takes the key's moment (dt 0), which is what lets it join a run.
+  - `K`, `ch`, `o` and `h` carry dt 0 and don't move the clock.
+  - `s` lines end with `"p"` (pointer) or `"n"` (NEO moved it); unmarked means a key.
+  - Copy and cut lines are `[dt,"c","copy"|"cut",len,"text",sha]`; paste adds `internal`.
+  - Chapter order is an `o` line, written when the order changes.
+  - A chapter new to the page (split, new, disk-twin) gets a full `b` line whose cause is the move that made it. A chapter that is written or deleted before it's changed in a session gets its `b` line first, so every `w` and `d` can be checked.
+  - The catch-up is a `continue` `b` line for where the last recording left the chapter, then `["x","catch-up"]` and the splice to the present.
+  - Where the last recording left each chapter comes from this device's own closed sessions (merging devices is phase 4), cached in `userData/recording-cache/<bookId>/known.json`.
+  - A replace-all writes one splice per chapter, not one per match. (4b changes this to a splice per run of paragraphs changed, decision 14: one splice a chapter put 1.5 MB in a novel's year for 7 KB of names.) Viewport lines aren't recorded yet.
+  - Until a session changes a chapter it isn't written at all, so opening a book to read leaves nothing behind.
+  - The setting is a File menu checkbox, **Keep a Replay of My Writing**, until the dialog exists. The hint and the setting say the replay "stays with your book and is never sent anywhere" rather than "stays on this computer", because `recording/` syncs with the library.
+- **Phase 2: dialog and player.** Keyframe cache in `userData`, the Writing History dialog, the player, timeline, speeds, skip-inactivity, markers, one-chapter and whole-book modes, and all four ways in (footer History, File menu, book menu, chapter menu). **Done 2026-10-06** on branch `recording-phase-0`, with phases 0 and 1 (`openHistory` in `app.js`, `History` in `recording.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+  - `History` turns a device's sessions into one step per key (runs expanded, each step with its line number, play time and wall time) and plays them once on opening, keeping the chapters every 2000 steps. A seek starts from the keyframe before it. Keyframes hold the whole chapter map, but strings are shared, so each costs only the chapters that changed. Seeking hasn't been timed on a year-long history yet.
+  - The cache is one file per closed session, `userData/recording-cache/<book>/kf-<device>-<session>.json.gz`: that session's keyframes as changes, its end state and any steps it couldn't follow. Its key is a hash over the session's last `h` and every session before it, so a session whose predecessors changed is played again. The session in progress is never cached.
+  - One device at a time: a menu in the footer picks the device when the book has more than one, and opens on this computer's. Merging devices is still phase 4.
+  - The player's clock runs the sessions back to back with 1.5 s between them; the days in between aren't played. **Skip pauses** is on by default. The timeline uses the same clock, so with Skip pauses on it isn't mostly empty. Its strip counts edits per pixel column on a square-root scale. Default speed is 8×; the speed and Skip pauses are remembered while NEO runs.
+  - Markers: pastes (from this book or from elsewhere), another device's text (`disk-adopt`, `disk-twin`, `disk-new`), text written before the recording began, catch-up and `unobserved` changes, restores, NEO's structural moves (split, merge, Darlings, Replace All, structural undo, the Outline), time away (blur or hidden until focus, shaded), and each session's start, labelled with its day. Hovering the timeline names them and the time.
+  - New text isn't tinted and deleted text isn't shown struck through: the page looks just as it did in the editor while it was typed. The caret, drawn in the ink's colour like the editor's, is a mark put into the copy of the HTML the player draws: never inside a tag, and a place between paragraphs moves into the next one. A selection is drawn from its `s` line's paragraph and offset, with the Highlight API in the manuscript's selection colour.
+  - The list shows every chapter in the book, a chapter with nothing recorded as "Not recorded yet", and deleted chapters under **Deleted**, named by their first words. Whole-book mode follows the `o` lines, and numbers chapters as they were numbered at that moment. One-chapter mode plays only that chapter's steps, from its first to its last.
+  - Opening on the book shows it as it is now, scrolled to the chapter the caret is in. **Watch This Chapter Being Written** plays from the start. Space plays and pauses, ← → jump, Home and End go to either end, Esc puts the caret back. Scrolling the sheet while it plays stops it following the caret.
+  - The sheets are `.rp-chapter` / `.rp-body`, so nothing that looks after the manuscript (the recorder, spellcheck, focus mode) mistakes them for it. The manuscript's rules reach them through `:is(.chapter-body, .rp-body)`. A screenplay replays as plain paragraphs: its page geometry isn't applied.
+  - The footer holds **Keep a replay of my writing** (the same setting as the File menu checkbox, which is rebuilt when it changes) and its description. Pocket has no `recList`, so History is hidden there and the menus don't offer it.
+  - The dialog is built on opening, before it can play; nothing works in the background yet.
+- **Phase 4: a year of writing, and coverage.** Before the first pull request. In this order, each leaving NEO working:
+  - **4a. Measure.** `scripts/benchmark-history.js` (not an npm script, like the spellcheck benchmark): generates the novel and the script years and times today's player against the budgets in Days, seeking and search. It also measures size: the recording per day and per year, what anchors would add to it under rules by time and by volume, the day states the cache would keep, and the size of `Backups/` after one year and after three: the zips without recordings, and the recording mirror. Its numbers go into this plan before 4b starts, and decide the anchor period and whether the paragraph model is needed. **Done 2026-10-09** (Measured, under Days, seeking and search): anchors by volume, the paragraph model for every chapter, and day states as paragraph diffs. The generator makes each session through `SessionWriter`, its gaps between keys log-normal like a real session's, and `--pace` writes the same book faster or slower; the play step checks that the year replays to the chapter files it ended on, and that the diffs rebuild them too. A year takes about 15 minutes, most of it the script. On 2026-10-10 the generator gained the edits under How representative, a second computer, and `--one-splice`; the numbers in Measured are from then.
+  - **4b. Days.** Sessions end with the writer's day and carry `day`. `dayStats` and `sessionStats` (with bins scaled to the chapter) in `recording.js`; anchor lines, and the build picking up at the next full `b` after damage; `history-worker.js` building each day's end state (paragraph diffs, a file a day) and stats and each session's stats into the cache, with progress; the recorder counting each chapter's edits since its last full `b` and writing anchors by that count; `Rec.splices`, a splice per run of paragraphs changed, for every change the recorder sees made all at once (catch-up and every cause but `input`; decision 14); a mode of `scripts/benchmark-history.js` that prints a real book's figures beside the generated year's; `History` loading one day from its start state; the overview, with the year strip as its seek bar, play by session, and a click on a chapter opening the player at that session; the list of days and playing on into the next day; skipping to the earlier or later session in the player, across days, and in one-chapter mode only to sessions that changed the chapter. Tests: a skip from a day's first session lands on the previous day's last session (or its last that changed the chapter), with the text that day's player reaches there; day stats of generated sessions against brute-force counts; session stats' words and bins against a brute-force count of the splices, including a chapter that crosses a bin-count threshold mid-session and one deleted in it; a generated history with a session removed plays up to the gap and again from the next anchor; an anchor comes once a chapter's edits pass 200,000 characters, or four times its length for a long one, and not before; a chapter's state rebuilt from its whole state and diffs is the state the replay reaches; `Rec.splices` applied in order gives the new HTML, a section moved is a delete and an insert, a name replaced at both ends of a chapter is two small splices, and a script's repeated cues stay matched around a changed line; the paragraph model replays to the same HTML as one string, step for step, on splices inside `<i>` and `<b>` and next to their tags, splices across a paragraph break (a selection deleted, a multi-paragraph paste), one splice over most of a chapter (Replace All, an Outline move), empty paragraphs and `***` lines, and characters outside the BMP, whose offsets count two UTF-16 units; a day loaded from the cache plays to the same text as the whole history played from the start; `npm run test:recording` closes a session across the writer's day end. **Done 2026-10-10** on branch `recording-phase-0` (`recording.js`, `history-worker.js`, WRITING HISTORY in `app.js`; `npm test`, `npm run test:recording`; Measured (4b), under Days, seeking and search). Where it settled details the plan left open, or departs from it:
+    - The day a session belongs to is `writingDay()` when it began, in its header as `day`. A session from before 4b has none; `Rec.sessionDay` takes the date it started in its header's `tz`.
+    - `Rec.baseLines` writes every first `b` of a session. An anchor holds the chapter as the recording left it (`was`), not as it is, and a catch-up follows it as usual, so a chapter that also changed while nothing recorded still shows the change.
+    - `Rec.splices` is the benchmark's `splicesOf` moved into the engine, with the text after the last `</p>` as a paragraph of its own, so the paragraphs always join back.
+    - The cache is one index per device, `days-<device>.json.gz`, and a file a day, `day-<device>-<day>.json.gz`. A chapter is kept whole again once the JSON of its diffs since its last whole state is longer than it is (4a judged it on gzipped sizes). A day whose sessions are the same as the index says is never built again; a day file gone from the cache rebuilds from that day on. The index holds each session's day, so opening reads no session to group them. The per-session keyframe files of phase 2 (`kf-…`) are deleted the first time a book's history opens.
+    - The worker answers `rec:days` with the days already built and posts the rest one by one; `rec:dayStart` waits only until every day before the one asked for is built. The sessions still open are never cached: the worker plays them on from the last closed day's end and sends their stats with its last message.
+    - Session stats count words as a multiset: a word there more often after the session counts as added, less often as removed, so moving a sentence changes nothing. Words written before the recording began (baseline, anchor) and words that came while nothing recorded (catch-up) are nobody's: they count neither as added nor in the bins. Time writing is the gaps between keys and edits shorter than a minute. A chapter deleted in a session keeps its bins, counted at the size it went at, and its first words, which name it in the list of deleted chapters.
+    - A session whose chain doesn't verify isn't played at all, and the chapters it names are lost until their next full `b`. Reading it from the mirror instead is 4g (done: a session the mirror holds whole plays from there).
+    - Skipping by session is `Rec.sessionSkip`. The player counts itself in the session of the step about to play, so at a session's start it is in that session; "the first second" is a second of real time at the speed playing.
+    - The overview: each chapter a column hanging from the top, its height its words (linear, against the most any chapter had), numbered as the book numbers it then; a born chapter is labelled above (new, split, joined, from another device) and a deleted one fades where it was. Marks: added green, deleted red, both gold, the three sessions before fading behind. The year strip's heights are the square root of the words a day added. The side pane switches between the chapters and the days. On 2026-10-10 the overview, the year strip and the list of days gave way to the strip of day tiles (The dialog by day).
+    - The player draws by paragraph: a sheet remembers the nodes each of its ChapterText's pieces made, and a frame replaces only the pieces that changed (what differs between the same at the start and the same at the end) and the piece the caret left and the one it went to. The sheet stays the chapter's own elements side by side, so the manuscript's rules (`p + p`, the opening paragraph) reach it as before. A chapter with a piece that doesn't close every tag it opens is drawn whole, as it was.
+    - `--book=<folder>` prints a real book's bytes a key, chapters touched a day, paragraph sizes, the sizes of NEO's own splices and of catch-ups, beside a generated month's.
+  - **4c. Search.** The search field, `normText` and `findPhrase`, the pass over day states, the worker's pass within days (with progress and cancel), the moment within a day, and the highlight. Tests: first written, last written, written out, moved, and a phrase that came and went inside one day, on generated sessions, each landing on the step a brute-force replay finds. **Done 2026-10-10** on branch `recording-phase-0` (`normText`, `normMap`, `phraseIn`, `PhraseTally`, `phraseDays`, `phraseSessions`, `phraseFindings`, `phraseEvents` and `phrasePick` in `recording.js`; `search` and `searchStop` in `history-worker.js`, as `rec:search` and `rec:searchStop`; the field in WRITING HISTORY in `app.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+    - `findPhrase` is `phraseIn`: a phrase that starts or ends with a letter matches only at a word's edge ("John" is in "John's", not in "Johnson"), and matches never overlap. Folding also reads `“ ”` as `"` and a final sigma as a sigma. `normMap` folds the same way and keeps where each character came from, for the highlight; `normText` is the fast version every paragraph is tested with.
+    - **Looks.** The second pass and the moment take a chapter's count where the recording says what the chapter was: each `w`, each `b` that sets it whole, and every session's end. Looks with no change to the text between them are one moment, so the order chapters are looked at in never matters. A phrase there only between two looks isn't found: a chunk keeps only a chapter's last `w` in its 20 s, so a word typed and taken back within one flush leaves no trace a search can see.
+    - **The same definitions in every pass.** First written: the first look at which the book's count goes up from none. Last written: the last at which it goes above both the look before and the day's start, so a passage moved within a day isn't a new one. Written out: the last at which it goes to none, when it is nowhere in the book now. Moved: a day whose end has fewer in one chapter and more in another. The first pass judges days by their ends; the second only looks inside the days before its First and after its Last, which is where those can move.
+    - **The moment** is the step after which the chapter's count reached what the look found and stayed there until the look, so "John" on the way to "Johnson" is never it.
+    - The first pass also plays the open sessions on from the last day state. The second starts once the first has answered, and its findings replace the first's when it ends; until then First is marked *perhaps earlier* and Last and Written out *perhaps later*, and Stop leaves them marked.
+    - The results sit under the field, above the chapter list, with how often the phrase is in the book now. Their days are underlined on the strip and beside the timeline. ⌘F (Ctrl+F), or Find in the menu, goes to the field while the dialog is open.
+    - A result names the chapter the first pass saw the count rise most in that day. The player opens on the chapter the moment is in, which can be another (one later merged or deleted).
+    - **Measured**, the same laptop and generated years as 4b (`node scripts/benchmark-history.js`, which now times `searchFirst` and `searchWithin` themselves): the first pass 450 ms for the novel's year (budget 1 s) and 420 ms for the script's (2 s); the second at its worst, a phrase never written so every day is played, 11.7 s and 47.3 s, against the first build's 24 s and 54 s. Two things made the difference: `normText` skips the per-character map that only the highlight needs, and a chapter kept whole again in the cache keeps the counts of the paragraphs it already had. Before them the first pass took 1.2 s and 1.5 s.
+  - **4d. Merging devices.** A day holds the sessions of every device that wrote that day, in wall-clock order, and each device's segment shows its name. A `continue` line resolves against its own device's last state, and where that isn't the page the other device left, the step is a sync marker. Each device has its own day states in the cache. The footer's device menu goes. **Done 2026-10-10** on branch `recording-phase-0` (`Page`, `QUIET`, `interleave`, `linePlayer`, `sessionPlayer` and `pageState` in `recording.js`; `BookDays` in `history-worker.js`; WRITING HISTORY in `app.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+    - **One page.** Each device plays its lines onto its own copy of each chapter, so its `continue` lines and `w` hashes check as they always did. The page is, chapter by chapter, the very copy (the same `ChapterText`) of the device that last changed it, so a key on that device is a key on the page. A change from another device takes the page over; where that device's copy isn't what the page showed, the step carries the copy as it was (`sync`), and the timeline marks it "As it was on …". When both computers changed a chapter apart, the page shows the second one's copy from then and the twin it made beside it, which is what both computers' disks ended up with.
+    - **Quiet changes.** `continue`, `anchor`, `baseline`, `catch-up`, `disk-adopt` and `disk-new` (`Rec.QUIET`) say nothing new about the book: they move the page only where it already shows that device's copy (otherwise the step is `page: false`). Where a run of them ends somewhere the page isn't, the page takes that copy (`settle`): that is the "`continue` … where that isn't the page the other device left" above, and it is also how text changed while nothing recorded reaches the page. Their words are nobody's in the stats, including a copy adopted in the middle of a session, which before 4d counted as the adopting computer's words.
+    - **Wall-clock order, a line at a time.** A day's sessions are in `sessionOrder` (by when each began, then device), and their lines play interleaved by the time of day each was written (`Rec.interleave`), so NEO left open all day on one computer interleaves with an hour written on the other, and neither goes back over the other's words. Played session after session, the laptop's words came in a lump with the desktop's adoption, went again where the laptop's session began, and were typed a second time. Sessions that don't overlap play one after another as before, 1.5 s apart on the player's clock; one that overlaps another starts where the time of day puts it. A session's `from` and `to` in `History` are where its steps begin and end: another's can come between.
+    - **One engine for the page.** The player's `History` (steps) and the worker's `linePlayer` / `sessionPlayer` (lines, played together by `playInterleaved`) both drive `Page` and interleave the same way, so the player, the cache's day states and search's passes all see the same page. The tests check it against the book itself: two computers' generated sessions played as one page end every session on what the book was then, and each computer's copies end where its own recording left them.
+    - **The cache is one per book**, `days.json.gz` and `day-<day>.json.gz`: the page's chapters and those of each device that wrote that day (a device's copy that was the page's at the day's end is `{ page: 1 }`, kind -2, so one computer's book costs little more than before), and `links`, which copy the page showed of each chapter. `rec:dayStart` answers with the page, each device's chapters and the links. `rec:days`, `rec:dayStart`, `rec:search` and `rec:searchStop` take no device, and a book's per-device caches from 4b are deleted the first time its history opens.
+    - **Sessions left open.** A session another device left open on a day before the last any device closed is built with its day: its device stopped, and closes it, crashed, when it next opens the book. Its day is built again then (the index remembers which sessions were open when built). Open sessions on the last day or after are still being written: played on, never cached, as before.
+    - **Names.** When the book has more than one device, a session's mark on the timeline, its label and the tooltip name the device it was written on, and a day's tile names the devices that wrote it.
+    - **Two costs that weren't 4d's.** The second computer's sessions pushed the novel's first build past its budget (35 s), and a profile found most of it predated 4d: each session's word stats bagged every word of each chapter it changed (now only the paragraphs that differ, with each paragraph's count remembered), and every `w` was hashed though only `replay` reads those checks. Measured (4d), under Days, seeking and search, has the figures.
+  - **4e. Pocket.** `pocket-bridge.js` records: chunks are plain file writes through Capacitor Filesystem, gzip uses `CompressionStream` where the WebView has it. The player and search work there from the same files. If building a year's cache on a phone is too slow for search, this is where a per-session index would be added (see Days, seeking and search). Pocket makes no backups today (nothing in `pocket/` does), so its sessions reach the mirror when a desktop sweeps them up after 7 days, unless Pocket mirrors at close like the desktop; decide which here. **Done 2026-10-10** on branch `recording-phase-0` (`recording-files.js`; `BookDays` over an `io` in `history-worker.js`; Writing History in `pocket-bridge.js` and `pocket/www/pocket-history.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+    - **One copy of the code, not two.** What `main.js` did with the recording's files (chunks, rollups, closing a session, crashed or not, where this device's recording left each chapter, listing and reading sessions) moved to `recording-files.js`, and `BookDays` in `history-worker.js` reads and writes the same way: through an `io` its caller hands in. On the desktop it is Node's `fs` and `zlib` (with `writeFileDurable` for the library); in Pocket it is Capacitor Filesystem and `CompressionStream`. So Pocket's recording is the desktop's byte for byte, and a rule about the files changes once. The `rec:` handlers in `main.js` became calls into it.
+    - **Pocket's cache is built in a web worker** (`pocket-history.js`, which loads `recording.js`, `recording-files.js` and `history-worker.js`, the same messages as on the desktop). A worker can't reach Capacitor's plugins, so it asks the page for each file and the page answers with its text. Where the desktop reads a day's file the moment `recording.js` asks for it, a promise can't answer in time, so `BookDays.loadDays` reads the files a step needs first (every day up to it that changed something), and keeps them. A web view whose worker won't start builds on the page instead. The worker lives only while History is open: when the dialog closes (`recHistoryClosed`) it is stopped once it has nothing left to do, after any build in progress, so the cache is never left half-written, and the day files it read go with it (up to about 40 MB for a year-long novel). On the page, `{ type: 'forget' }` lets go of them instead.
+    - **What the desktop keeps in `userData`**, Pocket keeps in the app's own folder (Capacitor's `DATA`): the device id (`recording-device.json`, made once), `recording-cache/<book>/known.json` and the days. Never the library.
+    - **No gzip, no recording.** A web view without `CompressionStream` (iOS before 16.4; Pocket's iOS target is 15) gets no `rec*` methods, so it records nothing and History isn't offered. A gzip of our own (or pako, which JSZip carries) would have been a dependency for a few devices that are years old.
+    - **Plain writes.** Pocket writes every file as it writes chapters, with `writeFile`, not through a temporary file and a rename: a rollup and a closed session are read back and checked before anything they replace is deleted, as on the desktop, and the cache rebuilds what doesn't read. A chunk cut short by a phone dying mid-write loses that chunk's lines, which `joinParts` reports as a gap.
+    - **The device's name** is "iPhone", "iPad" or "Android": a web view can't learn the phone's own name, and Android's user agent no longer says its model.
+    - **No mirror from Pocket.** It makes no backups, so it doesn't mirror at close either: its sessions reach `Backups/recordings/` when a desktop sweeps them up after 7 days (4g). A writer with only a phone has no backups of anything, recording or book, and that is Pocket's question, not the recording's.
+    - **Where it's set.** Pocket has no File menu, so **Keep a replay of my writing** is a row of the ⋯ sheet, beside Spellcheck; History is in the footer and the book menu, as planned. Android's back gesture leaves the player for the days, then closes the dialog, as Esc does.
+    - **Tests.** `scripts/pocket-recording.test.js` runs the bridge and its worker in `vm`, over a fake Capacitor Filesystem in a temporary folder, with Node's own `CompressionStream`: what Pocket writes (chunks, a rollup, a session closed, one left open and closed as crashed) is what the desktop's code writes from the same lines, and the days it builds, each day's start and search's two passes are what the desktop's `BookDays` makes of the same recording, through the worker and on the page. Nothing has run on a phone yet. Measured (4e), under Days, seeking and search, times Pocket's path over a year: no per-session index yet.
+  - **4f. Beyond chapters.** Notes, outline, chapter titles and stickies: each a stream of its own in the same session, with its own `b` and `w` lines. **Done 2026-10-11** on branch `recording-phase-0` (`STREAMS`, `isStream` and `streamTexts` in `recording.js`; `rec.streams`, `recOpenStreams` and the notes' hooks in RECORDING in `app.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+    - **A stream is a chapter id no chapter can have**: `:notes`, `:titles`, `:outline`, `:stickies`. It takes the same `b`, `ch`, `e`, `x` and `w` lines as a chapter, so replay, `replayCheck`, the hash chain, anchors, `continue` and catch-up, merging devices (`Page`) and the cache's day states needed nothing new. That is why it isn't a new `neoRec`: no line means anything new, and a session from before 4f has no streams in it. A reader from before 4f would take a stream for a chapter, but none was released. Renaming a stream is a new format.
+    - **The notes** are notes.html, recorded from the Notes tab as a chapter is: its keys (typing runs, Backspace runs, `k` lines), its `e` splices with their input types, its clipboard. Not its caret: the caret's address is a chapter body's paragraphs (`recPoint`), so the notes have no `s` lines and their arrow keys aren't kept either (an `n` run without its `s` lines would say the caret never moved). A `w` is the hash of notes.html's bytes, written by `flushAux`, which reconciles first as `persistChapter` does. notes.html is read once when the book opens, as the first look; text the Notes tab reads that isn't what the recorder last saw came from another device (`disk-adopt`). A page that draws the notes differently from the file (the browser tidies HTML it's given) is recorded as a `tidy` before the first key, not as part of it. A space typed at the very end of a bare line comes as `&nbsp;` until the next letter replaces it, so that letter isn't a run: what the editor did, recorded as it did it.
+    - **Titles, the outline and stickies** are JSON in `book.json` and `stickies.json`, edited in thirty-odd places. Rather than a cause at each, the recorder looks when they are written (`saveMeta`, `writeStickies`) and records what changed since its last look, with cause `edit`, then a `w` with the hash of the stream's text. Where the cause is known, the look comes first with it: `merge`, `delete`, `outline` (a chapter joined to another), `undo-structural`, `disk-twin`, and `disk-adopt` when `refreshFromDisk` takes another device's `book.json`. `streamTexts` writes each stream's text: keys in order, an entry a line (`JSON.stringify` indented one space), and no empty entries, so a title changed is a splice of its line and the same book is always the same text. `:titles` is `chapterTitles`; `:outline` is `chapterNotes`, `sectionNotes`, `sceneNotes` and `looseCards`; `:stickies` is the array. A title of a deleted chapter stays while `book.json` keeps it.
+    - **Recorded, not played.** The words in the stats, the day maps, the chapter list and search are the chapters' (`sessionPlayer` keeps a stream out of `chapters`, `PhraseTally` never counts one, `History.chapters` never lists one), and the player plays only the chapters' steps: its timeline has a stream's keys in its density but no step of it. A session's stats and a day's say which streams they changed (`streams`), and a day's description names them ("Notes, Chapter titles"), so a day spent only on the outline doesn't say nothing happened. `PLAYER` is 4. Playing the notes, and showing a chapter's title as it was then, are for later; restore (phase 3) can bring any of them back, since every day state holds them.
+  - **4g. Backups.** `dailyBackup` leaves `recording/` out of the zip; `rec:close` mirrors the session it closes into `Backups/recordings/`, and `dailyBackup` sweeps up this device's missed sessions and other devices' sessions missing for 7 days; writes `Backups/README.txt` and the zip's `_recordings.txt`; the mirror folder goes to the trash with its book; the build reads a missing or broken session from the mirror. This goes in the first pull request because today's zips already hold recordings. Tests: a second backup the same day copies nothing; a device doesn't mirror another device's session younger than 7 days, and does mirror an older one the mirror lacks; a conflict copy in the mirror is ignored; a session copied once is never written again; a book's history with a session deleted from the book plays whole from the mirror; unzipping a zip from before 4g (which holds `recording/`, open session folders included) over the library doesn't close a session twice or bring back chunks of a closed one. **Done 2026-10-12** on branch `recording-phase-0` (`readClosed`, `mirrorDevice` and `sweep` in `recording-files.js`; `backupRecordings`, `dailyBackup`, `recMirrorMine` and `book:delete` in `main.js`; `BookDays`' `mirror` in `history-worker.js`; `scripts/recording-backup.test.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+    - **What's copied.** `mirrorDevice` copies, for one device of one book, each closed session the mirror lacks, byte for byte (`io.copy`: `writeFileDurable`, then read back and compared, and removed if it differs, so the next sweep tries again), then the `device.json` beside them once the device has a folder in the mirror. A session whose chain doesn't verify isn't copied: the mirror is for when the book's copy breaks, and a broken copy is no use there. It is logged instead. A file in the mirror is never written again, even when the book's differs.
+    - **When.** `rec:close` and `rec:start` both mirror this device's missing sessions of the book (`recMirrorMine`), so a session `rec:start` closes as crashed is mirrored at once too. `dailyBackup` sweeps every book (`backupRecordings`) each time NEO starts, before it looks for today's zip, so a copy that failed is tried at the next start even when the day's zip is already there.
+    - **Another device's.** A session counts as closed when it began (its name) or when its file last changed, whichever is later, so a session its device left open and closed as crashed days afterwards waits seven days from then.
+    - **Reading.** `readClosed` reads the book's copy, and the mirror's when the book's is missing, won't read, or doesn't verify, as long as the mirror's verifies and its header names that session. It doesn't check that its first `h` chains from the session before (the header's `prev`): a copy is byte for byte, so a mirror copy that verifies is the session. `Files.list`, `Files.read`, `known` (where this device's recording left each chapter) and `BookDays` all read through it, so a session only in the mirror is listed, played, searched and counted, and nothing is copied back into the book. A day the cache built with a damaged session is built again once that session verifies (its last `h` alone can't say: a broken line leaves the `h` lines as they were). Pocket reads the mirror too, through the same functions; it still writes none.
+    - **A zip from before 4g, unzipped.** A session folder beside a closed copy that reads (in the book or the mirror) is a session closed since: `start` removes the folder instead of closing the session again, and `list`, `read` and `BookDays` take a session closed anywhere as closed, whatever folder of it is left (another device's, which this one never removes).
+    - **The words.** `Backups/README.txt` says how to put back a book, a chapter and a book's history, and that a chapter restored from a zip leaves its history alone; it is written again only when its text changes (another language). The zip's `_recordings.txt` points there. The zip leaves out `recording/` in each folder at the library's top level.
+    - **The trash.** `book:delete` moves the mirror folder to the trash after the book. If that fails, it stays where it is and the failure is logged: the book is already in the trash, and nothing is lost.
+  - Then phase 3, and the pull request: phases 0 to 4 together.
+- **Phase 3: restore.** Restore a chapter or a deleted chapter, copy from a moment, Darlings for the displaced text, structural undo, the `restore` event, and deleting a book's history to the trash. A restore's moment is a day and a step, so it uses the day loading from phase 4. **Done 2026-10-12** on branch `recording-phase-0` (`historyRestore`, and the dialog's restore button, copy and delete in WRITING HISTORY in `app.js`; `rec:deleteAsk` and `rec:delete` in `main.js`; `npm test`, `npm run test:recording`). Where it settled details the plan left open, or departs from it:
+  - One button, at the sheet's top right, shown while paused (in the player or the days): **Restore Chapter N to this moment**, or **Put this chapter back** for one deleted since, or **As it is now** (off) when there's nothing to restore. It acts on the chapter played; in the whole book on the paragraph picked's chapter, else the caret's. First a confirmation (`confirmRestore`) says what will happen: the chapter will read as on the sheet (its words then and now); what it holds now goes to Darlings under the label it will have, so no words are lost (or that it's empty); ⌘Z undoes it at once; Writing History keeps both versions; and NEO's daily backups aren't touched. For a chapter put back, where it will go and that nothing else changes. Cancel leaves History where it was. Then it closes the dialog and shows the chapter in the editor. A book not open is opened first, and the confirmation says so.
+  - The moment is `[session, line, device]`: `["x","restore",session,line,device]` before the splices, or before the `b` line of a chapter put back (whose cause is `restore`). Line 1 means the session's start. A moment inside a typing run names the run's line; the splices that follow carry the exact text. Not a format change: `x` already took more fields, and readers ignore them.
+  - A chapter put back gets a new id (its old one has a `d` line), its title as the `:titles` stream held it then, and goes after the nearest chapter that was before it then and still is (else first). Picking a deleted chapter in the list shows it, in the days, as it was just before it went.
+  - **Restore paragraphs.** With paragraphs picked on the sheet (a click, or a selection across several), the button restores only them. NEO first finds them in the book as it is (`trackToNow`): the rest of the day a step at a time (`Rec.partMove`), each later day that changed the chapter from one day's end to the next (`rec:track`, which runs `Rec.partDays` over the cache's day states in the worker), then the chapter as it is now. A day at a time is a diff of two day ends, so an edit inside the paragraphs keeps them, and paragraphs moved within one day are lost like ones taken out. Where they're lost, NEO looks for their words, as they last read and as they read at the moment, in every chapter (`Rec.findParagraphs`: three-word shingles, each paragraph matched to the most alike at least half alike, and the chapter where most of their words matched). Found in their own chapter, the confirmation says what they'll read and where what they hold goes (Darlings, "…, before restoring paragraphs to …"), and nothing else in the chapter changes; ⌘Z undoes it. Not found there, a dialog says why (taken out on a day, their chapter deleted on a day, or they seem to be in another chapter, which NEO doesn't restore into) and offers **Copy to the clipboard** or **Add to Darlings, and copy**, as they were; their paste is recorded with the moment. Costs: matching by words over a 200,000-word book (3,300 paragraphs) is 70 to 80 ms; carrying them through a year's days reads the day files once (as a search's first pass does, under a second) and diffs the chapter on the days that changed it. Following them through each later day's every step instead would load every such day, 50 to 180 ms each, so tens of seconds for a busy chapter's year, and wouldn't find more: a move between chapters is a delete and an insert either way.
+  - Copy from a moment: the sheet's `copy` puts the text, and the HTML without the player's caret, on the clipboard, and remembers the hash; a paste of it is `internal` and its `c` line ends with the moment (`[…, true, [session, line, device]]`), another optional field old readers ignore.
+  - **Delete this book's history…** is in the dialog's footer. It's the one thing here NEO can't take back, so the confirmation (`confirmModal` with a `phrase`) says what goes (every replay and every version it could restore, on every device sharing the library), what stays (the book, its notes and Darlings), where the history goes (the system trash, with its copy in Backups, recoverable from there but not from NEO), and whether recording carries on; its button stays off until the writer types "delete history" (in the interface's language, any case). Then the session ends (its close awaited), `recording/` and the book's mirror in `Backups/recordings/` go to the trash (if the trash refuses one, it stays where it is and is shown, as for a book), the cache (and `known.json`) goes, and recording starts again: the next session's chapters are `baseline`. Another device still recording the book writes into a fresh folder; its next `continue` lines have nothing before them, so its history starts at its next anchor. Pocket has no system trash, so it doesn't offer it.
+
+**Patch 2: Proof of when I wrote**
+
+- **Phase 5: seals and timestamps.** `proof.js`; the opt-in setting and its wording; the `safeStorage` device key; seals with the open session's head and the drand `after`; two RFC 3161 authorities (request, store, in-house DER/CMS check against bundled roots, failover); the yearly re-stamp; OpenTimestamps as the optional extra (port `ots.js`, plus the Bitcoin `after`). `scripts/verify-recording.js <book folder>`: chain, signatures, `replayCheck`, each timestamp, each `after`, and a list of time-cover gaps, for support and third parties.
+- **Phase 6: evidence report and exported replay page.**
+
+**If Hugh declines patch 2:** ship `proof.js` in a slimmed-down NEO Witness that only seals `recording/` (no launcher, no git history of its own). Otherwise NEO Witness is retired with no migration. Its existing records stay as they are and can still be checked with its own `verify`, or with `ots verify` on its `.ots` files.
+
+# Decisions
+
+Settled with the writer on 2026-10-06:
+
+1. **Recording is on by default and local.** What wasn't recorded can never be claimed, and nothing leaves the computer unless the writer turns on proof or exports.
+2. **Proof of time is opt-in, and needs no Bitcoin.** Default timestamps come from two RFC 3161 authorities, with a drand round as the lower bound. OpenTimestamps (Bitcoin) is an optional extra for writers who want proof that trusts no company. We don't build a timestamp server of our own: anyone sceptical could say we backdated, and it would have to run for decades.
+3. **Everything happens in NEO, in two patches.** Patch 1 (Writing History) stands on its own benefits; patch 2 (proof) is separate and opt-in. NEO Witness is retired, or kept only as a sealer if patch 2 is declined.
+4. **Recordings live in each book folder** (`book-…/recording/`). They're synced and go to the trash with the book. They are backed up as a mirror in `Backups/recordings/`, each closed session copied once, not in the daily zip (amended 2026-10-09: zipping an immutable history daily kept fourteen copies of it).
+5. **The history opens in a dialog, reached from four places** (see Where the history opens). The player is never a permanent panel.
+6. **The format stays JSON lines, built for density.** Ordinary typing is written as runs (characters plus the gap before each key, on one clock), the chapter and the physical key are written once and implied after, and runs are never split by pauses. Binary was measured and rejected: about 20% smaller after gzip, at the cost of a file nobody can read. Timings stay at millisecond resolution.
+7. **No append.** The recorder writes a new immutable chunk at each flush (`flushAllSaves`: every 20 s, and on blur, hide and close), rolls chunks up every 10 minutes, and joins a session into one gzipped file when it closes. Every write goes through `writeFileDurable`, so NEO's durability rule needs no exception.
+8. **No hold times.** Gaps between keys and the edits made after them show a writer thinking; how long keys are held adds little against a forger, identifies the typist, and varies by device in ways that would cast doubt on honest writers (see Capture).
+
+Settled with the writer on 2026-10-08:
+
+9. **Phase 4 before the first pull request.** The player has to cope with a year, and with a year-long script, before anyone records one. (Amended 2026-10-12: phase 3 goes in the same pull request; everything goes as one.)
+10. **Days are the unit** of the dialog, the replay and the cache. A day is the writer's day, the same one the goals use.
+11. **Search replays; there is no index, for now.** Search is rare, and it's fine for it to take a while. It reads the cached day states, then replays inside days in the worker for a phrase that came and went within one. A per-session summary of words was dropped (decided 2026-10-09, replacing the summary settled on 2026-10-08): it only sped up single words, phrases needed the day states anyway, and it would have been a second frozen format in the library. It can be added later without a new `neoRec`.
+
+Settled with the writer on 2026-10-09:
+
+12. **The dialog opens on the days**: the chapter (or book) as it is, above a tile for each writing day with where it added and deleted text, marked in bins that scale with the chapter (one per 500 words, 8 to 64). Picking a day plays it. The day is the unit of showing, loading and caching. The stats are in the cache, derived from the lines, so they need no new `neoRec`. (Until 2026-10-10 it opened on an overview of the whole book played one session at a time, with a year strip as its seek bar; the days said more.)
+
+13. **Anchors by how much was written, not by time.** A full `b` once a chapter has had 200,000 characters inserted and deleted since its last one, or four times its length if that is more. The writing between damage and the next anchor is what damage can cost, and the edits since the last anchor are what a build replays, so the bound is in writing, the same for a fast writer as a slow one. The multiple only matters for chapters over 50 KB, such as a whole script, where a fixed figure would rewrite the chapter too often.
+14. **A change made all at once is recorded as a splice per run of paragraphs it changed.** A catch-up, Replace All, an Outline move or a structural undo comes to the recorder as two versions of a chapter, and one splice from the first difference to the last can be the whole chapter for a name changed on its first and last pages. Matching paragraphs as patience diff matches lines, then cutting each run that changed to the characters that changed, records the change itself: a move is a delete and an insert. It isn't a new format: several `e` lines under one `x` already mean that cause made them all. In 4a it made a novel's recording a quarter smaller, and its anchors went from 8.5% of it to 3%.
+
+# To ask Hugh
+
+- **Daily zips on several computers.** Every desktop writes `Backups/neo-backup-<date>.zip` into the same synced folder and skips the day only if that file is already there (`dailyBackup`, `main.js`). Two computers started the same day before sync catches up both write the same name: a conflict copy, or one machine's zip silently replacing the other's. Once recordings are out of the zip (4g) the zips are small, so each device could have its own (`neo-backup-<date>-<device>.zip`). It changes behaviour NEO already has, so it's his call.
+- **Restore and sync aren't documented.** README.md says the zips are kept for two weeks and suggests iCloud; TUTORIAL.md says to sync with Dropbox or anything; `pocket/README.md` says Android shares the library over Syncthing and iOS over iCloud. Nothing says how to restore from a backup, or how to set up two computers on one library. 4g's `Backups/README.txt` covers restoring; a short section on two devices may belong in README.md.
+
+# Still to check before building patch 2
+
+- The terms of use and rate limits of each RFC 3161 authority for this use, and which two to default to.
+- drand `quicknet`'s API endpoints and how to check a round's BLS signature without adding a dependency (or accept trusting the API for `after`, and say so).
+- Whether Hugh is willing to add the third network feature at all, even opt-in.
