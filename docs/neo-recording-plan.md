@@ -730,7 +730,6 @@ Settled with the writer on 2026-10-12:
 # To ask Hugh
 
 - **Proof in the same pull request.** It's opt-in and separable (see The shape); he can take the history without it.
-
 - **Daily zips on several computers.** Every desktop writes `Backups/neo-backup-<date>.zip` into the same synced folder and skips the day only if that file is already there (`dailyBackup`, `main.js`). Two computers started the same day before sync catches up both write the same name: a conflict copy, or one machine's zip silently replacing the other's. Once recordings are out of the zip (4g) the zips are small, so each device could have its own (`neo-backup-<date>-<device>.zip`). It changes behaviour NEO already has, so it's his call.
 - **Restore and sync aren't documented.** README.md says the zips are kept for two weeks and suggests iCloud; TUTORIAL.md says to sync with Dropbox or anything; `pocket/README.md` says Android shares the library over Syncthing and iOS over iCloud. Nothing says how to restore from a backup, or how to set up two computers on one library. 4g's `Backups/README.txt` covers restoring; a short section on two devices may belong in README.md.
 
