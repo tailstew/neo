@@ -97,5 +97,9 @@
   "They will read exactly as they do here: {n} words, where they have {now} now.": {
     "one": "They will read exactly as they do here: {n} word, where they have {now} now.",
     "other": "They will read exactly as they do here: {n} words, where they have {now} now."
+  },
+  "Its {n} tags go with it.": {
+    "one": "Its one tag goes with it.",
+    "other": "Its {n} tags go with it."
   }
 }

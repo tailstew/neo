@@ -2947,21 +2947,43 @@ const rec = {
     this.idleTimer = setTimeout(() => this.context('idle'), REC_IDLE);
   },
 
+  // A tag: a name on a moment of the history (Rec.tagsOf). `label` null is
+  // one NEO makes for its own reasons (`made`), named when shown; `at` null
+  // is this moment, else [session, line, device, iso]. It goes to disk at
+  // once. Returns null when nothing is recording, else { ref: the moment
+  // the tag is on, saved: true once it's on disk, false if it couldn't be }.
+  tag(label, at = null, made = null, id = 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)) {
+    if (!this.on || !this.w) return null;
+    this.tick();
+    this.live = true;
+    this.order();
+    const line = ['tag', id, label, at];
+    if (made) line.push(made);
+    this.event(line);
+    const c = this.flush();
+    if (!c) return null;
+    // the tag's own line, counted as History counts lines (the header is 1)
+    const k = c.chunk.text.split('\n').findIndex((s) => s.includes('"tag"') && s.includes(JSON.stringify(id)));
+    return { id, ref: [this.session.id, c.chunk.first + k, this.device], saved: c.saved };
+  },
+
   // The lines so far, as one chunk, to disk: from flushAllSaves, and when
-  // a session closes or the history is opened.
+  // a session closes, a tag is made or the history is opened. Returns the
+  // chunk and a promise of whether it reached the disk, or null for none.
   flush() {
-    if (!this.on || !this.live) return;
+    if (!this.on || !this.live) return null;
     this.order();
     const c = this.w.chunk();
-    if (!c) return;
+    if (!c) return null;
     const { bookId } = this;
     const id = this.session.id;
-    const send = (part) => window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; }, (err) => {
+    const send = (part) => window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; return true; }, (err) => {
       window.neo.logError('recording chunk: ' + (err && err.message || err));
       if (this.session && this.session.id === id) this.retry.push(part); // tried again with the next
+      return false;
     });
     for (const part of this.retry.splice(0)) send(part);
-    send(c);
+    return { chunk: c, saved: send(c) };
   },
 
   rollup() {
@@ -3372,46 +3394,63 @@ async function historyToDarlings(bookId, html, label) {
   await window.neo.writeJSON(bookId, 'darlings', list);
 }
 
-// Restore: a chapter back as it was at a moment of its history. One still
-// in the book takes the old text, and what it held goes to Darlings; one
-// deleted since comes back as a new chapter, after the chapter it followed
-// then (`before`: the chapters before it at that moment, nearest last).
-// Either is one ⌘Z, and the recording says which moment it came from
-// (x restore: session, line, device). A book not open is opened first.
-async function historyRestore({ bookId, ch, html, title = '', before = [], when, ref, paras = null }) {
+// What a restore replaces is kept before anything changes, where the book
+// already keeps its past. While the book is recording, that's the recording:
+// every change reached it, so the moment just before the restore holds the
+// text exactly, and a tag goes there ("Before restoring to …"), on disk
+// before the restore. Otherwise, as a snapshot restore keeps it: a "Before a
+// restore" snapshot. `ref` and `wall` are the moment restored to. Returns
+// { tag } or { snapshot }, or null when neither could be kept, and then
+// nothing may change.
+async function historyKeepBefore(ref, wall) {
+  if (rec.on && book && rec.bookId === book.id) {
+    const tg = rec.tag(null, null, { restore: [...ref, new Date(wall).toISOString()] });
+    if (tg && await tg.saved) return { tag: tg };
+  }
+  try {
+    const r = await takeSnapshot('r');
+    // (null: a book with nothing in it, which has nothing to lose)
+    if (r || snapsCan()) return { snapshot: r ? r.snap : null };
+  } catch (err) { logSnap(err); }
+  return null;
+}
+// where it went, as a restore's toast says it
+const historyKeptSaid = (kept, wall, many = false) => (kept.tag
+  ? (many ? t('{undo} undoes it; the text they replaced is in Writing History, at “{tag}”.', { undo: KZ, tag: historyRestoreTag(wall) })
+    : t('{undo} undoes it; the text it replaced is in Writing History, at “{tag}”.', { undo: KZ, tag: historyRestoreTag(wall) }))
+  : many ? t('{undo} undoes it; the text they replaced is in a snapshot too.', { undo: KZ }) : t('{undo} undoes it; the text it replaced is in a snapshot too.', { undo: KZ }));
+// the name of the tag a restore leaves on the moment before it
+const historyRestoreTag = (wall) => t('Before restoring to {when}', { when: snapWhen(wall) });
+const historyCantKeep = () => toast(t('NEO couldn’t keep the text as it is now, so nothing was changed.'), 6000);
+
+// Restore: a chapter back as it was at a moment of its history (`wall`, as
+// the recording names it: `ref`, [session, line, device]). One still in the
+// book takes the old text, once what it held is kept (historyKeepBefore);
+// one deleted since comes back as a new chapter, after the chapter it
+// followed then (`before`: the chapters before it at that moment, nearest
+// last). Either is one ⌘Z, and the recording says which moment it came from
+// (x restore). A book not open is opened first.
+async function historyRestore({ bookId, ch, html, title = '', before = [], wall, ref, paras = null }) {
   if (!book || book.id !== bookId || $('#editor-view').hidden) {
     if (book) await backToShelf();
     await openBook(bookId);
     if (!book || book.id !== bookId) return;
   }
   if (currentTab !== 'manuscript') switchTab('manuscript');
-  if (paras) return historyRestoreParagraphs({ ch, html, when, ref, paras });
+  if (paras) return historyRestoreParagraphs({ ch, html, wall, ref, paras });
+  const when = snapWhen(wall);
   let target = ch;
   let said;
   if (book.chapterOrder.includes(ch) && chapterHTML[ch] !== undefined) {
-    const now = chapterHTML[ch];
-    if (now === html) { toast(t('This chapter is already as it was then.')); return; }
+    if (chapterHTML[ch] === html) { toast(t('This chapter is already as it was then.')); return; }
+    const kept = await historyKeepBefore(ref, wall);
+    if (!kept) { historyCantKeep(); return; }
+    if (!book || book.id !== bookId) return;
     snapshotStructure('restore');
-    const holder = document.createElement('div');
-    holder.innerHTML = now;
-    const text = [...holder.children].map((p) => p.textContent).join('\n\n').trim();
-    if (text) {
-      darlings.unshift({
-        id: 'd-' + Date.now().toString(36),
-        html: now,
-        text: text.slice(0, 2000),
-        chapterId: ch,
-        chapterLabel: t('{chapter}, before restoring to {when}', { chapter: chapterName(ch), when }),
-        date: new Date().toISOString()
-      });
-    }
     setChapterHTML(ch, html, 'restore', { ref });
     wordCache[ch] = null;
     await persistChapter(ch, html);
-    if (text) await writeSidecar(book.id, 'darlings', darlings);
-    said = text
-      ? t('{chapter} is as it was on {when}. What it held is in Darlings ({key} undoes it).', { chapter: chapterName(ch), when, key: KZ })
-      : t('{chapter} is as it was on {when} ({key} undoes it).', { chapter: chapterName(ch), when, key: KZ });
+    said = t('Chapter restored from {when}.', { when }) + ' ' + historyKeptSaid(kept, wall);
   } else {
     snapshotStructure('restore');
     target = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
@@ -3425,53 +3464,40 @@ async function historyRestore({ bookId, ch, html, title = '', before = [], when,
     rec.streams('restore');
     await persistChapter(target, html);
     await saveMeta();
-    said = t('The chapter is back, as it was on {when} ({key} undoes it).', { when, key: KZ });
+    said = t('Chapter put back from {when}. {undo} undoes it.', { when, undo: KZ });
   }
   renderChapters();
   updateCounters();
-  if (currentTab === 'darlings') renderDarlings();
   const sec = document.querySelector(`.chapter[data-id="${CSS.escape(target)}"]`);
   if (sec) sec.scrollIntoView({ block: 'start' });
   focusChapterStart(target);
   resetNativeUndo();
+  breakRun = 1; // ⌘Z, before any typing, undoes it
   toast(said, 9000);
 }
 
 // Paragraphs a…b of a chapter (as it was when they were found: `expect`)
-// back as they were (`html`): what they hold goes to Darlings, one ⌘Z
-// undoes it, and the recording names the moment
-async function historyRestoreParagraphs({ ch, html, when, ref, paras }) {
+// back as they were (`html`): what they hold is kept first, one ⌘Z undoes
+// it, and the recording names the moment
+async function historyRestoreParagraphs({ ch, html, wall, ref, paras }) {
+  const bookId = book.id;
   const cur = chapterHTML[ch];
   if (cur === undefined || !book.chapterOrder.includes(ch)) { toast(t('That couldn’t be restored. The book is as it was.')); return; }
   const q = { ch, a: paras.a, b: paras.b };
   // (the chapter as it opened can differ from its file by a tidy)
   if (cur !== paras.expect) Rec.partSplices(q, Rec.splices(paras.expect, cur), 1);
   if (q.gone || q.b <= q.a) { toast(t('Those paragraphs changed meanwhile, so nothing was restored.')); return; }
-  const now = cur.slice(q.a, q.b);
-  if (now === html) { toast(t('These paragraphs are already as they were then.')); return; }
+  if (cur.slice(q.a, q.b) === html) { toast(t('These paragraphs are already as they were then.')); return; }
+  const kept = await historyKeepBefore(ref, wall);
+  if (!kept) { historyCantKeep(); return; }
+  if (!book || book.id !== bookId || chapterHTML[ch] !== cur) { toast(t('Those paragraphs changed meanwhile, so nothing was restored.')); return; }
   snapshotStructure('restore');
-  const holder = document.createElement('div');
-  holder.innerHTML = now;
-  const text = [...holder.children].map((p) => p.textContent).join('\n\n').trim();
-  const chapter = chapterName(ch);
-  if (text) {
-    darlings.unshift({
-      id: 'd-' + Date.now().toString(36),
-      html: now,
-      text: text.slice(0, 2000),
-      chapterId: ch,
-      chapterLabel: t('{chapter}, before restoring paragraphs to {when}', { chapter, when }),
-      date: new Date().toISOString()
-    });
-  }
   const next = cur.slice(0, q.a) + html + cur.slice(q.b);
   setChapterHTML(ch, next, 'restore', { ref });
   wordCache[ch] = null;
   await persistChapter(ch, next);
-  if (text) await writeSidecar(book.id, 'darlings', darlings);
   renderChapters();
   updateCounters();
-  if (currentTab === 'darlings') renderDarlings();
   // the caret at the first paragraph restored
   const pIdx = (cur.slice(0, q.a).match(/<p[\s>]/g) || []).length;
   const body = document.querySelector(`.chapter[data-id="${CSS.escape(ch)}"] .chapter-body`);
@@ -3487,8 +3513,9 @@ async function historyRestoreParagraphs({ ch, html, when, ref, paras }) {
     p.scrollIntoView({ block: 'center' });
   } else focusChapterStart(ch);
   resetNativeUndo();
-  toast(text ? t('The paragraphs are as they were on {when}. What they held is in Darlings ({key} undoes it).', { when, key: KZ })
-    : t('The paragraphs are as they were on {when} ({key} undoes it).', { when, key: KZ }), 9000);
+  breakRun = 1;
+  const many = (html.match(/<p[\s>]/g) || []).length > 1;
+  toast((many ? t('Paragraphs restored from {when}.', { when: snapWhen(wall) }) : t('Paragraph restored from {when}.', { when: snapWhen(wall) })) + ' ' + historyKeptSaid(kept, wall, many), 9000);
 }
 
 // Opens the Writing History of a book (the open one unless another is
@@ -3497,7 +3524,7 @@ async function historyRestoreParagraphs({ ch, html, when, ref, paras }) {
 // A day picked opens the player on it, with its typing timeline, play and
 // speed. With `play`, straight into the player at the first day the
 // chapter was written, playing.
-async function openHistory({ bookId = book && book.id, chId = null, play = false } = {}) {
+async function openHistory({ bookId = book && book.id, chId = null, play = false, snapshot = null } = {}) {
   if (!bookId || !historyCanOpen() || historyShown) return;
   const here = !!(book && book.id === bookId && !$('#editor-view').hidden);
   const caret = here ? captureCaret() : null;
@@ -3512,7 +3539,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     <div class="hs-main">
       <div class="hs-scroll"><div class="hs-paper"></div></div>
       <div class="hs-badge" hidden></div>
-      <button class="hs-restore" type="button" hidden></button>
+      <div class="hs-acts"><button class="hs-tag" type="button" hidden></button><button class="hs-restore" type="button" hidden></button></div>
       <div class="hs-bottom">
         <div class="hs-controls" hidden>
           <button class="hs-back"></button>
@@ -3535,6 +3562,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     <div class="hs-foot">
       <label class="hs-keep"><input type="checkbox"> <span></span></label>
       <span class="hs-desc"></span>
+      <button class="hs-snaps" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
   const $h = (sel) => bd.querySelector(sel);
@@ -3557,6 +3585,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   const results = $h('.hs-results');
   const partEl = $h('.hs-part');
   const restoreBtn = $h('.hs-restore');
+  const tagBtn = $h('.hs-tag');
   const deleteBtn = $h('.hs-delete');
   $h('.hs-find').hidden = !window.neo.recSearch;
   qIn.placeholder = t('Search the history');
@@ -3634,6 +3663,8 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   let find = null;        // a search: { phrase ({ text, word, cs }), sid, findings, within: { done, total }, finished, stopped, error }
   let part = null;        // paragraphs picked on the sheet, to step through their changes: { ch, a, b (Rec's part), h, n (where it is once n steps of h played) }
   let partSeq = 0;        // each step through them, so a newer one makes an older one moot
+  let tags = [];          // the history's tags (Rec.tagsOf), oldest moment first
+  let tagsByDay = new Map(); // day -> its tags
   const resize = new ResizeObserver(() => { if (bd.isConnected) drawAll(); });
 
   const progress = (m) => {
@@ -3662,7 +3693,12 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     S.building = false;
     S.open = m.open || [];
     if (m.error) S.error = m.error;
-    if (play && chId) { play = false; reindex({ show: false }); startWatching(); } else reindex();
+    if (play && chId) { play = false; reindex({ show: false }); startWatching(); } else if (snapshot) {
+      const s = snapshot;
+      snapshot = null;
+      reindex({ show: false });
+      watchSnapshot(s);
+    } else reindex();
   }
   historyListeners.add(progress);
 
@@ -3736,6 +3772,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       return { order, words: { ...words } };
     });
     S.untouched = meta.chapterOrder.filter((ch) => !seen.has(ch));
+    computeTags();
     // a chapter the recording never saw: the whole book instead
     if (!S.building && !settled) {
       settled = true;
@@ -3899,7 +3936,9 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     b.className = 'hs-tile';
     b.dataset.day = d.day;
     b.setAttribute('role', 'option');
-    b.title = (label ? label + ' · ' : '') + describeDay(d);
+    const marked = (tagsByDay.get(d.day) || []).map(tagName);
+    b.title = (label ? label + ' · ' : '') + describeDay(d) + (marked.length ? ' · ' + t('Tags') + ': ' + marked.join(', ') : '');
+    if (marked.length) b.classList.add('hs-tagged');
     b.innerHTML = '<canvas></canvas><span></span>';
     b.lastChild.textContent = historyDayLabel(d.day);
     drawTile(b.firstChild, d);
@@ -3914,7 +3953,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     const keep = new Map();
     const made = fitting().map((di) => {
       const d = S.days[di];
-      const key = mode + '|' + dayKey(d);
+      const key = mode + '|' + dayKey(d) + '|' + (tagsByDay.get(d.day) || []).map((x) => x.id + ':' + tagName(x)).join(',');
       const b = tiles.get(key) || dayTile(d, () => { const i = dayIndex(d.day); if (i >= 0) openPlayer(S.days[i].from, { playIt: true }); });
       keep.set(key, b);
       return b;
@@ -3959,7 +3998,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   function drawWhen() {
     const el = $h('.hs-when');
     const s = h && steps.length ? h.steps[steps[Math.max(0, Math.min(pos || 1, steps.length) - 1)]] : null;
-    const when = s ? historyWhen(s.wall, HISTORY_MOMENT) : '';
+    const when = s ? t('Your book {when}', { when: snapWhen(s.wall) }) : '';
     if (el.textContent !== when) el.textContent = when;
   }
 
@@ -4133,6 +4172,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       if (s.k === 'session' && away) { away.to = x; markers.push(away); away = null; }
     });
     if (away) { away.to = total; markers.push(away); }
+    tagMarkers();
   }
 
   // jump: the chapters as they were after `p` entries of the view
@@ -4460,7 +4500,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     };
     bars(nav, 'rgba(201,168,106,0.18)');
     bars(bins, 'rgba(201,168,106,0.6)');
-    const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b' };
+    const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e' };
     let lastLabel = -1e9;
     g.font = '10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
     for (const m of markers) {
@@ -4476,6 +4516,10 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
           g.fillText(label, x + 3, 10);
           lastLabel = x + g.measureText(label).width - 57;
         }
+      } else if (m.kind === 'tag') {
+        // a flag on a pole
+        g.beginPath(); g.moveTo(x, 1); g.lineTo(x, H); g.stroke();
+        g.beginPath(); g.moveTo(x, 1); g.lineTo(x + 7, 4); g.lineTo(x, 7); g.closePath(); g.fill();
       } else {
         g.beginPath(); g.moveTo(x - 3, top - 1); g.lineTo(x + 3, top - 1); g.lineTo(x, top + 4); g.closePath(); g.fill();
       }
@@ -4514,15 +4558,21 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     const ch = mode !== 'book' ? mode : part && !part.away ? part.ch : caretAt ? caretAt.ch : null;
     return ch && !Rec.isStream(ch) && chapters[ch] !== undefined ? { ch, paras: false } : null;
   }
-  // the moment on the sheet, as the recording names it: [session, line, device], and when
+  // the moment on the sheet, as the recording names it: [session, line,
+  // device], when it was (wall), and as the snapshot view says it
   function momentRef() {
     const s = h.steps[pos ? steps[pos - 1] : steps[0]];
     const x = h.sessions[s.session];
-    return { ref: [x.id, pos ? s.line : 1, x.device], when: historyWhen(s.wall, HISTORY_MOMENT) };
+    const wall = Number.isFinite(s.wall) ? s.wall : historyDayMs(h.day);
+    return { ref: [x.id, pos ? s.line : 1, x.device], wall, when: snapWhen(wall) };
   }
+  // where what a restore replaces is kept, as a button's tooltip says it
+  const keptWhere = () => (recordingWanted() ? t('What it holds now stays in Writing History, tagged on the moment before the restore.')
+    : t('What it holds now is kept in a snapshot, on the Darlings tab.'));
   let restoreSig = '';
   let restoring = false; // finding picked paragraphs as they are now
   function renderRestore() {
+    renderTagBtn();
     if (restoring) return;
     const target = restoreTarget();
     const sig = target ? [h.key, pos, target.ch, target.paras ? part.a + '-' + part.b : '', mode].join(':') : '';
@@ -4534,57 +4584,29 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     if (target.paras) {
       const c = chapters[ch];
       restoreBtn.disabled = false;
-      restoreBtn.textContent = c.find(part.a) !== c.find(part.b - 1) ? t('Restore these paragraphs to this moment') : t('Restore this paragraph to this moment');
-      restoreBtn.title = t('NEO finds them in the book as it is now and puts them back as they are here. What they hold now goes to Darlings. × beside the paragraph’s name restores the whole chapter instead.');
+      restoreBtn.textContent = c.find(part.a) !== c.find(part.b - 1) ? t('Restore Paragraphs') : t('Restore This Paragraph');
+      restoreBtn.title = t('NEO finds them in the book as it is now and puts them back as they are here.') + ' ' + keptWhere() + ' ' + t('× beside the paragraph’s name restores the whole chapter instead.');
       return;
     }
     const inBook = meta.chapterOrder.includes(ch);
     const same = inBook && here && book && book.id === bookId && chapterHTML[ch] === chapters[ch].toString();
     restoreBtn.disabled = same;
-    restoreBtn.textContent = same ? t('As it is now') : inBook ? t('Restore {chapter} to this moment', { chapter: chapterName(ch, meta) }) : t('Put this chapter back');
-    restoreBtn.title = same ? '' : inBook ? t('The chapter becomes what you see here. What it holds now goes to Darlings.')
+    restoreBtn.textContent = same ? t('Same as now') : inBook ? t('Restore This Chapter') : t('Put This Chapter Back');
+    restoreBtn.title = same ? '' : inBook ? chapterName(ch, meta) + ': ' + t('The chapter becomes what you see here.') + ' ' + keptWhere()
       : t('The chapter comes back as you see it here, after the chapter it followed.');
   }
-  // What a restore will do, said before it does it: what the chapter
-  // becomes, where what it holds now goes, how to undo it, and what the
-  // history and the backups keep
-  async function confirmRestore({ ch, html, before, when }) {
-    const words = (x) => {
-      const holder = document.createElement('div');
-      holder.innerHTML = x || '';
-      return countWords([...holder.children].map((p) => p.textContent).join(' ') || holder.textContent);
-    };
-    const undo = here ? t('{key}, with the caret outside the text, undoes it at once.', { key: KZ })
-      : t('The book opens first. {key}, with the caret outside the text, undoes the restore at once.', { key: KZ });
-    const kept = t('Writing History keeps both versions: the restore is recorded, and you can come back to this moment, or any other, later.');
-    if (meta.chapterOrder.includes(ch)) {
-      const chapter = chapterName(ch, meta);
-      let now = '';
-      try { now = here && book && book.id === bookId ? chapterHTML[ch] || '' : (await window.neo.readChapter(bookId, ch)) || ''; } catch { /* unread: said as nothing */ }
-      const nowWords = words(now);
-      return confirmModal({
-        title: t('Restore {chapter} to {when}?', { chapter, when }),
-        points: [
-          t('{chapter} will read exactly as it does here: {n} words, where it has {now} now.', { chapter, n: words(html), now: nowWords }),
-          nowWords ? t('What it holds now goes to Darlings, as “{label}”, so no words are lost.', { label: t('{chapter}, before restoring to {when}', { chapter, when }) }) : t('It is empty now, so nothing goes to Darlings.'),
-          undo,
-          kept,
-          t('NEO’s daily backups in the Backups folder aren’t touched: the latest still holds the chapter as it was when that backup was made.')
-        ],
-        ok: t('Restore')
-      });
-    }
-    const prev = [...before].reverse().find((x) => meta.chapterOrder.includes(x));
+  // A restore acts at once, and ⌘Z undoes it. The one thing it asks is
+  // whether to open the book, when it isn't the one being written in.
+  function opensFirst() {
+    if (here && book && book.id === bookId && !$('#editor-view').hidden) return Promise.resolve(true);
+    const name = (m) => (isUntitled(m.title) ? t('Untitled') : m.title);
     return confirmModal({
-      title: t('Put this chapter back as it was on {when}?', { when }),
+      title: t('Open “{title}” to restore it?', { title: name(meta) }),
       points: [
-        prev ? t('It comes back as a new chapter after {chapter}, reading exactly as it does here ({n} words).', { chapter: chapterName(prev, meta), n: words(html) })
-          : t('It comes back as a new chapter at the start of the book, reading exactly as it does here ({n} words).', { n: words(html) }),
-        t('Nothing else in the book changes.'),
-        undo,
-        kept
+        t('NEO opens the book, then restores it as you see it here. {undo} undoes the restore.', { undo: KZ }),
+        ...(book && book.id !== bookId && !$('#editor-view').hidden ? [t('“{title}”, open now, is saved and closed first.', { title: name(book) })] : [])
       ],
-      ok: t('Put it back')
+      ok: t('Open and Restore')
     });
   }
 
@@ -4603,11 +4625,11 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     const order = h.order(n) || dayOrder();
     const at = order.indexOf(ch);
     const before = at < 0 ? order.slice() : order.slice(0, at);
-    const { ref, when } = momentRef();
+    const { ref, wall } = momentRef();
     setPlaying(false);
-    if (!(await confirmRestore({ ch, html, before, when }))) { bd.focus(); return; }
+    if (!(await opensFirst())) { bd.focus(); return; }
     close();
-    historyRestore({ bookId, ch, html, title, before, when, ref }).catch((err) => {
+    historyRestore({ bookId, ch, html, title, before, wall, ref }).catch((err) => {
       window.neo.logError('history restore: ' + (err && err.stack || err));
       toast(t('That couldn’t be restored. The book is as it was.'));
     });
@@ -4705,7 +4727,8 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     const ch = part.ch;
     const { a, b } = part;
     const then = chapters[ch].toString().slice(a, b);
-    const { ref, when } = momentRef();
+    const { ref, wall } = momentRef();
+    const when = historyWhen(wall, HISTORY_MOMENT);
     const many = chapters[ch].find(a) !== chapters[ch].find(b - 1);
     const chapter = meta.chapterOrder.includes(ch) ? chapterName(ch, meta) : t('a deleted chapter');
     restoring = true;
@@ -4751,29 +4774,26 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     }
     const nowHtml = r.now.slice(r.a, r.b);
     if (nowHtml === then) { toast(many ? t('These paragraphs are already as they were then.') : t('This paragraph is already as it was then.')); return; }
-    const words = (x) => Rec.countWords(x);
-    const nowWords = words(nowHtml);
-    const sure = await confirmModal({
-      title: many ? t('Restore these paragraphs to {when}?', { when }) : t('Restore this paragraph to {when}?', { when }),
-      points: [
-        t('They will read exactly as they do here: {n} words, where they have {now} now.', { n: words(then), now: nowWords }),
-        ...(r.moved ? [t('They have moved within {chapter} since; NEO found them by their words.', { chapter })] : []),
-        nowWords ? t('What they hold now goes to Darlings, as “{label}”, so no words are lost.', { label: t('{chapter}, before restoring paragraphs to {when}', { chapter, when }) }) : t('They are empty now, so nothing goes to Darlings.'),
-        t('Nothing else in {chapter} changes.', { chapter }),
-        here ? t('{key}, with the caret outside the text, undoes it at once.', { key: KZ })
-          : t('The book opens first. {key}, with the caret outside the text, undoes the restore at once.', { key: KZ }),
-        t('Writing History keeps both versions: the restore is recorded, and you can come back to this moment, or any other, later.'),
-        t('NEO’s daily backups in the Backups folder aren’t touched: the latest still holds the chapter as it was when that backup was made.')
-      ],
-      ok: t('Restore')
-    });
-    if (!sure) { bd.focus(); return; }
+    if (!(await opensFirst())) { bd.focus(); return; }
     close();
-    historyRestore({ bookId, ch, html: then, when, ref, paras: { a: r.a, b: r.b, expect: r.now } }).catch((err) => {
+    historyRestore({ bookId, ch, html: then, wall, ref, paras: { a: r.a, b: r.b, expect: r.now } }).catch((err) => {
       window.neo.logError('history restore: ' + (err && err.stack || err));
       toast(t('That couldn’t be restored. The book is as it was.'));
     });
   }
+
+  // Snapshots: the other way back, kept as plain files, listed on the
+  // Darlings tab of the open book
+  const snapsBtn = $h('.hs-snaps');
+  snapsBtn.hidden = !here || !snapsCan();
+  snapsBtn.textContent = t('Snapshots');
+  snapsBtn.title = t('The snapshots of this book, on the Darlings tab. {key} while writing takes one.', { key: IS_MAC ? '⌘S' : 'Ctrl+S' });
+  snapsBtn.addEventListener('click', () => {
+    close();
+    if (!book || book.id !== bookId) return;
+    switchTab('darlings');
+    showDarlingsAgain();
+  });
 
   // Delete this book's history: to the system trash, once the writer has
   // read what goes and typed the phrase that says so
@@ -4786,7 +4806,8 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       title: t('Delete the Writing History of “{title}”?', { title: isUntitled(meta.title) ? t('Untitled') : meta.title }),
       points: [
         t('Every replay of how this book was written goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
-        t('The book itself is untouched: every chapter, note and Darling stays as it is.'),
+        t('The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.'),
+        ...(tags.length ? [t('Its {n} tags go with it.', { n: tags.length })] : []),
         bin ? t('The history, and its copy in the Backups folder, go to the Recycle Bin. You can get them back from there until it is emptied, but not from inside NEO.')
           : t('The history, and its copy in the Backups folder, go to the Trash. You can get them back from there until it is emptied, but not from inside NEO.'),
         library.recordWriting !== false ? t('NEO starts a new history from the book as it is now.') : t('Writing History is off, so nothing new is recorded until you turn it on.')
@@ -4864,6 +4885,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
 
   bd.addEventListener('keydown', (e) => {
     e.stopPropagation();
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.code === 'KeyS' || e.key === 's')) { e.preventDefault(); tagHere(); return; }
     if (e.target === qIn) {
       if (e.key === 'Enter') { e.preventDefault(); runFind(qIn.value); } else if (e.key === 'Escape') { e.preventDefault(); if (qIn.value || find) clearFind(); else bd.focus(); }
       return;
@@ -4970,6 +4992,17 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       results.appendChild(p);
       return p;
     };
+    const q = Rec.normText(find.phrase.text);
+    for (const tg of tags.slice().reverse()) {
+      if (!Rec.normText(tagName(tg)).includes(q)) continue;
+      const b = document.createElement('button');
+      b.className = 'hs-ch hs-hit';
+      b.innerHTML = '<span class="hs-ch-name"></span><span class="hs-ch-when"></span>';
+      b.firstChild.textContent = t('Tag') + ' · ' + tagName(tg);
+      b.lastChild.textContent = tagWhen(tg);
+      b.addEventListener('click', () => goTag(tg));
+      results.appendChild(b);
+    }
     if (find.error) { note(t('The history couldn’t be searched.')); return; }
     const f = find.findings;
     if (!f) { note(S.building ? t('Reading the history…') : t('Searching…')); return; }
@@ -5329,6 +5362,162 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   }
   renderPart();
 
+  /* ---------- tags: names on moments ---------- */
+
+  // A tag is one line in the recording (Rec.tagsOf): one the writer named,
+  // or one NEO made for a snapshot or just before a restore. Made, renamed
+  // and removed here by a new line in the session being recorded, so only
+  // while this book is open and recording.
+  const canTag = () => !!(rec.on && rec.bookId === bookId && book && book.id === bookId);
+  const tagWhy = () => (library.recordWriting === false ? t('Turn on Keep a replay of my writing, below, to tag moments.')
+    : t('Open this book to tag its moments.'));
+  // the tags written since the history was read, until it's read again
+  let localTags = [];
+  function computeTags() {
+    const local = { id: ':local', device: ':local', day: null, stats: { tags: localTags } };
+    tags = Rec.tagsOf([...S.sessions, local]);
+    tagsByDay = new Map();
+    for (const tg of tags) {
+      if (!tagsByDay.has(tg.day)) tagsByDay.set(tg.day, []);
+      tagsByDay.get(tg.day).push(tg);
+    }
+  }
+  // a tag as it's shown: its name, or what NEO made it for
+  function tagName(tg) {
+    if (tg.label) return tg.label;
+    const m = tg.made || {};
+    if (m.snapshot) {
+      const s = parseSnapName(String(m.snapshot));
+      return s && snapWhy(s.kind) ? t('Snapshot · {why}', { why: snapWhy(s.kind) }) : t('Snapshot');
+    }
+    if (Array.isArray(m.restore)) return historyRestoreTag(Date.parse(m.restore[3]));
+    return t('Tagged');
+  }
+  const tagWhen = (tg) => (tg.when !== null ? snapWhen(tg.when) : historyWhen(historyDayMs(tg.day), HISTORY_DATE));
+  const tagMoment = (tg) => [...tg.at, new Date(tg.when !== null ? tg.when : historyDayMs(tg.day)).toISOString()];
+
+  // A line for a tag, written now, and seen at once
+  function writeTag(label, at, made, id) {
+    const tg = rec.tag(label, at, made, id);
+    if (!tg) return null;
+    localTags.push({ id: tg.id, label, at, made: made || null, wall: Date.now(), line: tg.ref[1] });
+    computeTags();
+    renderList();
+    renderStrip();
+    if (view === 'player' && h) { buildMarkers(); drawTimeline(); renderDayline(); }
+    return tg;
+  }
+
+  // Tag This Moment… (or ⌘S in History): a name for the moment on the sheet
+  let tagAsking = false;
+  async function tagHere() {
+    if (!h || !steps.length || tagAsking || !bd.isConnected) return;
+    setPlaying(false);
+    if (!canTag()) { toast(tagWhy(), 5000); return; }
+    // a moment is a line of the recording: inside a typing run, the run's
+    // end. The sheet goes there first, so what's tagged is what's shown.
+    if (view === 'player') {
+      const n = Rec.momentStep(h, momentRef().ref);
+      let p = 0;
+      while (p < steps.length && steps[p] < n) p++;
+      if (p !== pos) seek(p);
+    }
+    const { ref, wall } = momentRef();
+    tagAsking = true;
+    const name = await askInput(escHtml(t('Tag this moment')), escHtml(t('Draft 2, Sent to my agent…')));
+    tagAsking = false;
+    if (!bd.isConnected) return;
+    bd.focus();
+    if (!name) return;
+    const tg = writeTag(name, [...ref, new Date(wall).toISOString()], null);
+    if (!tg) { toast(t('NEO couldn’t tag this moment.')); return; }
+    toast((await tg.saved) ? t('Tagged “{name}”, {when}.', { name, when: snapWhen(wall) }) : t('NEO couldn’t save the tag yet. It tries again with the next save.'), 4000);
+  }
+  function renderTagBtn() {
+    const show = !!h && steps.length > 0 && !playing && (view === 'player' || view === 'days');
+    tagBtn.hidden = !show;
+    if (!show) return;
+    const ok = canTag();
+    tagBtn.classList.toggle('hs-off', !ok);
+    tagBtn.title = ok ? t('A name for this moment, to come back to') + ' (' + (IS_MAC ? '⌘S' : 'Ctrl+S') + ')' : tagWhy();
+  }
+  tagBtn.textContent = t('Tag This Moment…');
+  tagBtn.addEventListener('click', () => tagHere());
+  close.tag = () => tagHere();
+
+  // A tag picked: its moment in the player, paused. In one chapter's view
+  // when that chapter was written that day, else in the whole book.
+  async function goTag(tg) {
+    const i = S.sessions.findIndex((s) => s.id === tg.at[0] && s.device === tg.at[2]);
+    if (i < 0) return;
+    const d = S.days[S.sessions[i].di];
+    await openPlayer(i, { ch: mode !== 'book' && d && d.stats.chapters.includes(mode) ? null : 'book' });
+    if (!h || h.day !== S.sessions[i].day) return;
+    const n = Rec.momentStep(h, tg.at);
+    if (n < 0) return;
+    let p = 0;
+    while (p < steps.length && steps[p] < n) p++;
+    seek(p);
+    renderList();
+  }
+
+  // the tags in the side pane, newest first: each a way to its moment, and
+  // its right-click menu renames or removes it
+  function renderTagList() {
+    if (!tags.length) return;
+    const hd = document.createElement('div');
+    hd.className = 'hs-list-head';
+    hd.textContent = t('Tags');
+    list.appendChild(hd);
+    for (const tg of tags.slice().reverse()) {
+      const b = item(tagName(tg), [tagWhen(tg), deviceName(tg.at[2])].filter(Boolean).join(' · '), false, () => goTag(tg));
+      b.classList.add('hs-tag-item');
+      b.title = canTag() ? t('Right-click to rename or remove it') : '';
+      b.addEventListener('contextmenu', async (e) => {
+        e.preventDefault();
+        const choice = await popMenu(e.clientX, e.clientY, [
+          { label: t('Go to This Moment'), value: 'go' },
+          '-',
+          { label: tg.label ? t('Rename…') : t('Name…'), value: 'rename', disabled: !canTag() },
+          { label: t('Remove Tag'), value: 'remove', disabled: !canTag(), danger: true }
+        ], { title: tagName(tg) });
+        if (choice === 'go') goTag(tg);
+        else if (choice === 'rename') {
+          const name = await askInput(escHtml(t('Name this tag')), escHtml(tagName(tg)), tg.label || '');
+          bd.focus();
+          if (name && name !== tg.label && !writeTag(name, tagMoment(tg), tg.made, tg.id)) toast(t('NEO couldn’t tag this moment.'));
+        } else if (choice === 'remove') {
+          if (!writeTag(false, tagMoment(tg), tg.made, tg.id)) toast(t('NEO couldn’t tag this moment.'));
+          // (a snapshot keeps its files: only its name in History goes)
+          else toast(tg.made && tg.made.snapshot ? t('The tag is gone from Writing History. The snapshot itself is still on the Darlings tab.') : t('The tag is gone. The moment itself is still in Writing History.'), 5000);
+        }
+      });
+    }
+  }
+
+  // the tags of the day in the player, on its timeline
+  function tagMarkers() {
+    for (const tg of tagsByDay.get(h.day) || []) {
+      const n = Rec.momentStep(h, tg.at);
+      if (n < 0) continue;
+      let j = 0;
+      while (j < steps.length && steps[j] < n) j++;
+      markers.push({ x: j ? vt[j - 1] : 0, kind: 'tag', label: tagName(tg), step: j ? steps[j - 1] : 0 });
+    }
+  }
+
+  // Watch from Here (a snapshot's, on the Darlings tab): the player at its
+  // tag; a snapshot without one (taken while nothing recorded) at the first
+  // day from then on, or the history's first day for one older than it
+  function watchSnapshot(s) {
+    const tg = tags.find((x) => x.made && x.made.snapshot === s.name);
+    if (tg) { goTag(tg); return; }
+    const day = writingDay(new Date(s.at));
+    let di = S.days.findIndex((d) => d.day >= day);
+    if (di < 0) di = S.days.length - 1;
+    if (di >= 0) openPlayer(S.days[di].from);
+  }
+
   /* ---------- the list of chapters ---------- */
 
   function renderList() {
@@ -5381,6 +5570,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       list.appendChild(hd);
       for (const c of dropped) item(goneLead(c.ch) || t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
     }
+    renderTagList();
   }
 
   // the whole book, or one chapter: the overview marks it, the player plays only it
@@ -5444,6 +5634,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     dayLoads = new Map();
     following = true;
     Object.assign(S, { entries: [], open: [], days: [], sessions: [], frames: [], building: false, built: null, listed: false, error: null, done: 0, total: 0 });
+    localTags = [];
     setView('days');
     let devices = [];
     try {
@@ -14503,7 +14694,7 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
   for (const c of order) texts[c] = htmlOf(c);
   const snaps = await loadSnaps(bookId);
   const now = Date.now();
-  if (ifNoneToday && snaps.some((s) => new Date(s.at).toDateString() === new Date(now).toDateString())) return null;
+  if (ifNoneToday && snaps.some((s) => writingDay(new Date(s.at)) === writingDay(new Date(now)))) return null;
   const last = snaps[snaps.length - 1] || null;
   const lastMeta = last ? await snapMeta(bookId, last) : null;
   const hashes = {};
@@ -14529,6 +14720,8 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
   snap.files = new Set([...changed.map((c) => c + '.html'), 'snapshot.json']);
   snap.meta = meta;
   snaps.push(snap);
+  // while the book is recording, Writing History shows it as a tag on this moment
+  if (rec.on && rec.bookId === bookId) rec.tag(null, null, { snapshot: name });
   // NEO's own old ones go, each handing its chapters on to the next first
   for (const gone of snapsToThin(snaps, now)) {
     const i = snaps.findIndex((s) => s.name === gone);
@@ -14548,11 +14741,12 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
 }
 
 // The first change of a writing day keeps the book as the day found it
-// (what's on disk: savedHTML, before this change reaches it)
+// (what's on disk: savedHTML, before this change reaches it). The writer's
+// day, as the goals and Writing History count it (writingDay)
 const snapDay = {};
 function maybeDailySnapshot() {
   if (!book || !snapsCan() || shelfExport) return;
-  const today = new Date().toDateString();
+  const today = writingDay();
   if (snapDay[book.id] === today) return;
   snapDay[book.id] = today;
   takeSnapshot('d', (c) => (typeof savedHTML[c] === 'string' ? savedHTML[c] : chapterHTML[c] || ''), { ifNoneToday: true }).catch(logSnap);
@@ -14636,6 +14830,7 @@ async function renderSnapList() {
     p.className = 'snap-empty';
     p.textContent = IS_MAC ? t('Press ⌘S to take a snapshot of your book. It costs only the chapters that changed.')
       : t('Press Ctrl+S to take a snapshot of your book. It costs only the chapters that changed.');
+    if (recordingWanted()) p.textContent += ' ' + t('Writing History keeps every moment in between, and shows your snapshots there as tags.');
     list.appendChild(p);
     return;
   }
@@ -14658,6 +14853,16 @@ async function renderSnapList() {
     const on = snapShown && snapShown.name === s.name;
     const b = item(s.kind === SNAP_KEPT ? 'snap-k' : 'snap-a', when, snapWhy(s.kind) + ' · ' + what, on, () => showSnapshot(s.name));
     b.title = t('{n} words', { n: s.words });
+    b.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      const has = await snapHasHistory(bookId);
+      const choice = await popMenu(e.clientX, e.clientY, [
+        { label: t('Show This Snapshot'), value: 'show' },
+        { label: t('Watch from Here'), value: 'watch', disabled: !has }
+      ]);
+      if (choice === 'show') showSnapshot(s.name);
+      else if (choice === 'watch') snapWatch(s);
+    });
     if (on && snapShown.diff && snapShown.diff.length) {
       // the chapters that differ from today, to jump to
       const sub = document.createElement('div');
@@ -14784,6 +14989,15 @@ async function showSnapshot(name) {
   all.textContent = t('Restore Whole Book');
   all.disabled = !diff.length && !extra && JSON.stringify(meta.chapterOrder) === JSON.stringify(book.chapterOrder);
   all.onclick = () => restoreSnapshot(null);
+  // Writing History from this snapshot's moment, while the book has one
+  const watch = document.createElement('button');
+  watch.className = 'snap-watch';
+  watch.textContent = t('Watch from Here');
+  watch.title = t('Writing History, playing from this snapshot');
+  watch.hidden = true;
+  watch.onclick = () => snapWatch(snap);
+  band.querySelector('.snap-band-do').prepend(watch);
+  snapHasHistory(bookId).then((has) => { watch.hidden = !has; });
   v.appendChild(band);
 
   const ranges = [];
@@ -14832,6 +15046,16 @@ async function showSnapshot(name) {
   const first = diff.length && v.querySelector(`.snap-chapter[data-id="${diff[0].chId}"]`);
   if (first) first.scrollIntoView({ block: 'start' });
   else $('#paper-scroll').scrollTop = 0;
+}
+
+// Whether a book has a Writing History to watch
+async function snapHasHistory(bookId) {
+  if (!historyCanOpen()) return false;
+  try { return ((await window.neo.recList(bookId)) || []).some((d) => d.sessions.length); } catch { return false; }
+}
+// Watch from Here: Writing History at the snapshot's tag
+function snapWatch(s) {
+  if (book) openHistory({ bookId: book.id, snapshot: { name: s.name, at: s.at } });
 }
 
 // ranges over the words of p at the given places (its text nodes end to end)
@@ -19081,7 +19305,8 @@ window.neo.onMenu(async (msg) => {
     await writeLibrary(library);
   }
   if (msg.type === 'emailDraft') doEmailDraft();
-  if (msg.type === 'snapshot' && book && !$('#editor-view').hidden) snapshotNow();
+  // (in Writing History, ⌘S tags the moment shown instead)
+  if (msg.type === 'snapshot') { if (historyShown && historyShown.tag) historyShown.tag(); else if (book && !$('#editor-view').hidden) snapshotNow(); }
   if (msg.type === 'emailSettings') emailSettings();
   if (msg.type === 'find') { if (historyShown) historyShown.focusFind(); else openSearch(); }
   if (msg.type === 'spellcheck') toggleSpellcheck();

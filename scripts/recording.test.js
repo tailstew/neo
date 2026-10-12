@@ -623,3 +623,89 @@ test('the chapter order at any step is the last o line before it', () => {
   assert.deepEqual(h.order(5), ['a', 'b']);
   assert.deepEqual(h.order(6), ['b', 'a']);
 });
+
+/* ---------- tags ---------- */
+
+// A session of `device` from `start`: a chapter typed in, with tags put in
+// as the recorder puts them, each flushed as its own chunk
+function tagged(device, id, start, steps) {
+  const w = new R.SessionWriter({ neoRec: 1, session: id, device, book: 'book-x', startedAt: start, prev: null });
+  let html = '<p>Rain.</p>';
+  w.push([0, 'b', 'c1', html, R.digest(html), 'baseline']);
+  const parts = [];
+  const lines = {};
+  for (const s of steps) {
+    if (s.type) {
+      const at = html.length - 4;
+      w.push([s.dt || 100, 'k', 'KeyA', 0]);
+      w.push([0, 'e', at, 0, s.type, 'iT']);
+      html = R.applyEdit(html, at, 0, s.type);
+      continue;
+    }
+    w.push([s.dt || 100, 'tag', s.id, s.label === undefined ? null : s.label, s.at || null, ...(s.made ? [s.made] : [])]);
+    const c = w.chunk();
+    parts.push(c);
+    lines[s.id] = c.first + c.text.split('\n').findIndex((l) => l.includes('"tag"'));
+  }
+  w.push([100, 'w', R.digest(html)]);
+  const c = w.chunk();
+  if (c) parts.push(c);
+  return { id, device, text: parts.map((p) => p.text).join(''), parts, lines, html };
+}
+const statsOf = (sessions) => {
+  const b = new R.DayBuilder();
+  return sessions.map((s) => ({ id: s.id, device: s.device, day: '2026-10-08', stats: b.day('2026-10-08', [s]).entry.sessions[0].stats }));
+};
+
+test('tags go through chunks and come back from the joined session, each on its own line', () => {
+  const s = tagged('d-1', '2026-10-08T09-00-00Z-aaaa', '2026-10-08T09:00:00.000Z', [
+    { type: 'x' }, { id: 't1', label: 'Draft 2' }, { type: 'y' }, { id: 't2', made: { snapshot: '20261008T090001Z-k-1-2-ab12' } }
+  ]);
+  const joined = R.joinParts(s.parts.slice().reverse().map((p) => ({ name: 'c-' + String(p.first).padStart(6, '0') + '.jsonl', text: p.text })));
+  assert.ok(R.verifyChain(joined.text).ok);
+  const tags = R.tagsOf(statsOf([{ ...s, text: joined.text }]));
+  assert.deepEqual(tags.map((x) => [x.id, x.label, x.at[1]]), [['t1', 'Draft 2', s.lines.t1], ['t2', null, s.lines.t2]]);
+  assert.deepEqual(tags[1].made, { snapshot: '20261008T090001Z-k-1-2-ab12' });
+  // a tag's moment: the text as its line found it
+  const h = new R.History([{ ...s, text: joined.text }]);
+  h.build({});
+  assert.equal(h.state(R.momentStep(h, tags[0].at)).c1, '<p>Rain.x</p>');
+  assert.equal(h.state(R.momentStep(h, tags[1].at)).c1, '<p>Rain.xy</p>');
+});
+
+test('a later line renames or removes a tag; tags on two devices go by the time they were made', () => {
+  const a = tagged('d-1', '2026-10-08T09-00-00Z-aaaa', '2026-10-08T09:00:00.000Z', [{ type: 'x' }, { id: 't1', label: 'First' }, { id: 't2', label: 'Gone soon' }]);
+  const iso = '2026-10-08T09:00:00.200Z';
+  // the other computer, a minute later: renames one, removes the other, adds its own
+  const b = tagged('d-2', '2026-10-08T09-01-00Z-bbbb', '2026-10-08T09:01:00.000Z', [
+    { id: 't1', label: 'Renamed', at: [a.id, a.lines.t1, 'd-1', iso] },
+    { id: 't2', label: false, at: [a.id, a.lines.t2, 'd-1', iso] },
+    { id: 't3', label: 'Mine' }
+  ]);
+  const tags = R.tagsOf(statsOf([a, b]));
+  assert.deepEqual(tags.map((x) => [x.id, x.label, x.at[2]]), [['t1', 'Renamed', 'd-1'], ['t3', 'Mine', 'd-2']]);
+  // made in the other order, the earlier line loses
+  const c = tagged('d-2', '2026-10-08T08-59-00Z-cccc', '2026-10-08T08:59:00.000Z', [{ id: 't1', label: 'Older', at: [a.id, a.lines.t1, 'd-1', iso] }]);
+  assert.equal(R.tagsOf(statsOf([a, c])).find((x) => x.id === 't1').label, 'First');
+  // a tag on a session the history doesn't hold is left out
+  assert.deepEqual(R.tagsOf(statsOf([b])).map((x) => x.id), ['t3']);
+});
+
+test('a restore’s tag is the moment before the restore: the text it replaced', () => {
+  const w = new R.SessionWriter({ neoRec: 1, session: 's1', device: 'd-1', book: 'book-x', startedAt: '2026-10-08T09:00:00.000Z', prev: null });
+  const old = '<p>Rain fell.</p><p>Night came.</p>';
+  const now = '<p>Rain fell hard.</p><p>Night.</p>';
+  w.push([0, 'b', 'c1', old, R.digest(old), 'baseline']);
+  for (const sp of R.splices(old, now)) w.push([0, 'e', sp.at, sp.del, sp.ins]);
+  w.push([100, 'tag', 't-r', null, null, { restore: ['s1', 2, 'd-1', '2026-10-08T09:00:00.000Z'] }]);
+  w.push([0, 'x', 'restore', 's1', 2, 'd-1']);
+  for (const sp of R.splices(now, old)) w.push([0, 'e', sp.at, sp.del, sp.ins]);
+  w.push([100, 'w', R.digest(old)]);
+  const s = { id: 's1', device: 'd-1', text: w.chunk().text };
+  const [tg] = R.tagsOf(statsOf([s]));
+  const h = new R.History([s]);
+  h.build({});
+  assert.equal(h.state(R.momentStep(h, tg.at)).c1, now, 'the tag: what the restore replaced');
+  assert.equal(h.state(R.momentStep(h, tg.made.restore)).c1, old, 'its restore: the moment restored to');
+  assert.equal(h.end.c1, old);
+});

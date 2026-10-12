@@ -58,35 +58,53 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged.
 - [ ] **(2 computers)** NEO open on both at once on the same book (iCloud or Syncthing): no words lost, the twin chapter appears, and History shows both.
 
-## Restore (phase 3)
+## Restore (phases 3 and 7)
 
-- [ ] Click **Restore Chapter N to this moment**: a confirmation says what the chapter becomes (words then and now), that what it holds now goes to Darlings and under what name, how to undo, that History keeps both versions, and that the backups aren't touched. Cancel and Esc leave History as it was.
-- [ ] In the player, pause on an earlier moment of a chapter, click **Restore Chapter N to this moment** and confirm. The dialog closes, the chapter reads as it did then, a toast says where the words went, and Darlings' newest entry is the text it replaced, labelled "before restoring to …".
-- [ ] Ctrl+Z (with the caret outside the text) puts the chapter and Darlings back as they were.
+- [ ] In the player, pause on an earlier moment of a chapter and click **Restore This Chapter**. No confirmation: the dialog closes, the chapter reads as it did then, and a toast says "Chapter restored from …", that Ctrl+Z undoes it, and that the text it replaced is in Writing History at "Before restoring to …". Darlings and the snapshot list are unchanged.
+- [ ] Open History again: that day has a **Before restoring to …** tag (in Tags in the side pane, a flag on the timeline and on the day's tile). Picking it shows the chapter exactly as it was before the restore.
+- [ ] Ctrl+Z (with the caret outside the text) puts the chapter back as it was.
+- [ ] Turn **Keep a replay of my writing** off, then restore a chapter from History (it still plays what was recorded). The toast says the replaced text is in a snapshot too; the Darlings tab's list has a new **Before a restore** snapshot holding it; Darlings is unchanged; Ctrl+Z undoes it.
 - [ ] In the days, ← to an earlier day and restore from there (the day as it ended).
-- [ ] In the whole book, click a paragraph of chapter 3 and the button names Chapter 3; with nothing picked it names the caret's chapter.
-- [ ] At the moment that's the chapter as it is now, the button says **As it is now** and does nothing.
-- [ ] Pick a deleted chapter under **Deleted**. The days show it as it was just before it went; **Put this chapter back** brings it back after the chapter it followed, with its old title.
-- [ ] Restore from History opened on the shelf (book menu): the book opens and the chapter is restored.
-- [ ] Click a paragraph on the sheet at an earlier moment: the button says **Restore this paragraph to this moment** (several selected: **these paragraphs**), and × beside its name goes back to restoring the chapter. Restoring it changes only that paragraph; the old one is in Darlings; Ctrl+Z undoes it.
+- [ ] In the whole book, click a paragraph of chapter 3: the restore goes to Chapter 3 (its name is in the button's tooltip); with nothing picked, to the caret's chapter.
+- [ ] At the moment that's the chapter as it is now, the button says **Same as now** and does nothing.
+- [ ] Pick a deleted chapter under **Deleted**. The days show it as it was just before it went; **Put This Chapter Back** brings it back after the chapter it followed, with its old title, at once.
+- [ ] Restore from History opened on the shelf (book menu): it asks once whether to open the book (naming the book open now, if any, which is saved and closed); yes opens it and restores.
+- [ ] Click a paragraph on the sheet at an earlier moment: the button says **Restore This Paragraph** (several selected: **Restore Paragraphs**), and × beside its name goes back to the chapter. Restoring changes only that paragraph, at once; nothing goes to Darlings; the day gets a "Before restoring to …" tag; Ctrl+Z undoes it.
 - [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.
-- [ ] Restore a paragraph that was moved within its chapter: it's found by its words and the confirmation says it moved.
+- [ ] Restore a paragraph that was moved within its chapter: it's found by its words and restored in its new place.
 - [ ] Restore a paragraph that was later deleted: the dialog says when it was taken out, and **Add to Darlings, and copy** puts it in Darlings and on the clipboard (paste it into a chapter to check).
 - [ ] Restore a paragraph that was moved to another chapter (cut and paste, or an Outline card): the dialog names the chapter it seems to be in now.
 - [ ] Restore a paragraph of a chapter that was deleted: the dialog says the chapter was deleted, and Copy works.
 - [ ] Select text on the sheet, Ctrl+C, close History, Ctrl+V in a chapter. It pastes as plain prose (no caret mark, no stray styles), and the timeline marks it as pasted from this book.
 - [ ] A restore made on a script restores the whole script, and its pages and (CONT'D) come back right.
 - [ ] Restore, then open History again: the day shows a Restored marker on the timeline.
-- [ ] **Delete this book's history…**: a confirmation says what goes and what stays, and **Delete history** stays off until you type "delete history" (any case; in another interface language, that language's phrase). Cancel, Esc and a click outside change nothing. Yes: `recording/` and `Backups/recordings/<book folder>/` are in the Recycle Bin, the book's words are all there, and History says nothing is recorded yet. Write a little: History shows it as the first day.
+- [ ] **Delete this book's history…**: a confirmation says what goes and what stays (snapshots on the Darlings tab stay; the history's tags go, with their number), and **Delete history** stays off until you type "delete history" (any case; in another interface language, that language's phrase). Cancel, Esc and a click outside change nothing. Yes: `recording/` and `Backups/recordings/<book folder>/` are in the Recycle Bin, the book's words are all there, the snapshots are still listed, and History says nothing is recorded yet. Write a little: History shows it as the first day.
 - [ ] Restore both folders from the Recycle Bin (with NEO closed): the old history plays again beside the new.
 - [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
 - [ ] **(phone)** Restore works on the phone; the delete button isn't there.
+
+## Tags and snapshots (phase 7)
+
+- [ ] In the player, pause, click **Tag This Moment…** (or Ctrl+S while History is open), type "Draft 2", Enter. A toast says it's tagged; Tags in the side pane lists it (newest first), the timeline has a flag there, and the day's tile has a flag in its corner with the name in its tooltip.
+- [ ] Tag a moment in the days (no player): the tag is on the day's end.
+- [ ] Pick a tag in the side pane: the player opens at that moment, paused, the sheet showing the book as it was then.
+- [ ] Right-click a tag: **Rename…** changes its name everywhere; **Remove Tag** takes it away (the moment is still there). Close and reopen History: both stick.
+- [ ] Search the history for a word in a tag's name: the tag is listed first, as "Tag · …", and picking it goes to it.
+- [ ] Ctrl+S while writing: the snapshot is taken as before (toast, Darlings tab), and History shows it as a tag "Snapshot · Taken by you" at that moment. A snapshot's tag can be named (right-click → **Name…**) and removed; removing it says the snapshot itself is still on the Darlings tab, and it is.
+- [ ] The first change of a writing day takes a "Start of the day" snapshot at the writer's day (`library.dayEndsAt`): with the day ending at 4am, writing at 1am and 3am takes no second one; at 5am it does.
+- [ ] On the Darlings tab, show a snapshot: **Watch from Here** is in its band (only while the book has a history) and opens History in the player at the snapshot's tag. Right-click a snapshot in the list: **Watch from Here** does the same. A snapshot older than the history opens at its first day.
+- [ ] With recording off, or History opened on a book from the shelf without opening it, **Tag This Moment…** is dimmed and its tooltip says why; Ctrl+S in History says the same and tags nothing.
+- [ ] History's footer has **Snapshots** (only for the open book): it closes History and shows the Darlings tab's snapshot list. With no snapshots, the list's hint mentions Writing History.
+- [ ] Duplicate a book from the shelf: the copy has no `recording/` folder, opens with no history, and records its own from then on; the original's history is unchanged.
+- [ ] **(2 computers)** Tag on one computer, rename the tag on the other: once both have synced, History on each shows the newer name.
+- [ ] In German and Russian, Tags, the tag dialog and the restore toasts read right and fit.
+- [ ] **(phone)** A tag made on the desktop shows on the phone, and the phone can tag a moment.
 
 ## Upstream 1.5.0's features, recorded
 
 Each of these changes chapters in code that came in with the rebase onto 1.5.0. After each, the session shows no "A change the recorder didn't see", and History plays it.
 
-- [ ] Restore a Snapshot from the Darlings tab, the whole book and one chapter: History marks it "Snapshot restored", and a chapter the snapshot didn't have leaves the book.
+- [ ] Restore a Snapshot from the Darlings tab, the whole book and one chapter: History marks it "Snapshot restored", a chapter the snapshot didn't have leaves the book, and the "Before a restore" snapshot it takes is a tag on the moment before.
 - [ ] Send a chapter, a written section and a scene to Loose Cards, then drag each back in: "Moved in the Outline".
 - [ ] Paste a list into the Outline's List that makes new chapters.
 - [ ] Delete a scene and a section to Darlings from their cards; delete a scene break with Backspace.

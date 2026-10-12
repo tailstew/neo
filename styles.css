@@ -604,13 +604,23 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
   margin-left: auto; flex: none; background: transparent; border: none; color: #77736b; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
 }
 .hs-delete:hover, .hs-delete:focus-visible { color: #d9776b; }
-/* restore: the moment on the sheet back in the book */
-.hs-restore {
-  position: absolute; top: 12px; right: 22px; z-index: 2; background: #262626; border: 1px solid #3a3a3a; border-radius: 14px;
-  padding: 5px 13px; font-size: 12px; color: #c9c3b8; cursor: pointer; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* tag this moment, and restore it: at the sheet's top right */
+.hs-acts { position: absolute; top: 12px; right: 22px; z-index: 2; display: flex; gap: 8px; max-width: 70%; }
+.hs-restore, .hs-tag {
+  min-width: 0; background: #262626; border: 1px solid #3a3a3a; border-radius: 14px;
+  padding: 5px 13px; font-size: 12px; color: #c9c3b8; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.hs-restore:hover:not(:disabled), .hs-restore:focus-visible { border-color: var(--accent); color: var(--accent); }
-.hs-restore:disabled { opacity: 0.5; cursor: default; }
+.hs-restore:hover:not(:disabled), .hs-restore:focus-visible, .hs-tag:hover:not(.hs-off), .hs-tag:focus-visible { border-color: var(--accent); color: var(--accent); }
+.hs-restore:disabled, .hs-tag.hs-off { opacity: 0.5; cursor: default; }
+/* a day with tags: a flag in its tile's corner */
+.hs-tile { position: relative; }
+.hs-tile.hs-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; width: 0; height: 0; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
+.hs-snaps {
+  flex: none; background: transparent; border: none; color: #a9a294; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
+}
+.hs-snaps:hover, .hs-snaps:focus-visible { color: var(--accent); }
+.hs-snaps:not([hidden]) + .hs-delete { margin-left: 0; }
+.hs-foot .hs-snaps { margin-left: auto; }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
   .hs-side { display: none; }
@@ -1802,7 +1812,8 @@ body.light .hs-find-stop { border-color: #cfcac0; }
 body.light .hs-controls button { border-color: #cfcac0; }
 body.light .hs-head { background: #1c1a17; box-shadow: 0 0 0 1px rgba(255,255,255,0.5); }
 body.night .hs-head { background: #f4f1ea; }
-body.light .hs-restore { background: #fbfaf8; border-color: #dcd7ce; color: #3f3b35; }
+body.light .hs-restore, body.light .hs-tag { background: #fbfaf8; border-color: #dcd7ce; color: #3f3b35; }
+body.light .hs-snaps { color: #6a665e; }
 body.light .hs-delete { color: #8a857a; }
 body.light .hs-badge, body.light .hs-tip { background: #fbfaf8; border-color: #dcd7ce; color: #2b2926; }
 

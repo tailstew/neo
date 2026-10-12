@@ -1191,6 +1191,20 @@ async function answer(yes) {
   await tick(200);
 }
 
+// The text of chapter chId at the moment a tag's own line is on: every
+// session on disk played from the start, as History plays them
+async function atTag(tagId, chId) {
+  const sid = await sessionId();
+  const device = path.basename(recDirOf());
+  const open = readOpen(sid).text;
+  const idx = R.splitLines(open).lines.findIndex((l) => l.includes('"tag"') && l.includes(JSON.stringify(tagId)));
+  assert.ok(idx > 0, 'the tag is on disk');
+  const h = new R.History([...closedSessions().map((id) => ({ id, device, text: readClosed(id) })), { id: sid, device, text: open }]);
+  h.build({});
+  return h.state(R.momentStep(h, [sid, idx + 1, device]))[chId];
+}
+const snapCount = () => js('window.neo.snapshotList(book.id).then((l) => l.length)');
+
 // The player on chapter chId, paused at a moment where it isn't as it is now
 async function playerAtOlder(chId) {
   await js('openHistory()');
@@ -1206,49 +1220,90 @@ async function playerAtOlder(chId) {
   throw new Error('no moment where the chapter was otherwise');
 }
 
-test('a chapter restored to a moment: what it held goes to Darlings, the recording says which moment, and ⌘Z takes it back', async () => {
+test('a chapter restored to a moment at once: the moment before it tagged and on disk first, no snapshot or Darlings, and ⌘Z takes it back', async () => {
   const chId = (await chapterIds())[0];
   const { now, then } = await playerAtOlder(chId);
   await waitFor('!document.querySelector(".hs-restore").hidden && !document.querySelector(".hs-restore").disabled');
-  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore Chapter 1 to this moment');
+  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore This Chapter');
   const darlingsBefore = await js('darlings.length');
-  // it says what will happen first, and Cancel changes nothing
+  const snapsBefore = await snapCount();
   await js('document.querySelector(".hs-restore").click()');
-  const asked = await confirmShown();
-  assert.match(asked.title, /^Restore Chapter 1 to .+\?$/);
-  assert.equal(asked.ok, 'Restore');
-  assert.ok(asked.points.some((x) => /goes to Darlings, as “Chapter 1, before restoring to /.test(x)), 'where its words go');
-  assert.ok(asked.points.some((x) => /undoes it at once/.test(x)), 'how to undo it');
-  assert.ok(asked.points.some((x) => /Writing History keeps both versions/.test(x)), 'what the history keeps');
-  assert.ok(asked.points.some((x) => /daily backups/.test(x)), 'what the backups keep');
-  await answer(false);
-  assert.equal(await js('!!historyShown && !document.querySelector(".confirm-modal")'), true, 'History still open');
-  assert.equal(await html(0), now);
-  await js('document.querySelector(".hs-restore").click()');
-  await confirmShown();
-  await answer(true);
+  assert.equal(await js('!!document.querySelector(".confirm-modal")'), false, 'no confirmation');
   await waitFor(`!historyShown && chapterHTML[${JSON.stringify(chId)}] === ${JSON.stringify(then)}`);
   await tick(300);
-  // the page shows it, and what it held is the newest darling
+  // the page shows it; Darlings and the snapshots are as they were
   assert.equal(await js(`captureBody(document.querySelector('.chapter[data-id="${chId}"] .chapter-body'))`), then);
-  assert.equal(await js('darlings.length'), darlingsBefore + 1);
-  assert.equal(await js('darlings[0].html'), now);
-  assert.match(await js('darlings[0].chapterLabel'), /^Chapter 1, before restoring to /);
-  // the recording: x restore with the moment, then the splices
+  assert.equal(await js('darlings.length'), darlingsBefore);
+  assert.equal(await snapCount(), snapsBefore, 'no snapshot while recording');
+  assert.match(await js('document.getElementById("hint").textContent'), /Chapter restored from .+ undoes it; the text it replaced is in Writing History, at “Before restoring to /);
+  // the recording: the tag, then x restore with the moment, then the splices
   const lines = await sessionLines();
-  const x = lines.filter((l) => l[1] === 'x').pop();
+  const xi = lines.map((l) => l[1]).lastIndexOf('x');
+  const x = lines[xi];
   assert.equal(x[2], 'restore');
   const [sid, line, device] = x.slice(3);
   assert.ok(Number.isInteger(line) && line >= 1, 'a line number');
   assert.equal(device, await js('rec.device'));
   assert.ok(closedSessions().includes(sid) || sid === await sessionId(), 'a session of this book');
+  // (between them nothing that changes text: the chunk's seal, the chapter's first sight this session)
+  const ti = lines.map((l) => l[1]).lastIndexOf('tag', xi);
+  assert.ok(ti > 0 && lines.slice(ti + 1, xi).every((l) => !['e', 'r', 'rd', 'x', 'd'].includes(l[1])), 'a tag just before: ' + JSON.stringify(lines.slice(Math.max(0, xi - 6), xi + 1).map((l) => l.slice(1, 3))));
+  const tg = lines[ti];
+  assert.equal(tg[3], null, 'NEO’s own');
+  assert.deepEqual(tg[5].restore.slice(0, 3), x.slice(3), 'naming the moment restored to');
+  // its chunk went to disk before the restore's lines were made: on its own
+  const folder = path.join(recDirOf(), await sessionId());
+  const chunk = fs.readdirSync(folder).filter((n) => /^c-.*\.jsonl$/.test(n)).map((n) => readPart(path.join(folder, n))).find((c) => c.includes(JSON.stringify(tg[2])));
+  assert.ok(chunk, 'the tag’s chunk');
+  assert.ok(!chunk.includes('"x","restore"'), 'the tag on disk before the restore');
   await flush();
   replayAll([readOpen(await sessionId()).text]);
-  // ⌘Z: the chapter as it was, and Darlings as they were
+  // the tag's moment is the text the restore replaced
+  assert.equal(await atTag(tg[2], chId), now);
+  // ⌘Z: the chapter as it was
   await js('structuralUndo()');
   await tick(300);
   assert.equal(await html(0), now);
   assert.equal(await js('darlings.length'), darlingsBefore);
+});
+
+test('with recording off, a History restore keeps the chapter in a “Before a restore” snapshot first, and changes nothing when it can’t', async () => {
+  const chId = (await chapterIds())[0];
+  const { now, then } = await playerAtOlder(chId);
+  key('Escape');
+  await tick(200);
+  key('Escape');
+  await tick(300);
+  await js('setRecordWriting(false)');
+  await tick(300);
+  try {
+    const darlingsBefore = await js('darlings.length');
+    // a snapshot that can't be written: nothing changes
+    const { ipcMain } = require('electron');
+    const handlers = ipcMain._invokeHandlers;
+    const write = handlers.get('snapshot:write');
+    handlers.set('snapshot:write', () => { throw new Error('disk full'); });
+    try {
+      await js(`historyRestore({ bookId: book.id, ch: ${JSON.stringify(chId)}, html: ${JSON.stringify(then)}, wall: Date.now() - 3600000, ref: ['s', 1, 'd'] })`);
+    } finally { handlers.set('snapshot:write', write); }
+    assert.equal(await html(0), now, 'unchanged');
+    const before = await js('window.neo.snapshotList(book.id).then((l) => l.map((s) => s.name))');
+    await js(`historyRestore({ bookId: book.id, ch: ${JSON.stringify(chId)}, html: ${JSON.stringify(then)}, wall: Date.now() - 3600000, ref: ['s', 1, 'd'] })`);
+    await tick(300);
+    assert.equal(await html(0), then);
+    const made = (await js('window.neo.snapshotList(book.id)')).filter((s) => !before.includes(s.name));
+    assert.equal(made.length, 1, 'one snapshot');
+    assert.match(made[0].name, /Z-r-/, 'a “Before a restore” one');
+    const holds = await js(`window.neo.snapshotRead(book.id, ${JSON.stringify(made[0].name)}, ${JSON.stringify(chId + '.html')})`);
+    assert.equal(holds, now, 'holding the chapter as it was');
+    assert.equal(await js('darlings.length'), darlingsBefore, 'nothing to Darlings');
+    await js('structuralUndo()');
+    await tick(300);
+    assert.equal(await html(0), now);
+  } finally {
+    await js('setRecordWriting(true)');
+    await tick(500);
+  }
 });
 
 test('a deleted chapter put back, after the chapter it followed, and ⌘Z taking it away again', async () => {
@@ -1266,12 +1321,8 @@ test('a deleted chapter put back, after the chapter it followed, and ⌘Z taking
   const then = await js(`historyShown.player.chapters()[${JSON.stringify(gone)}]`);
   assert.match(then, /Brief\./);
   await waitFor('!document.querySelector(".hs-restore").hidden');
-  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Put this chapter back');
+  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Put This Chapter Back');
   await js('document.querySelector(".hs-restore").click()');
-  const asked = await confirmShown();
-  assert.match(asked.title, /^Put this chapter back as it was on .+\?$/);
-  assert.match(asked.points[0], /^It comes back as a new chapter after Chapter 1, reading exactly as it does here \(1 word\)\.$/);
-  await answer(true);
   await waitFor(`!historyShown && book.chapterOrder.length === ${before.length + 1}`);
   await tick(300);
   const after = await chapterIds();
@@ -1317,7 +1368,7 @@ test('text copied from a moment, pasted in the book, is recorded as from this bo
   assert.equal(c[7][2], await js('rec.device'));
 });
 
-test('a paragraph restored to a moment: only it changes, what it held goes to Darlings, and ⌘Z takes it back', async () => {
+test('a paragraph restored to a moment: only it changes, the moment before it is tagged, and ⌘Z takes it back', async () => {
   const chId = (await chapterIds())[0];
   const { now } = await playerAtOlder(chId);
   // a paragraph as it was then whose words the chapter doesn't have now
@@ -1331,29 +1382,27 @@ test('a paragraph restored to a moment: only it changes, what it held goes to Da
   })()`);
   assert.ok(then, 'a paragraph that has changed since');
   await waitFor('!document.querySelector(".hs-restore").hidden');
-  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore this paragraph to this moment');
-  await js('document.querySelector(".hs-restore").click()');
-  const asked = await confirmShown();
-  assert.match(asked.title, /^Restore this paragraph to .+\?$/);
-  assert.ok(asked.points.some((x) => /before restoring paragraphs to /.test(x)), 'where its words go');
-  assert.ok(asked.points.some((x) => /^Nothing else in Chapter 1 changes\.$/.test(x)));
+  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore This Paragraph');
   const darlingsBefore = await js('darlings.length');
-  await answer(true);
+  await js('document.querySelector(".hs-restore").click()');
   await waitFor(`!historyShown && chapterHTML[${JSON.stringify(chId)}] !== ${JSON.stringify(now)}`);
   await tick(300);
   const after = await html(0);
   const texts = (x) => [...x.matchAll(/<p[^>]*>(.*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
   assert.ok(texts(after).includes(then), 'the paragraph as it was');
-  assert.equal(await js('darlings.length'), darlingsBefore + 1);
-  assert.match(await js('darlings[0].chapterLabel'), /^Chapter 1, before restoring paragraphs to /);
-  // every other paragraph is as it was
-  const replaced = new Set(texts(await js('darlings[0].html')));
-  for (const p of texts(now)) if (!replaced.has(p)) assert.ok(texts(after).includes(p), 'kept: ' + p);
-  const x = (await sessionLines()).filter((l) => l[1] === 'x').pop();
-  assert.equal(x[2], 'restore');
-  assert.equal(x.length, 6, 'with the moment');
+  assert.equal(await js('darlings.length'), darlingsBefore, 'nothing to Darlings');
+  // one paragraph changed, every other as it was
+  const changed = texts(now).filter((p) => !texts(after).includes(p));
+  assert.equal(changed.length, 1, 'kept: ' + JSON.stringify(texts(now)));
+  const lines = await sessionLines();
+  const xi = lines.map((l) => l[1]).lastIndexOf('x');
+  assert.equal(lines[xi][2], 'restore');
+  assert.equal(lines[xi].length, 6, 'with the moment');
+  const ti = lines.map((l) => l[1]).lastIndexOf('tag', xi);
+  assert.ok(ti > 0 && lines.slice(ti + 1, xi).every((l) => !['e', 'r', 'rd', 'x', 'd'].includes(l[1])), 'the moment before it tagged');
   await flush();
   replayAll([readOpen(await sessionId()).text]);
+  assert.equal(await atTag(lines[ti][2], chId), now);
   await js('structuralUndo()');
   await tick(300);
   assert.equal(await html(0), now);
@@ -1378,7 +1427,7 @@ test('a paragraph whose chapter was deleted: History says so, and puts it in Dar
   })()`);
   await waitFor(`!!historyShown.player.paper.querySelector('.rp-chapter[data-ch="${gone}"] .rp-body p')`);
   await js(`historyShown.player.pickPart(${JSON.stringify(gone)}, historyShown.player.paper.querySelector('.rp-chapter[data-ch="${gone}"] .rp-body p'))`);
-  await waitFor('document.querySelector(".hs-restore").textContent === "Restore this paragraph to this moment"');
+  await waitFor('document.querySelector(".hs-restore").textContent === "Restore This Paragraph"');
   // the clipboard, as the page writes it
   await js(`(() => {
     window.__clip = null;
@@ -1404,6 +1453,67 @@ test('a paragraph whose chapter was deleted: History says so, and puts it in Dar
   await tick(300);
   // (the book's own Darlings, as they were)
   await js(`darlings.shift(); window.neo.writeJSON(book.id, 'darlings', darlings)`);
+});
+
+/* ---------- tags and snapshots ---------- */
+
+test('⌘S takes a snapshot, and tags it in the recording, on disk at once', async () => {
+  if (await js('!!historyShown')) await js('historyShown(); 0'); // (left open by the test before)
+  await caretAt(0, 0, -1);
+  await type(' Snap.');
+  await tick(900);
+  const before = await js('window.neo.snapshotList(book.id).then((l) => l.map((s) => s.name))');
+  key('s', [CTRL]);
+  await waitFor(`window.neo.snapshotList(book.id).then((l) => l.length > ${before.length})`);
+  await tick(300);
+  const name = (await js('window.neo.snapshotList(book.id)')).map((s) => s.name).find((n) => !before.includes(n));
+  assert.match(name, /Z-k-/, 'a snapshot of the writer’s');
+  const tg = (await sessionLines()).filter((l) => l[1] === 'tag').pop();
+  assert.deepEqual([tg[3], tg[4], tg[5]], [null, null, { snapshot: name }]);
+  assert.ok(readOpen(await sessionId()).text.includes(JSON.stringify(tg[2])), 'already on disk');
+  // History shows it among its tags, named as the snapshot list names it
+  await js('openHistory()');
+  await daysReady();
+  await waitFor('[...document.querySelectorAll(".hs-tag-item .hs-ch-name")].some((x) => x.textContent === "Snapshot · Taken by you")');
+  key('Escape');
+  await tick(300);
+});
+
+test('Tag This Moment… names the moment on the sheet, and the tag takes you back to it', async () => {
+  const chId = (await chapterIds())[0];
+  await playerAtOlder(chId);
+  await waitFor('!document.querySelector(".hs-tag").hidden');
+  const ref = await js(`(() => { const p = historyShown.player; const h = p.h(); const s = h.steps[p.steps()[p.pos() - 1]]; const x = h.sessions[s.session]; return [x.id, s.line, x.device]; })()`);
+  key('s', [CTRL]);
+  // (the newest dialog: the first-run one is there too, hidden)
+  await waitFor('document.body.lastElementChild.classList.contains("modal-backdrop") && !!document.body.lastElementChild.querySelector("input")');
+  await js('(() => { const i = document.body.lastElementChild.querySelector("input"); i.value = "Sent to my agent"; i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); })()');
+  await waitFor('[...document.querySelectorAll(".hs-tag-item .hs-ch-name")].some((x) => x.textContent === "Sent to my agent")');
+  const tg = (await sessionLines()).filter((l) => l[1] === 'tag').pop();
+  assert.equal(tg[3], 'Sent to my agent');
+  assert.deepEqual(tg[4].slice(0, 3), ref, 'the moment shown, not now');
+  const then = await js(`historyShown.player.chapters()[${JSON.stringify(chId)}]`); // (the sheet as tagged)
+  // picked: the player at that moment
+  await js('historyShown.player.seek(0)');
+  await js('[...document.querySelectorAll(".hs-tag-item")].find((x) => x.textContent.includes("Sent to my agent")).click()');
+  await waitFor(`historyShown.player.chapters()[${JSON.stringify(chId)}] === ${JSON.stringify(then)}`);
+  // and search finds it by its name
+  await js('historyShown.player.runFind("agent")');
+  await waitFor('[...document.querySelectorAll(".hs-results .hs-ch-name")].some((x) => x.textContent === "Tag · Sent to my agent")');
+  key('Escape');
+  await tick(200);
+  key('Escape');
+  await tick(300);
+});
+
+test('a duplicated book leaves the original’s Writing History behind', async () => {
+  await flush();
+  const copy = await js(`window.neo.duplicateBook(book.id, 'Harbor copy')`);
+  const dir = path.join(LIB, copy.id);
+  assert.ok(fs.existsSync(path.join(dir, 'chapters')), 'the chapters copied');
+  assert.ok(fs.existsSync(path.join(LIB, BOOK, 'recording')), 'the original keeps its history');
+  assert.ok(!fs.existsSync(path.join(dir, 'recording')), 'the copy has none');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 /* ---------- imported books ---------- */

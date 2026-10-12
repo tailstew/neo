@@ -577,8 +577,9 @@ ipcMain.handle('book:create', (_e, meta) => {
 
 // A copy of a book, for a backup or a version to play with: every file in
 // its folder (chapters, notes, darlings, covers) written whole into a new
-// folder, then its book.json under the new id and title. A half-made copy
-// is removed; the original is only ever read.
+// folder, then its book.json under the new id and title. Not its Writing
+// History: recording/ stays with the original, and the copy starts its own
+// from a baseline. A half-made copy is removed; the original is only read.
 ipcMain.handle('book:duplicate', (_e, bookId, title) => {
   ensureLibrary();
   const src = bookDir(bookId);
@@ -595,8 +596,9 @@ ipcMain.handle('book:duplicate', (_e, bookId, title) => {
   const copyDir = (from, to) => {
     fs.mkdirSync(to, { recursive: true });
     for (const ent of fs.readdirSync(from, { withFileTypes: true })) {
-      // (a write caught halfway, a spare copy, a placeholder: not the book)
-      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json') continue;
+      // (a write caught halfway, a spare copy, a placeholder: not the book;
+      // nor the original's Writing History, which stays with it)
+      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json' || (from === src && ent.name === 'recording')) continue;
       const a = path.join(from, ent.name);
       const b = path.join(to, ent.name);
       if (ent.isDirectory()) copyDir(a, b);

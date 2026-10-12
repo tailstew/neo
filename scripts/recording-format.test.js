@@ -33,6 +33,8 @@ function fixture(v) {
     .map((f) => ({ id: f.replace(/\.jsonl$/, ''), device: 'd-0123456789abcdef', text: fs.readFileSync(path.join(dir, f), 'utf8') }));
 }
 const v1 = fixture(1);
+// the first two, frozen before tags: what these tests measured from the start
+const v1First = v1.slice(0, 2);
 
 const NEW_FORMAT = 'what a format-1 line means has changed. If that is on purpose, it is a new format: ' +
   'raise FORMAT in recording.js, keep 1 in READS with a branch that still reads it this way, ' +
@@ -54,7 +56,7 @@ test('the fixture files reached the disk byte for byte (no CRLF from git)', () =
     const chain = R.verifyChain(s.text);
     assert.ok(chain.ok, `${s.id}: ${JSON.stringify(chain.breaks)}`);
   }
-  assert.equal(R.parseSession(v1[1].text).header.prev, R.verifyChain(v1[0].text).last, 'the sessions chain together');
+  for (let i = 1; i < v1.length; i++) assert.equal(R.parseSession(v1[i].text).header.prev, R.verifyChain(v1[i - 1].text).last, 'the sessions chain together');
 });
 
 test('the format-1 fixture uses every kind of line recording.js describes', () => {
@@ -79,7 +81,7 @@ test('format 1 still parses, replays and hashes as it did', () => {
     assert.ok(p.known, `${s.id} is no longer read: ${NEW_FORMAT}`);
     assert.equal(p.format, 1);
   }
-  const r = R.replayCheck(v1.map((s) => s.text));
+  const r = R.replayCheck(v1First.map((s) => s.text));
   assert.ok(r.ok, NEW_FORMAT + '\n' + JSON.stringify({ problems: r.problems, bad: r.bad }));
   assert.equal(r.writes, 4);
   assert.deepEqual(r.chapters, {
@@ -89,7 +91,7 @@ test('format 1 still parses, replays and hashes as it did', () => {
 
 test('format 1’s runs still expand to the same keys, edits and carets', () => {
   // one k and one e or s per key, as the recorder saw them before encoding
-  const got = v1.map((s) => R.expandRuns(R.parseSession(s.text).lines));
+  const got = v1First.map((s) => R.expandRuns(R.parseSession(s.text).lines));
   const keys = got.flat().filter((l) => l[1] === 'k').map((l) => l[2] + (l[3] ? '+' + l[3] : '')).join(' ');
   assert.equal(keys,
     'Space KeyD KeyO KeyW KeyN Space Quote+1 KeyH KeyA KeyR KeyD Quote+1 Space KeyQ Backspace Backspace ' +
@@ -137,7 +139,7 @@ function caretSplit(html, pIdx, off) {
 }
 
 test('a format-1 caret still lands on the letters it was recorded at', () => {
-  const h = new R.History(v1);
+  const h = new R.History(v1First);
   h.build({}, { every: 5 });
   const seen = [];
   h.steps.forEach((s, i) => {
@@ -171,13 +173,14 @@ function days(sessions) {
 }
 
 // What PLAYER's number vouches for: the steps and keyframes a History makes
-// of the format-1 fixture, and the days the cache keeps of it. Add a line
-// when PLAYER moves on; never edit one.
+// of the format-1 fixture, and the days the cache keeps of it (from 5 on,
+// the session with tags too). Add a line when PLAYER moves on; never edit one.
 const PLAYER_FINGERPRINTS = {
   1: 'hg23E-vVGuQIZXgIsGSFbw',
   2: 'xbHUWHB2DFtMfqIHCwPosw',
   3: 'vacLbqay6MQQMDO7U1BK4w',
-  4: 'critEwgcdtDFZt0cc4keLw'
+  4: 'critEwgcdtDFZt0cc4keLw',
+  5: '8HbjOIYIxuPvJhIfPZzmDw'
 };
 
 test('the player makes the same steps, keyframes and days, or PLAYER moved on', () => {
@@ -199,6 +202,30 @@ test('a cached day’s key names the PLAYER that made it, and every session up t
     ancestry = R.sha256(ancestry + ':' + (s.device || '') + '/' + s.id + ':' + R.verifyChain(s.text).last);
     assert.equal(built[i].entry.key, ancestry, 'a day’s key must change with PLAYER, or days from an older player are used');
   });
+});
+
+/* ---------- tags ---------- */
+
+test('format-1 tags still name the moments they named', () => {
+  const built = days(v1);
+  const sessions = v1.map((s, i) => ({ id: s.id, device: s.device, day: built[i].entry.day, stats: built[i].entry.sessions[0].stats }));
+  const tags = R.tagsOf(sessions);
+  // renamed by a later line, one removed, NEO's own unnamed: oldest moment first
+  assert.deepEqual(tags.map((x) => [x.id, x.label, x.at[0].slice(0, 10), x.at[1]]), [
+    ['t-cut', 'Before the big cut', '2026-10-06', 6],
+    ['t-draft', 'Second draft', '2026-10-08', 4],
+    ['t-snap', null, '2026-10-08', 7],
+    ['t-rest', null, '2026-10-08', 14]
+  ], NEW_FORMAT);
+  assert.deepEqual(tags[2].made, { snapshot: '20261008T083002Z-k-1-11-ab12' });
+  const h = new R.History(v1);
+  h.build({});
+  const at = (x) => h.state(R.momentStep(h, x.at))['ch-a'];
+  // a tag on an earlier moment is that moment; a restore's is the text it replaced
+  assert.equal(at(tags[0]), '<p>The rain came</p><p class="scene-break">***</p><p>She left the door open.</p>', NEW_FORMAT);
+  assert.equal(at(tags[3]), '<p>The rain came down “hard” indeed Again.</p><p class="scene-break">***</p><p>She left the gate open. </p>', NEW_FORMAT);
+  assert.deepEqual(tags[3].made.restore.slice(0, 3), tags[0].at, 'a restore’s tag names the moment restored to');
+  assert.equal(h.end['ch-a'], at(tags[0]), 'and the restore made the chapter that moment’s');
 });
 
 /* ---------- the player draws old HTML with today's CSS ---------- */

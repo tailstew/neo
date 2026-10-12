@@ -27,11 +27,19 @@
 //                                            chapter it put back)
 //   w   hash[, chapter]                      the chapter as it went to disk (chapter: when not the current one)
 //   d   chapter, cause                       the chapter left the book
+//   tag id, label, at[, made]                a name on a moment of the history (tagsOf): label
+//                                            null for one NEO made (named when shown), false to
+//                                            remove it; at null for this moment, or [session, line,
+//                                            device, iso] for an earlier one; made: { snapshot:
+//                                            folder } or { restore: the moment restored to, as at }
 //   o   [chapter…]                           the book's chapter order
 //   f   what                                 focus, blur, hidden, visible, idle, tab:…
 //   T   iso                                  wall-clock checkpoint
 //   h   n, hash                              hash chain: ends every chunk
 //   end {counts}
+//
+// A later `tag` line with the same id takes the earlier one's place, so a
+// tag is renamed or removed by a line, never by rewriting a file.
 //
 // K, ch, o and h carry dt 0: they describe, they don't happen. An `e` line
 // with an input code came from the engine (typing, paste, dictation); a
@@ -80,7 +88,7 @@
   // History, playSession, DayBuilder). A change to what they come out as
   // takes the next number, so days cached by an earlier NEO are built again
   // instead of used.
-  const PLAYER = 4;
+  const PLAYER = 5;
 
   // What an `s` line's pIdx counts: the chapter body's elements that match
   // this, in document order (recPoint and historyPoint in app.js). Counting
@@ -1281,6 +1289,8 @@
         if (page) page.after(device, line[2], how);
       } else if (kind === 'o') {
         if (on.order) on.order(line[2]);
+      } else if (kind === 'tag') {
+        if (on.tag) on.tag(line, t, i);
       } else if (kind === 'T') {
         if (on.wall) on.wall(Date.parse(line[2]), t);
       } else if (kind === 'w') {
@@ -1510,6 +1520,10 @@
         gone[ch] = { why, words: (text.match(WORD) || []).length, lead: lead.length > 40 ? lead.slice(0, 38).trimEnd() + '…' : lead };
       },
       order(list) { out.order = list.slice(); },
+      // (only a session with tags has the field, so the stats of one without are as they were)
+      tag(line, t, i) {
+        (out.tags || (out.tags = [])).push({ id: line[2], label: line[3], at: line[4] || null, made: line[5] || null, wall: wallAt === null ? null : wallAt + t - wallT, line: i + 2 });
+      },
       key(t) { out.keys++; active(t); },
       wall(ms, t) { if (Number.isFinite(ms)) { wallAt = ms; wallT = t; } }
     };
@@ -1564,6 +1578,50 @@
     out.chapters = [...touched];
     out.streams = [...streams];
     return out;
+  }
+
+  // The tags of a history, from its sessions' stats ({ id, device, day,
+  // stats }, every device's): the last line for each id is the tag, and
+  // one whose last line has label false was removed. A tag's moment (at) is
+  // [session, line, device]: its own line, or the earlier moment it names.
+  // Tags whose moment is in a session the history doesn't hold are left
+  // out. Oldest moment first: { id, label (null: NEO's own), made, at,
+  // when (the moment's time), day, session (index into sessions), madeAt }
+  function tagsOf(sessions) {
+    const where = new Map(sessions.map((s, i) => [(s.device || '') + '/' + s.id, i]));
+    const lines = [];
+    sessions.forEach((s, si) => { for (const x of (s.stats && s.stats.tags) || []) lines.push({ ...x, si }); });
+    const wall = (x) => (Number.isFinite(x.wall) ? x.wall : 0);
+    lines.sort((a, b) => wall(a) - wall(b) || a.si - b.si || a.line - b.line);
+    const last = new Map();
+    for (const x of lines) last.set(x.id, x);
+    const out = [];
+    for (const x of last.values()) {
+      if (x.label === false || typeof x.id !== 'string') continue;
+      const s = sessions[x.si];
+      const past = Array.isArray(x.at);
+      const at = past ? x.at.slice(0, 3) : [s.id, x.line, s.device || ''];
+      const k = where.get((at[2] || '') + '/' + at[0]);
+      if (k === undefined || !Number.isInteger(at[1])) continue;
+      const when = past ? Date.parse(x.at[3]) : x.wall;
+      out.push({
+        id: x.id, label: typeof x.label === 'string' ? x.label : null, made: x.made || null, at,
+        when: Number.isFinite(when) ? when : null, day: sessions[k].day, session: k, madeAt: Number.isFinite(x.wall) ? x.wall : null
+      });
+    }
+    return out.sort((a, b) => (a.when || 0) - (b.when || 0) || a.session - b.session || a.at[1] - b.at[1]);
+  }
+
+  // Where a moment [session, line, device] is in a History: the steps played
+  // once every line of that session up to `line` has (line 1: the session's
+  // start), or -1 when the History doesn't hold the session
+  function momentStep(h, ref) {
+    const k = h.sessions.findIndex((x) => x && x.id === ref[0] && (x.device || '') === (ref[2] || ''));
+    if (k < 0) return -1;
+    const x = h.sessions[k];
+    let n = x.from + 1;
+    for (let i = x.from; i < x.to; i++) if (h.steps[i].session === k && h.steps[i].line <= ref[1]) n = i + 1;
+    return Math.min(n, h.steps.length);
   }
 
   // Where skipping to an earlier (dir -1) or later (dir 1) session lands,
@@ -2746,7 +2804,7 @@
     parseSession, splitLines, joinParts, verifyChain,
     replay, replayCheck, ANCHOR_CHARS, ANCHOR_TIMES, anchorDue, baseLines,
     QUIET, Page, sessionOrder,
-    sessionDay, binsFor, playSession, dayStats, sessionSkip, DayBuilder, dayState, pageState,
+    sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
     textOffset, compileSession, History,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs

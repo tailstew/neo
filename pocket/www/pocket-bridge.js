@@ -279,8 +279,9 @@
     // a copy of a book: every file in its folder (chapters, notes, covers)
     // read and written into a new folder, then book.json under the new id
     // and title. Spare copies (.bak, .tmp) stay behind; a chapter iCloud
-    // hasn't brought down stops the copy rather than leave it out. A
-    // half-made copy is removed; the original is only read.
+    // hasn't brought down stops the copy rather than leave it out. Its
+    // Writing History (recording/) stays with the original. A half-made
+    // copy is removed; the original is only read.
     duplicateBook: async (bookId, title) => {
       await ready;
       await fetchCloud(bookId, 8000);
@@ -294,7 +295,7 @@
           const name = (f && f.name) || f;
           const sub = rel ? rel + '/' + name : name;
           if (/\.icloud$/.test(name)) throw new Error(t('Some of this book is still downloading from iCloud. Try again in a moment'));
-          if (f && f.type === 'directory') await walk(sub);
+          if (f && f.type === 'directory') { if (sub !== 'recording') await walk(sub); }
           else if (!/\.(tmp|bak)$/.test(name) && sub !== 'book.json') files.push(sub);
         }
       };
