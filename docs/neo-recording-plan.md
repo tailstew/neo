@@ -533,10 +533,31 @@ A main-process module with no Electron imports. It takes the recording folder, a
 Every seal is stamped by **two RFC 3161 timestamp authorities**, and optionally by OpenTimestamps too.
 
 **RFC 3161 (the default).** The standard behind timestamped PDF signatures, signed software and e-contracts, familiar to lawyers and publishers. NEO POSTs a `TimeStampReq` (`application/timestamp-query`: version 1, SHA-256 of the seal, a random nonce, `certReq: true`, about 60 bytes of DER) and stores the `TimeStampResp` as `seals/NNNNNN.<tsa>.tsr`.
-- **Which authorities**: two of DigiCert (`http://timestamp.digicert.com`), Sectigo (`https://timestamp.sectigo.com`), GlobalSign and FreeTSA (`https://freetsa.org/tsr`), with a third tried if one fails. **Before shipping, check each one's terms for this use** (several are meant for code signing) and their rate limits. Hourly seals from one writer are a handful of requests a day.
+- **Which authorities**: DigiCert (`http://timestamp.digicert.com`) and Sectigo (`https://timestamp.sectigo.com`), with GlobalSign (`http://timestamp.globalsign.com/tsa/r6advanced1`) tried if one fails (`TSAS` in `proof.js`). FreeTSA (`https://freetsa.org/tsr`) was considered and isn't used. Their terms and reliability are under **The authorities' terms and reliability**, below. Hourly seals from one writer are a handful of requests a day.
 - **Checking in NEO**: a small DER reader (about 200–300 lines, in-house, no dependency) that checks the status, the hash, the nonce, `genTime`, and the CMS signature over the signed attributes with the TSA certificate's key (`crypto.verify`), chained to a bundled list of the chosen authorities' roots. Anyone can check without NEO: `openssl ts -verify -data <seal> -in <tsr> -CAfile <root>`.
 - **Why two**: backdating would need two unrelated companies to collude. One is a company to trust; two is a much harder story to argue with.
 - **Keeping it valid for decades**: TSA certificates expire, often after ten years or more. Once a year NEO re-timestamps the newest seal's tokens (stamping a hash of the old tokens), so every older token is covered by a newer, still-valid one (the "archive timestamp" idea from RFC 4998).
+
+### The authorities' terms and reliability
+
+Gathered 2026-10-13. What each service promises depends on whether it is commercial, public or non-profit. None of the three below promises uptime to an anonymous caller, which is why NEO asks two and keeps a third in reserve, and asks again every half hour for a stamp that failed.
+
+**DigiCert** (used by default)
+- Endpoint: `http://timestamp.digicert.com`
+- Terms and policy: the [DigiCert Legal Repository and CPS](https://www.digicert.com/legal-repository/); [DigiCert API rate limits](https://dev.digicert.com/certcentral-apis/services-api/rate-limits.html).
+- Reliability and use: enterprise-grade, geo-redundant clusters built for code signing and PKI. The rate-limit page allows up to 1,000 requests per 3 minutes; that page is for the CertCentral account API, so it is a guide to scale rather than a stated limit for the timestamp endpoint. An hourly request is negligible either way. The public, unauthenticated endpoint is offered as is, on a best-effort basis, for client software; a guarantee backed by an SLA needs an enterprise account.
+
+**Sectigo** (used by default)
+- Endpoint: `http://timestamp.sectigo.com` (NEO uses `https://`)
+- Terms and policy: the [Sectigo Legal Repository and CPS](https://www.sectigo.com/legal); [Sectigo Terms of Use](https://www.sectigo.com/uploads/legal/ET-Terms-of-Use-v1.0.pdf).
+- Reliability and use: like DigiCert's, the public URL is meant to support client applications (Microsoft Office, PDF signers, code signing tools). Sections 2 and 8 of the terms say unauthenticated public tools carry no contractual uptime guarantee unless tied to a paid subscriber agreement. In practice its availability tracks the uptime CAs are held to (99.9% and above). NEO waits 15 s between requests to it (`gap` in `TSAS`).
+
+**FreeTSA** (not used)
+- Endpoint: `https://freetsa.org/tsr` over HTTP(S), or TCP port 318.
+- Terms and policy: [FreeTSA home and documentation](https://freetsa.org/index_en.php).
+- Reliability and use: a non-profit, open-source service for privacy-minded, low-volume use (it supports DNSCrypt, DoT and Tor onion routing). No contractual SLA. Stable enough for testing and personal or open-source projects, but it runs on a single server that can go down, and a root certificate rotation needs the trust store (`proof-roots.pem`) updated by hand. That last point is why NEO doesn't use it: a token that stops chaining to a bundled root would read as broken.
+
+**GlobalSign** (NEO's third) isn't covered here yet; its terms are in the [GlobalSign repository](https://www.globalsign.com/en/repository).
 
 **OpenTimestamps (optional extra: "Also anchor in Bitcoin").** For writers who want proof that depends on no company. Port `neo-witness/lib/ots.js` (~340 lines, no dependencies, tested against the reference fixture), stamp each seal, upgrade pending proofs every few hours, store `seals/NNNNNN.ots`. NEO sends a 32-byte hash over HTTPS to the public calendars; each calendar puts one transaction per round into Bitcoin covering everyone's hashes and pays its fee itself. NEO has no wallet, holds no Bitcoin keys and pays nothing. Upgrading and checking are read-only. Anyone can check with `ots verify` against their own Bitcoin node, trusting no one.
 
@@ -766,6 +787,6 @@ Settled with the writer on 2026-10-12:
 
 # Still to check before building part 2
 
-- ~~The terms of use and rate limits of each RFC 3161 authority for this use, and which two to default to.~~ Checked 2026-10-12: DigiCert and Sectigo by default, GlobalSign third (phase 5). None publishes terms for its timestamp service; Sectigo's one request is 15 s between requests. Worth asking DigiCert and Sectigo outright before a release that turns many writers on.
+- ~~The terms of use and rate limits of each RFC 3161 authority for this use, and which two to default to.~~ Checked 2026-10-12: DigiCert and Sectigo by default, GlobalSign third (phase 5). None promises uptime to an anonymous caller (see **The authorities' terms and reliability**); Sectigo's one request is 15 s between requests. Worth asking DigiCert and Sectigo outright before a release that turns many writers on.
 - ~~drand `quicknet`'s API endpoints and how to check a round's BLS signature without adding a dependency.~~ `api.drand.sh` (and `api2`, `api3`, `drand.cloudflare.com`), chain `52db9ba7…e971`, a round every 3 s since 1692803367. The BLS signature isn't checked in NEO; the API is trusted for `after`, and phase 5 says so.
 - Whether Hugh is willing to add the third network feature at all, even opt-in. If not, part 2 comes out of the pull request (see The shape).
