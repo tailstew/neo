@@ -82,6 +82,20 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
 - [ ] **(phone)** Restore works on the phone; the delete button isn't there.
 
+## Upstream 1.5.0's features, recorded
+
+Each of these changes chapters in code that came in with the rebase onto 1.5.0. After each, the session shows no "A change the recorder didn't see", and History plays it.
+
+- [ ] Restore a Snapshot from the Darlings tab, the whole book and one chapter: History marks it "Snapshot restored", and a chapter the snapshot didn't have leaves the book.
+- [ ] Send a chapter, a written section and a scene to Loose Cards, then drag each back in: "Moved in the Outline".
+- [ ] Paste a list into the Outline's List that makes new chapters.
+- [ ] Delete a scene and a section to Darlings from their cards; delete a scene break with Backspace.
+- [ ] Paste styled text from a web page into a chapter: the spans NEO strips afterwards are a tidy, not part of the next key.
+- [ ] Type a dedication in the paperback dialog on a book without one: the new Dedication page is recorded.
+- [ ] Open two books quickly one after the other (double-click, then another): only the second is open, and its session holds only its own chapters.
+- [ ] Edit the same chapter on two devices so a save finds the other's version: the chapter kept beside it is "From another device, kept beside this one".
+- [ ] Change stickies on another device while the book is open here: the comments stream picks the change up as from another device.
+
 ## Upgrading from earlier builds
 
 - [ ] Open History on a book recorded with an earlier build of this branch (phases 1 to 4f, sessions with no `day` in their header). Every session still plays, on the day it was written.
