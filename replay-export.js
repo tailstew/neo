@@ -16,8 +16,22 @@ const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
 
-// a seal, its stamps and its Bitcoin proof; never a .pending.ots
-const SEAL_FILE = /^\d{6}\.(?:json|[a-z0-9-]+\.tsr|ots)$/;
+// a seal, its stamps, its Bitcoin proof, and the root of a service the
+// writer added; never a .pending.ots
+const SEAL_FILE = /^(?:\d{6}\.(?:json|[a-z0-9-]+\.tsr|ots)|root-[0-9a-f]{16}\.pem)$/;
+const ROOT_FILE = /^root-[0-9a-f]{16}\.pem$/;
+
+// proof-roots.pem as the page offers it: NEO's own roots, then the roots
+// of services the writer added, which the book carries beside its seals
+function rootsPem(read, seals) {
+  const added = new Map();
+  for (const files of Object.values(seals || {})) {
+    for (const f of files) if (ROOT_FILE.test(f.name)) added.set(f.name, Buffer.from(f.b64, 'base64').toString('latin1'));
+  }
+  let pem = read('proof-roots.pem');
+  for (const [name, text] of added) pem += `\n# Added by the writer, not one of NEO's own (${name}):\n${text.trim()}\n`;
+  return pem;
+}
 
 // One device's seals folder as the page carries it: [{ name, b64 }], in order
 function sealFiles(dir) {
@@ -43,7 +57,7 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
     neoReplay: 1, title, author, made, version, partial, lang, chapters, strings, evidence,
     sessions: sessions.map((s) => ({ id: s.id, device: s.device, name: s.name || s.device, open: !!s.open, gz: zlib.gzipSync(Buffer.from(s.text, 'utf8')).toString('base64') })),
     seals: partial ? null : seals,
-    roots: partial || !seals ? null : read('proof-roots.pem')
+    roots: partial || !seals ? null : rootsPem(read, seals)
   };
   const T = (s, vars = {}) => String(strings[s] || s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   const head = T('Writing History');
@@ -79,4 +93,4 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 `;
 }
 
-module.exports = { build, sealFiles, SEAL_FILE };
+module.exports = { build, sealFiles, rootsPem, SEAL_FILE };

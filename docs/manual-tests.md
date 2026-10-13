@@ -118,6 +118,19 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] **(2 computers)** Proof on (it's a library setting, so on for both): each computer seals its own folder with its own key, and verify-recording checks both.
 - [ ] **(phone)** The phone doesn't offer proof and writes no seals; its sessions are checked as unsealed.
 
+### Timestamp services…
+
+- [ ] With proof on, the proof line in History's footer underlines on hover, and a click (or Tab to it and Enter) opens **Timestamp services**: DigiCert, Sectigo, GlobalSign, all ticked, each with its address. GlobalSign's ends `tsa/r45standard`.
+- [ ] ↑ and ↓ show only on the row under the pointer or with focus. Move GlobalSign to the top: close and reopen History; the order is kept. Write past the hour (or tag a moment): the new seal's stamps are `globalsign` and `digicert`.
+- [ ] Untick all but one: a warning says each seal has one timestamp. Untick all: it says nothing timestamps your writing. The opt-in, turned off and on again, names the services that are first now, not DigiCert and Sectigo.
+- [ ] **Add a service…**, type `freetsa.org/tsr`, Enter: after a moment it says freetsa.org answered, and that its root is in no public list; the button says **Add anyway**. Add it: it's last in the list, with that note under it, and `%APPDATA%\NEO\timestamp-roots\freetsa-org.pem` exists.
+- [ ] Add `http://ts.ssl.com`: it says its root is in Mozilla's list, and the button says **Add**.
+- [ ] Add a web address that isn't a timestamp service (`https://example.com`): it says NEO couldn't use it, and nothing is added. Add one already in the list: it says so.
+- [ ] Tick freetsa.org and move it into the first two: the warning says its stamps don't count toward the time cover. With a seal stamped by it, the book's `seals/` holds `root-<16 hex>.pem` once, beside `NNNNNN.freetsa-org.tsr`; `verify-recording.js` lists that stamp "(root added by the writer, in no public list)"; Evidence's Timestamps don't count it; the exported page's proof-roots.pem ends with it, and `openssl ts -verify … -CAfile proof-roots.pem` on its stamp says OK.
+- [ ] × on an added service takes it out (its `timestamp-roots` file goes; its stamps in books stay checkable). **Restore the defaults** with one added asks first, then shows the three, ticked, in order.
+- [ ] Esc in the address field closes the add row; Esc again closes the dialog, and History stays open. A click outside closes it too.
+- [ ] **(2 computers)** The choice is this computer's: the other still uses the three.
+
 ## Evidence report and exported replay (phase 6)
 
 - [ ] History's footer has **Evidence…** and **Export replay…** beside Snapshots, and the footer still fits at the window's smallest width (nothing overlaps the proof line).

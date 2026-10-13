@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld('neo', {
   proofSet: (flags) => ipcRenderer.invoke('proof:set', flags),
   proofSeal: (bookId) => ipcRenderer.invoke('proof:seal', bookId),
   proofStatus: (bookId) => ipcRenderer.invoke('proof:status', bookId),
+  proofServices: () => ipcRenderer.invoke('proof:services'),
+  proofServicesSet: (order) => ipcRenderer.invoke('proof:servicesSet', order),
+  proofServicesReset: () => ipcRenderer.invoke('proof:servicesReset'),
+  proofServiceTry: (url) => ipcRenderer.invoke('proof:serviceTry', url),
+  proofServiceAdd: (url) => ipcRenderer.invoke('proof:serviceAdd', url),
+  proofServiceRemove: (id) => ipcRenderer.invoke('proof:serviceRemove', id),
   onProofChanged: (fn) => ipcRenderer.on('proof:changed', (_e, bookId) => fn(bookId)),
 
   exportSave: (payload) => ipcRenderer.invoke('export:save', payload),

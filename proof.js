@@ -51,6 +51,8 @@ const SEAL = /^(\d{6})\.json$/;
 const TOKEN = /^(\d{6})\.([a-z0-9-]+)\.tsr$/;
 const OTS_FILE = /^(\d{6})\.ots$/;
 const OTS_PENDING = /^(\d{6})\.pending\.ots$/;
+// the root of a service the writer added, beside the seals it stamped
+const ROOT_FILE = /^root-[0-9a-f]{16}\.pem$/;
 const pad = (n) => String(n).padStart(6, '0');
 const sha256 = (b) => crypto.createHash('sha256').update(b).digest();
 const sha256hex = (b) => sha256(b).toString('hex');
@@ -60,11 +62,13 @@ const sha256hex = (b) => sha256(b).toString('hex');
 // Asked in this order until two have stamped a seal. DigiCert's and
 // Sectigo's are free and public, built for code signing and for anyone's
 // RFC 3161 client; Sectigo asks that a script wait 15 s between requests.
-// GlobalSign's is tried when one of them fails.
+// GlobalSign's is tried when one of them fails. These are the defaults: the
+// writer can turn them off, reorder them, and add their own (main.js keeps
+// that in settings.json, and hands the Sealer the list).
 const TSAS = [
   { id: 'digicert', name: 'DigiCert', url: 'http://timestamp.digicert.com' },
   { id: 'sectigo', name: 'Sectigo', url: 'https://timestamp.sectigo.com', gap: 15000 },
-  { id: 'globalsign', name: 'GlobalSign', url: 'http://timestamp.globalsign.com/tsa/r6advanced1' }
+  { id: 'globalsign', name: 'GlobalSign', url: 'http://timestamp.globalsign.com/tsa/r45standard' }
 ];
 const STAMPS_WANTED = 2;
 
@@ -166,6 +170,18 @@ function roots() {
   }
   return ROOTS;
 }
+// Mozilla's list as Node ships it, the same in every NEO: a root the
+// writer's own service chains to is public when it's here
+let MOZILLA = null;
+function mozilla() {
+  if (!MOZILLA) MOZILLA = require('tls').rootCertificates.map((p) => new crypto.X509Certificate(p));
+  return MOZILLA;
+}
+const isPublic = (cert) => roots().some((r) => r.raw.equals(cert.raw)) || mozilla().some((r) => r.raw.equals(cert.raw));
+const pemOf = (cert) => cert.toString().trim() + '\n';
+// the file a service's root is kept in beside the seals
+const rootFileName = (cert) => 'root-' + sha256hex(cert.raw).slice(0, 16) + '.pem';
+const certsIn = (pem) => (String(pem).match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || []).map((p) => new crypto.X509Certificate(p));
 const cnOf = (cert) => {
   const m = /(?:^|\n)CN=([^\n]+)/.exec(cert.subject);
   return m ? m[1] : cert.subject.split('\n').pop();
@@ -270,8 +286,11 @@ function checkToken(buf, { digest = null, nonce = null, anchors = roots() } = {}
     out.tsa = cnOf(signer);
     if (!signer.keyUsage || !signer.keyUsage.includes(OID.timeStamping)) out.problems.push('its certificate isn’t for timestamping');
     if (!out.problems.length) out.ok = true;
+    // (for findRoot: the signer and what it carries, not part of the answer)
+    Object.defineProperty(out, 'carried', { value: { signer, certs } });
     const c = chainOf(signer, certs, anchors, out.genTime);
     out.trusted = out.ok && c.trusted;
+    if (c.root) Object.defineProperty(out, 'root', { value: c.root });
     if (!c.trusted) out.problems.push(c.reason);
   } catch (err) {
     out.problems.push('it can’t be read (' + err.message + ')');
@@ -309,15 +328,100 @@ function chainOf(signer, pool, anchors, at) {
   const seen = [];
   for (let depth = 0; depth < 8; depth++) {
     if (!validAt(cert, at)) return { trusted: false, reason: '“' + cnOf(cert) + '” wasn’t valid when it stamped' };
-    if (anchors.some((r) => r.raw.equals(cert.raw))) return { trusted: true };
+    if (anchors.some((r) => r.raw.equals(cert.raw))) return { trusted: true, root: cert };
     const root = anchors.find((r) => cert.checkIssued(r) && cert.verify(r.publicKey));
-    if (root) return validAt(root, at) ? { trusted: true } : { trusted: false, reason: 'its root wasn’t valid when it stamped' };
+    if (root) return validAt(root, at) ? { trusted: true, root } : { trusted: false, reason: 'its root wasn’t valid when it stamped' };
     seen.push(cert);
     const up = pool.find((p) => !seen.includes(p) && cert.checkIssued(p) && cert.verify(p.publicKey));
     if (!up) return { trusted: false, reason: 'its certificates don’t lead to a root NEO knows' };
     cert = up;
   }
   return { trusted: false, reason: 'its certificate chain is too long' };
+}
+
+/* ---------- the writer's own services ---------- */
+
+// The certificates a caIssuers link gives: one, DER or PEM, or a
+// PKCS#7 bundle (.p7c) of several
+function certsFrom(buf) {
+  if (/^-----BEGIN/.test(buf.subarray(0, 20).toString('latin1'))) return certsIn(buf.toString('latin1'));
+  try { return [new crypto.X509Certificate(buf)]; } catch { /* a bundle, then */ }
+  const k = kids(buf, der(buf));
+  if (oidOf(buf, k[0]) !== OID.signedData) return [];
+  const set = kids(buf, kids(buf, k[1])[0]).find((n) => n.id === 0xa0);
+  return set ? kids(buf, set).filter((c) => c.id === 0x30).map((c) => new crypto.X509Certificate(whole(buf, c))) : [];
+}
+
+// The certificate that issued `cert`, fetched from its caIssuers link
+// (Authority Information Access), or null
+async function fetchIssuer(cert, fetchFn) {
+  const urls = [...String(cert.infoAccess || '').matchAll(/CA Issuers - URI:(https?:\/\/\S+)/g)].map((m) => m[1]);
+  for (const url of urls) {
+    try {
+      const res = await fetchFn(url, { headers: { 'User-Agent': 'NEO' }, signal: AbortSignal.timeout(15000) });
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length > 256 * 1024) continue;
+      const up = certsFrom(buf).find((c) => cert.checkIssued(c) && cert.verify(c.publicKey));
+      if (up) return up;
+    } catch { /* the next link */ }
+  }
+  return null;
+}
+
+// A timestamp service's root, from one of its replies: a public root it
+// chains to (proof-roots.pem, or Mozilla's list), else the self-signed top
+// of its chain, found in what the token carries and up the caIssuers links.
+// { ok, root (X509), public, tsa, problems }
+async function findRoot(reply, { fetch: fetchFn = globalThis.fetch, digest = null, nonce = null } = {}) {
+  const c = checkToken(reply, { digest, nonce, anchors: [...roots(), ...mozilla()] });
+  if (!c.ok) return { ok: false, problems: c.problems };
+  if (c.trusted) return { ok: true, root: c.root, public: true, tsa: c.tsa, problems: [] };
+  const pool = [...c.carried.certs];
+  let cert = c.carried.signer;
+  for (let depth = 0; ; depth++) {
+    if (cert.checkIssued(cert) && cert.verify(cert.publicKey)) break; // self-signed: the root
+    let up = pool.find((p) => p !== cert && !p.raw.equals(cert.raw) && cert.checkIssued(p) && cert.verify(p.publicKey));
+    if (!up && depth < 8) up = await fetchIssuer(cert, fetchFn);
+    if (!up || depth >= 8) return { ok: false, problems: ['its root certificate couldn’t be found'] };
+    pool.push(up);
+    cert = up;
+  }
+  const again = checkToken(reply, { digest, nonce, anchors: [cert] });
+  if (!again.trusted) return { ok: false, problems: again.problems };
+  return { ok: true, root: cert, public: isPublic(cert), tsa: c.tsa, problems: [] };
+}
+
+// A service the writer is adding, tried with one request for a random
+// fingerprint: whether it answers with a good token, and its root.
+// { ok, root, public, tsa, problems }
+async function tryService(url, { fetch: fetchFn = globalThis.fetch } = {}) {
+  const digest = crypto.randomBytes(32);
+  const nonce = crypto.randomBytes(8);
+  let reply;
+  try {
+    const res = await fetchFn(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/timestamp-query', 'User-Agent': 'NEO' },
+      body: tsaRequest(digest, nonce),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!res.ok) return { ok: false, problems: ['it answered ' + res.status] };
+    reply = Buffer.from(await res.arrayBuffer());
+  } catch (err) {
+    return { ok: false, problems: ['it couldn’t be reached (' + (err.cause && err.cause.code || err.message) + ')'] };
+  }
+  return findRoot(reply, { fetch: fetchFn, digest, nonce });
+}
+
+// A service's id, from its URL: the host as a file-name part, unlike
+// any in `taken`
+function serviceId(url, taken = []) {
+  const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  const base = host.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'service';
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = base + '-' + n;
+  return id;
 }
 
 /* ---------- the device key ---------- */
@@ -580,6 +684,13 @@ class Sealer {
         const c = this.check(reply, { digest, nonce, anchors: this.anchors || undefined });
         if (!c.ok) throw new Error(tsa.name + '’s stamp: ' + c.problems.join('; '));
         if (!c.trusted) this.log('proof', new Error(tsa.name + '’s stamp: ' + c.problems.join('; ')));
+        // a service the writer added: its root beside the seals first,
+        // once, so anyone reading the book can check its stamps
+        if (tsa.root) {
+          const root = certsIn(tsa.root)[0];
+          const file = path.join(this.sealsDir, rootFileName(root));
+          if (!fs.existsSync(file)) this.put(file, pemOf(root));
+        }
         this.put(path.join(this.sealsDir, `${stem}.${tsa.id}.tsr`), reply);
         have.add(tsa.id);
         done.push(tsa.id);
@@ -656,6 +767,16 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
   try { files = fs.readdirSync(sealsDir).sort(); } catch { /* none */ }
   const out = { device: path.basename(dir), publicKey: null, seals: [], problems: [] };
   let prevHash = null;
+  // roots of services the writer added: trusted when they're public, and
+  // otherwise only said to be theirs
+  const added = [];
+  for (const f of files) {
+    if (!ROOT_FILE.test(f)) continue;
+    try { added.push(...certsIn(fs.readFileSync(path.join(sealsDir, f), 'latin1'))); } catch { out.problems.push(f + ' can’t be read'); }
+  }
+  const publicAdded = added.filter((r) => mozilla().some((m) => m.raw.equals(r.raw)));
+  const privateAdded = added.filter((r) => !publicAdded.includes(r));
+  anchors = [...anchors, ...publicAdded];
   for (const f of files) {
     const m = SEAL.exec(f);
     if (!m) continue;
@@ -715,8 +836,14 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
     for (const t of files) {
       const tm = TOKEN.exec(t);
       if (!tm || +tm[1] !== s.seq) continue;
-      const c = checkToken(fs.readFileSync(path.join(sealsDir, t)), { digest, anchors });
-      s.stamps.push({ tsa: tm[2], file: t, ok: c.ok, trusted: c.trusted, genTime: c.genTime, name: c.tsa, problems: c.problems });
+      const tok = fs.readFileSync(path.join(sealsDir, t));
+      const c = checkToken(tok, { digest, anchors });
+      let mine = false;
+      if (c.ok && !c.trusted && privateAdded.length && checkToken(tok, { digest, anchors: privateAdded }).trusted) {
+        mine = true;
+        c.problems = ['its root was added by the writer and isn’t in a public list'];
+      }
+      s.stamps.push({ tsa: tm[2], file: t, ok: c.ok, trusted: c.trusted, added: mine, genTime: c.genTime, name: c.tsa, problems: c.problems });
       if (!c.ok) bad(tm[2] + '’s stamp: ' + c.problems.join('; '));
       else if (!c.trusted) s.problems.push(tm[2] + '’s stamp: ' + c.problems.join('; '));
       else {
@@ -781,8 +908,9 @@ function timeCover(sessions, seals) {
 }
 
 module.exports = {
-  TSAS, DRAND, STAMPS_WANTED, timeCover,
-  der, kids, oidOf, tsaRequest, checkToken, roots,
+  TSAS, DRAND, STAMPS_WANTED, ROOT_FILE, timeCover,
+  der, kids, oidOf, tsaRequest, checkToken, roots, mozilla, isPublic, pemOf, certsIn, rootFileName,
+  findRoot, tryService, serviceId,
   newKey, keyOf, canonical, sign, verifySignature,
   drandRound, roundTime, bitcoinTip, chainHashes,
   Sealer, verifyDevice, sha256hex

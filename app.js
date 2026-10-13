@@ -3164,7 +3164,7 @@ async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } =
       title: t('Prove when you wrote?'),
       points: [
         t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
-        t('The fingerprint goes to DigiCert and Sectigo, the companies that timestamp signed software, and each seal carries a public random number from drand, so it can’t have been made before then.'),
+        ...await proofWhoSays(),
         t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
         t('A timestamp shows when your writing existed, not who wrote it. The replay of how you wrote it is what speaks to that.')
       ],
@@ -3183,6 +3183,226 @@ async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } =
     window.neo.proofSeal(book.id).catch(() => {});
   }
   return !!on;
+}
+
+// Who the opt-in says the fingerprint goes to: the services this computer
+// asks first (Timestamp services…), DigiCert and Sectigo unless changed
+async function proofWhoSays() {
+  let on = [];
+  try { on = (await window.neo.proofServices()).filter((s) => s.on); } catch { /* the defaults, then */ }
+  if (!on.length || on.slice(0, 2).map((s) => s.id).join() === 'digicert,sectigo') {
+    return [t('The fingerprint goes to DigiCert and Sectigo, the companies that timestamp signed software, and each seal carries a public random number from drand, so it can’t have been made before then.')];
+  }
+  const names = new Intl.ListFormat(NeoI18n.getLocale(), { type: 'conjunction' }).format(on.map((s) => s.name));
+  return [t('The fingerprint goes to {services}, the timestamp services you chose, and each seal carries a public random number from drand, so it can’t have been made before then.', { services: names })];
+}
+
+// Timestamp services… (docs/neo-recording-plan.md, The writer's own
+// services): who stamps the seals, opened from the proof line in History's
+// footer. NEO's three and any the writer added, in the order they're
+// asked; the first two that answer stamp each seal. Every change is kept at
+// once, on this computer (main.js, settings.json). Resolves when closed.
+async function openTsaServices() {
+  if (!window.neo.proofServices) return;
+  let list = [];
+  try { list = await window.neo.proofServices(); } catch { return; }
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop tsa-backdrop';
+    bd.innerHTML = `
+      <div class="modal tsa-modal" role="dialog" aria-modal="true">
+        <h2></h2>
+        <p class="tsa-lede"></p>
+        <ul class="tsa-list"></ul>
+        <p class="tsa-warn" hidden></p>
+        <div class="tsa-add" hidden>
+          <div class="tsa-row"><input type="url" spellcheck="false" autocomplete="off"><button class="tsa-try btn-quiet" type="button"></button></div>
+          <p class="tsa-said" hidden></p>
+          <div class="tsa-row tsa-yes" hidden><button class="tsa-cancel btn-quiet" type="button"></button><button class="tsa-ok btn-gold" type="button"></button></div>
+        </div>
+        <div class="tsa-foot">
+          <button class="tsa-new btn-quiet" type="button"></button>
+          <button class="tsa-reset btn-quiet" type="button"></button>
+          <button class="m-ok btn-gold" type="button"></button>
+        </div>
+      </div>`;
+    const $q = (sel) => bd.querySelector(sel);
+    const title = t('Timestamp services');
+    $q('h2').textContent = title;
+    $q('.modal').setAttribute('aria-label', title);
+    $q('.tsa-lede').textContent = t('Each seal’s fingerprint, never your words, goes to these services in this order, until two have timestamped it. A service whose box is clear is never asked.');
+    $q('.tsa-new').textContent = t('Add a service…');
+    $q('.tsa-reset').textContent = t('Restore the defaults');
+    $q('.m-ok').textContent = t('Done');
+    const input = $q('.tsa-add input');
+    input.placeholder = 'https://…';
+    input.setAttribute('aria-label', t('The service’s web address'));
+    $q('.tsa-try').textContent = t('Check');
+    $q('.tsa-cancel').textContent = t('Cancel');
+    const ul = $q('.tsa-list');
+    const warn = $q('.tsa-warn');
+
+    const save = async (next) => {
+      try { list = await window.neo.proofServicesSet(next.map((s) => ({ id: s.id, on: s.on }))); } catch { /* shown as it was */ }
+      render();
+    };
+    function render(focusId = null, focusSel = null) {
+      ul.textContent = '';
+      list.forEach((s, i) => {
+        const li = document.createElement('li');
+        const label = document.createElement('label');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = s.on;
+        box.addEventListener('change', () => save(list.map((x) => (x === s ? { ...x, on: box.checked } : x))));
+        const name = document.createElement('span');
+        name.className = 'tsa-name';
+        name.textContent = s.name;
+        label.append(box, ' ', name);
+        const about = document.createElement('span');
+        about.className = 'tsa-about';
+        about.textContent = s.added
+          ? (s.public
+            ? t('Added by you. Its root, {root}, is in Mozilla’s list.', { root: s.rootName })
+            : t('Added by you. Its root, {root}, is in no public list, so its stamps are proof only to someone who trusts {name}.', { root: s.rootName, name: s.name }))
+          : s.url;
+        about.title = s.url;
+        const acts = document.createElement('span');
+        acts.className = 'tsa-acts';
+        const btn = (txt, label, cls, disabled, fn) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'tsa-move ' + cls;
+          b.textContent = txt;
+          b.title = label;
+          b.setAttribute('aria-label', label + ': ' + s.name);
+          b.disabled = disabled;
+          b.addEventListener('click', fn);
+          acts.append(b);
+        };
+        const move = (by, sel) => () => {
+          const next = list.slice();
+          next.splice(i, 1);
+          next.splice(i + by, 0, s);
+          save(next).then(() => render(s.id, sel));
+        };
+        btn('↑', t('Move up'), 'tsa-up', i === 0, move(-1, '.tsa-up'));
+        btn('↓', t('Move down'), 'tsa-down', i === list.length - 1, move(1, '.tsa-down'));
+        if (s.added) {
+          btn('×', t('Take out'), 'tsa-x', false, async () => {
+            try { list = await window.neo.proofServiceRemove(s.id); } catch { /* as it was */ }
+            render();
+            $q('.tsa-new').focus();
+          });
+        }
+        li.dataset.id = s.id;
+        li.append(label, acts, about);
+        ul.append(li);
+      });
+      const on = list.filter((s) => s.on);
+      const notPublic = on.slice(0, 2).find((s) => s.added && !s.public);
+      warn.textContent = !on.length
+        ? t('With none on, your writing is still sealed, but nothing timestamps it.')
+        : on.length < 2
+          ? t('With one on, each seal has one timestamp. Two services from different companies make a much harder story to argue with.')
+          : notPublic
+            ? t('Stamps from {name} rest on a root you added, so they don’t count toward the time cover in Evidence.', { name: notPublic.name })
+            : '';
+      warn.hidden = !warn.textContent;
+      if (focusId) {
+        const li = ul.querySelector(`li[data-id="${focusId}"]`);
+        const b = li && li.querySelector(focusSel);
+        (b && !b.disabled ? b : li && li.querySelector('input')).focus();
+      }
+    }
+    render();
+
+    // Adding: the address, one test request, what it said, then yes or no
+    const said = $q('.tsa-said');
+    const yes = $q('.tsa-yes');
+    let tried = null;
+    const resetAdd = () => { tried = null; said.hidden = true; yes.hidden = true; $q('.tsa-try').disabled = false; };
+    $q('.tsa-new').addEventListener('click', () => {
+      $q('.tsa-add').hidden = false;
+      $q('.tsa-new').hidden = true;
+      input.focus();
+    });
+    input.addEventListener('input', resetAdd);
+    async function check() {
+      const url = input.value.trim();
+      if (!url) return;
+      resetAdd();
+      $q('.tsa-try').disabled = true;
+      said.hidden = false;
+      said.textContent = t('Asking it for a timestamp…');
+      let r;
+      try { r = await window.neo.proofServiceTry(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url); } catch (err) { r = { ok: false, problems: [String(err && err.message || err)] }; }
+      if (!bd.isConnected || input.value.trim() !== url) return;
+      $q('.tsa-try').disabled = false;
+      if (!r.ok) {
+        said.textContent = t('NEO couldn’t use it: {why}', { why: (r.problems || []).join('; ') });
+        return;
+      }
+      tried = r;
+      said.textContent = r.public
+        ? t('{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.', { name: r.name, root: r.rootName })
+        : t('{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.', { name: r.name, root: r.rootName });
+      $q('.tsa-ok').textContent = r.public ? t('Add') : t('Add anyway');
+      yes.hidden = false;
+      $q('.tsa-ok').focus();
+    }
+    $q('.tsa-try').addEventListener('click', check);
+    input.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter') { e.preventDefault(); check(); }
+    });
+    const closeAdd = () => {
+      input.value = '';
+      resetAdd();
+      $q('.tsa-add').hidden = true;
+      $q('.tsa-new').hidden = false;
+      $q('.tsa-new').focus();
+    };
+    $q('.tsa-cancel').addEventListener('click', closeAdd);
+    $q('.tsa-ok').addEventListener('click', async () => {
+      if (!tried) return;
+      try { list = await window.neo.proofServiceAdd(tried.url); } catch { /* as it was */ }
+      closeAdd();
+      render();
+    });
+
+    $q('.tsa-reset').addEventListener('click', async () => {
+      const added = list.filter((s) => s.added);
+      if (added.length) {
+        const sure = await confirmModal({
+          title: t('Restore the defaults?'),
+          points: [
+            t('DigiCert, Sectigo and GlobalSign, in that order, all on.'),
+            t('The services you added are taken out. Their stamps already in your books stay there, and can still be checked.')
+          ],
+          ok: t('Restore the defaults')
+        });
+        if (!sure || !bd.isConnected) { $q('.tsa-reset').focus(); return; }
+      }
+      try { list = await window.neo.proofServicesReset(); } catch { /* as it was */ }
+      render();
+      $q('.tsa-reset').focus();
+    });
+
+    const done = () => { bd.remove(); resolve(); };
+    $q('.m-ok').addEventListener('click', done);
+    bd.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // (not to History behind it)
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (!$q('.tsa-add').hidden && document.activeElement && $q('.tsa-add').contains(document.activeElement)) closeAdd();
+        else done();
+      }
+    });
+    document.body.appendChild(bd);
+    const first = ul.querySelector('input');
+    (first || $q('.m-ok')).focus();
+  });
 }
 
 // Recording the open book from now, as it is now
@@ -3836,7 +4056,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       <span class="hs-desc"></span>
       <label class="hs-keep hs-prove" hidden><input type="checkbox"> <span></span></label>
       <label class="hs-keep hs-btc" hidden><input type="checkbox"> <span></span></label>
-      <span class="hs-proof" hidden></span>
+      <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
       <button class="hs-snaps" type="button" hidden></button>
@@ -3919,6 +4139,12 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     if (!bd.isConnected) return;
     proofLine.textContent = proofSays(st);
   }
+  // the line that says who stamped the last seal is the way to choose who does
+  proofLine.title = t('Timestamp services…');
+  proofLine.addEventListener('click', async () => {
+    await openTsaServices();
+    if (bd.isConnected) { bd.focus(); renderProof(); }
+  });
   function proofSays(st) {
     if (!st || !st.seals) return t('Nothing sealed yet. The first seal comes with your next words.');
     const when = snapWhen(Date.parse(st.at));

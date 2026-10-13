@@ -1,0 +1,19 @@
+{
+ "neoSeal": 1,
+ "seq": 1,
+ "at": "2026-10-13T11:44:10.690Z",
+ "book": "book-x",
+ "device": "d-0123456789abcdef",
+ "publicKey": "ln0psHvDkEX1u7k+LuqfjgSocUWFnS6ULvV5m5soxqI=",
+ "after": [
+  {
+   "beacon": "drand-quicknet",
+   "round": 33029495,
+   "randomness": "258d0a85c51278d1a9f14f7bd87017123e55ff3611c7f194bb79eeea72f01c1f",
+   "signature": "b128f46f8d357bacb4f0d84302b913f549107a02291660fed893f984c9972d8d137dd077208265ddc91601e63309dc15"
+  }
+ ],
+ "heads": {},
+ "prev": null,
+ "sig": "ulR4gcuN5H3VJUF1sSN905IUbFOk3EYSEHjcyXUs4LfslE1cX8vFRZzz9AosFjrRt8/FOvts7+V3CtBQxf8NCw=="
+}

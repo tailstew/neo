@@ -9,7 +9,8 @@
 // each other; that replaying them hashes to every chapter write they record
 // (replayCheck); each seal's signature, its place in the seals' chain, the
 // sessions it seals, its stamps (RFC 3161 tokens checked against the roots
-// in proof-roots.pem) and its `after`; then the time cover: when each
+// in proof-roots.pem, and the roots of services the writer added that are
+// in Mozilla's list) and its `after`; then the time cover: when each
 // session was sealed, and every one that went more than a day unsealed.
 // --online also asks drand for each seal's round and a block explorer for
 // its Bitcoin blocks. A session the book lacks is read from the backup
@@ -95,7 +96,7 @@ function print(r) {
       const stamped = ss.filter((s) => s.by !== null).length;
       out.push(`  ${ss.length} seals, signed by key ${d.seals.publicKey}; ${stamped} stamped, ${ss.filter((s) => s.by === null && s.byLater).length} fixed in time by a later seal`);
       for (const s of ss) {
-        const who = s.stamps.filter((x) => x.ok).map((x) => `${x.tsa} ${iso(x.genTime)}${x.trusted ? '' : ' (untrusted)'}`).join(', ');
+        const who = s.stamps.filter((x) => x.ok).map((x) => `${x.tsa} ${iso(x.genTime)}${x.trusted ? '' : x.added ? ' (root added by the writer, in no public list)' : ' (untrusted)'}`).join(', ');
         out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}${s.ots ? `; Bitcoin ${s.ots.heights.join(', ') || 'pending'}` : ''}`);
       }
       const gaps = d.cover.filter((c) => c.gap);

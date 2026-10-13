@@ -379,3 +379,147 @@ test('an authority asked moments ago is passed over for the next, not waited for
   assert.deepEqual(await s.stamp(), ['two', 'three']);
   assert.ok(Date.now() - t0 < 5000);
 });
+
+/* ---------- the writer's own services ---------- */
+
+// Real replies from two services NEO doesn't build in, fetched on
+// 2026-10-13: SSL.com's (its chain ends in Mozilla's list) and FreeTSA's
+// (its own root, in no public list), each over services/<name>.txt; and a
+// seal stamped by both as services the writer added, with their roots
+// beside it as the Sealer wrote them.
+const SVC = path.join(FIX, 'services');
+const svc = (f) => fs.readFileSync(path.join(SVC, f));
+const sha = (b) => crypto.createHash('sha256').update(b).digest();
+const noNet = async (url) => { throw new Error('no network in the tests: ' + url); };
+const SVC_SEALS = path.join(SVC, 'recording', DEV, 'seals');
+
+// DER with long lengths, for a token rebuilt without one of its certificates
+function tlv(id, body) {
+  const l = body.length;
+  const len = l < 0x80 ? [l] : l < 0x100 ? [0x81, l] : l < 0x10000 ? [0x82, l >> 8, l & 255] : [0x83, l >> 16, (l >> 8) & 255, l & 255];
+  return Buffer.concat([Buffer.from([id, ...len]), body]);
+}
+// a TimeStampResp with the certificates `drop` picks taken out (they aren't
+// under the signature, so the token still checks)
+function withoutCerts(reply, drop) {
+  const whole = (n) => reply.subarray(n.start, n.end);
+  const [status, tok] = P.kids(reply, P.der(reply));
+  const tk = P.kids(reply, tok);
+  const sd = P.kids(reply, P.kids(reply, tk[1])[0]);
+  const parts = sd.map((n) => (n.id === 0xa0
+    ? tlv(0xa0, Buffer.concat(P.kids(reply, n).filter((c) => !drop(new crypto.X509Certificate(whole(c)))).map(whole)))
+    : whole(n)));
+  return tlv(0x30, Buffer.concat([whole(status), tlv(0x30, Buffer.concat([whole(tk[0]), tlv(0xa0, tlv(0x30, Buffer.concat(parts)))]))]));
+}
+
+test('a service whose chain ends in Mozilla’s list is public, found with no network', async () => {
+  const r = await P.findRoot(svc('sslcom.tsr'), { digest: sha(svc('sslcom.txt')), fetch: noNet });
+  assert.equal(r.ok, true, r.problems.join('; '));
+  assert.equal(r.public, true);
+  assert.match(r.root.subject, /SSL\.com Root Certification Authority RSA/);
+  assert.equal(P.isPublic(r.root), true);
+});
+
+test('a service with its own root: the self-signed top of what it carries, not public', async () => {
+  const r = await P.findRoot(svc('freetsa.tsr'), { digest: sha(svc('freetsa.txt')), fetch: noNet });
+  assert.equal(r.ok, true, r.problems.join('; '));
+  assert.equal(r.public, false);
+  assert.match(r.root.subject, /O=Free TSA/);
+  assert.equal(r.root.issuer, r.root.subject);
+  // for other bytes, it's no use
+  const other = await P.findRoot(svc('freetsa.tsr'), { digest: crypto.randomBytes(32), fetch: noNet });
+  assert.equal(other.ok, false);
+});
+
+test('a root the token doesn’t carry is fetched from its caIssuers link, and only there', async () => {
+  const full = await P.findRoot(svc('freetsa.tsr'), { fetch: noNet });
+  const root = full.root;
+  const bare = withoutCerts(svc('freetsa.tsr'), (c) => c.raw.equals(root.raw));
+  assert.equal(P.checkToken(bare, { anchors: [] }).ok, true); // still a good token
+  const asked = [];
+  const served = async (url) => {
+    asked.push(url);
+    if (url !== 'http://www.freetsa.org/files/cacert.pem') return { ok: false, status: 404 };
+    return { ok: true, status: 200, arrayBuffer: async () => Buffer.from(P.pemOf(root)) };
+  };
+  const r = await P.findRoot(bare, { digest: sha(svc('freetsa.txt')), fetch: served });
+  assert.equal(r.ok, true, (r.problems || []).join('; '));
+  assert.ok(r.root.raw.equals(root.raw));
+  assert.deepEqual(asked, ['http://www.freetsa.org/files/cacert.pem']);
+  // the link down, or serving something that didn't issue it: not found
+  assert.match((await P.findRoot(bare, { fetch: noNet })).problems[0], /root certificate couldn’t be found/);
+  const ssl = (await P.findRoot(svc('sslcom.tsr'), { fetch: noNet })).root;
+  const wrong = async () => ({ ok: true, status: 200, arrayBuffer: async () => Buffer.from(P.pemOf(ssl)) });
+  assert.equal((await P.findRoot(bare, { fetch: wrong })).ok, false);
+});
+
+test('a service’s id is its host as a file-name part, never one already taken', () => {
+  assert.equal(P.serviceId('https://www.FreeTSA.org/tsr'), 'freetsa-org');
+  assert.equal(P.serviceId('https://freetsa.org/tsr', ['freetsa-org']), 'freetsa-org-2');
+  assert.equal(P.serviceId('http://ts.ssl.com', ['digicert', 'sectigo', 'globalsign']), 'ts-ssl-com');
+  for (const id of ['freetsa-org', 'ts-ssl-com']) assert.match(`000001.${id}.tsr`, /^(\d{6})\.([a-z0-9-]+)\.tsr$/);
+});
+
+test('an added service’s root goes beside the seals once, before its first stamp', async () => {
+  const { dir, open, rest } = deviceFolder();
+  const pem = fs.readFileSync(path.join(SVC_SEALS, fs.readdirSync(SVC_SEALS).find((f) => P.ROOT_FILE.test(f))), 'latin1');
+  const name = P.rootFileName(P.certsIn(pem)[0]);
+  const tsas = [{ id: 'mine', name: 'Mine', url: 'https://mine.test', root: pem }, TSAS[1]];
+  const s = sealer(dir, network({ tsa: { mine: 'up', two: 'up' } }), { tsas });
+  await s.seal();
+  assert.deepEqual(await s.stamp(), ['mine', 'two']);
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'seals')).sort(), ['000001.json', '000001.mine.tsr', '000001.two.tsr', name]);
+  const at = fs.statSync(path.join(dir, 'seals', name)).mtimeMs;
+  // the next seal: the root is there already, and isn't written again
+  const n = R.splitLines(fs.readFileSync(path.join(open, 'c-000001.jsonl'), 'utf8')).lines.length;
+  put(path.join(open, `c-${String(n + 1).padStart(6, '0')}.jsonl`), rest.map((l) => l + '\n').join(''));
+  await s.seal();
+  await s.stamp();
+  assert.equal(fs.readdirSync(path.join(dir, 'seals')).filter((f) => P.ROOT_FILE.test(f)).length, 1);
+  assert.equal(fs.statSync(path.join(dir, 'seals', name)).mtimeMs, at);
+});
+
+test('a stamp resting on a root the writer added is good but not trusted; one in Mozilla’s list is trusted', async () => {
+  const dir = path.join(tmp(), DEV);
+  copyDir(path.join(SVC, 'recording', DEV), dir);
+  let v = await P.verifyDevice(dir);
+  const [seal] = v.seals;
+  assert.equal(seal.ok, true, seal.problems.join('; '));
+  const free = seal.stamps.find((x) => x.tsa === 'freetsa-org');
+  const ssl = seal.stamps.find((x) => x.tsa === 'ts-ssl-com');
+  assert.deepEqual([free.ok, free.trusted, free.added], [true, false, true]);
+  assert.deepEqual(free.problems, ['its root was added by the writer and isn’t in a public list']);
+  assert.deepEqual([ssl.ok, ssl.trusted, ssl.added], [true, true, false]);
+  assert.equal(seal.by, ssl.genTime); // only the trusted stamp fixes it in time
+  // without the book's copy of SSL.com's root, its stamp isn't trusted:
+  // NEO trusts its own three's roots, and those the book carries
+  const sslRoot = fs.readdirSync(path.join(dir, 'seals')).find((f) => P.ROOT_FILE.test(f) && /SSL\.com/.test(P.certsIn(fs.readFileSync(path.join(dir, 'seals', f), 'latin1'))[0].subject));
+  fs.rmSync(path.join(dir, 'seals', sslRoot));
+  v = await P.verifyDevice(dir);
+  assert.equal(v.seals[0].stamps.find((x) => x.tsa === 'ts-ssl-com').trusted, false);
+  assert.equal(v.seals[0].by, null);
+});
+
+test('the mirror and an exported page carry the roots of the writer’s services', async () => {
+  const Files = require('../recording-files.js');
+  const ReplayExport = require('../replay-export.js');
+  const io = Files.nodeIO({ fs, path, zlib, write: put, log: () => {} });
+  const root = path.join(tmp(), 'recording');
+  copyDir(path.join(SVC, 'recording'), root);
+  const mirror = path.join(tmp(), 'mirror');
+  await Files.sweep(io, root, mirror, DEV);
+  const roots = fs.readdirSync(SVC_SEALS).filter((f) => P.ROOT_FILE.test(f)).sort();
+  assert.equal(roots.length, 2);
+  assert.deepEqual(fs.readdirSync(path.join(mirror, DEV, 'seals')).sort(), fs.readdirSync(SVC_SEALS).sort());
+  const files = ReplayExport.sealFiles(SVC_SEALS);
+  assert.deepEqual(files.map((f) => f.name).filter((n) => P.ROOT_FILE.test(n)), roots);
+  const pem = ReplayExport.rootsPem((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), { [DEV]: files });
+  assert.ok(pem.startsWith(fs.readFileSync(path.join(__dirname, '..', 'proof-roots.pem'), 'utf8')));
+  for (const r of roots) assert.ok(pem.includes(`(${r}):`), r);
+  assert.equal(P.certsIn(pem).length, P.roots().length + 2);
+});
+
+test('NEO’s third authority is GlobalSign’s R45 address', () => {
+  assert.deepEqual(P.TSAS.map((t) => t.id), ['digicert', 'sectigo', 'globalsign']);
+  assert.equal(P.TSAS[2].url, 'http://timestamp.globalsign.com/tsa/r45standard');
+});
