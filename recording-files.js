@@ -48,9 +48,8 @@
   const SESSION = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\dZ-[a-z0-9]{4,12}$/;
   const CHUNK = /^c-(\d+)\.jsonl$/;
   const ROLLUP = /^s-(\d+)-(\d+)\.jsonl\.gz$/;
-  // a seal, its stamps, its Bitcoin proof, and the root of a service the
-  // writer added (proof.js)
-  const SEAL_FILE = /^(?:\d{6}\.(json|[a-z0-9-]+\.tsr|ots)|root-[0-9a-f]{16}\.pem)$/;
+  // a seal, its stamps, and the root of a service the writer added (proof.js)
+  const SEAL_FILE = /^(?:\d{6}\.(json|[a-z0-9-]+\.tsr)|root-[0-9a-f]{16}\.pem)$/;
   const pad = (n) => String(n).padStart(6, '0');
   // a closed session's file name, or null
   const closedName = (n) => (n.endsWith('.jsonl.gz') && SESSION.test(n.slice(0, -9)) ? n.slice(0, -9) : null);
@@ -324,8 +323,7 @@
       if ((await io.exists(copy)) && (await io.exists(about))) await mirrorFile(io, about, io.join(copy, 'device.json'));
     } catch (err) { io.log('recording backup', err); }
     // Proof's seals, their stamps and roots (proof.js), which nothing could make
-    // again: each written once, so copied once. A pending OpenTimestamps
-    // proof is left out; the one Bitcoin holds replaces it.
+    // again: each written once, so copied once.
     for (const f of await names(io, io.join(dir, 'seals'))) {
       if (!SEAL_FILE.test(f)) continue;
       const from = io.join(dir, 'seals', f);

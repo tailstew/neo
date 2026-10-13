@@ -16,9 +16,8 @@ const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
 
-// a seal, its stamps, its Bitcoin proof, and the root of a service the
-// writer added; never a .pending.ots
-const SEAL_FILE = /^(?:\d{6}\.(?:json|[a-z0-9-]+\.tsr|ots)|root-[0-9a-f]{16}\.pem)$/;
+// a seal, its stamps, and the root of a service the writer added
+const SEAL_FILE = /^(?:\d{6}\.(?:json|[a-z0-9-]+\.tsr)|root-[0-9a-f]{16}\.pem)$/;
 const ROOT_FILE = /^root-[0-9a-f]{16}\.pem$/;
 
 // proof-roots.pem as the page offers it: NEO's own roots, then the roots
@@ -75,7 +74,7 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 <header class="rx-top">
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
-  <p class="rx-lede">${esc(T('This is a timelapse of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'))}</p>
+  <p class="rx-lede">${esc(T('This is a replay of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'))}</p>
   ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It replays them exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'))}</p>` : ''}
   <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the replay and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>

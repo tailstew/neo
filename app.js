@@ -2012,7 +2012,7 @@ function bookTile(meta, opts = {}) {
       if (coverItems.length) options.push({ label: t('Cover'), desc: t('A new cover, your own art, or a saved image.'), value: 'coverMenu' });
       options.push(
         { label: t('Set word goal…'), desc: t('Adds the subtle progress bar to the cover.'), value: 'goal' },
-        ...(historyCanOpen() ? [{ label: t('Writing history…'), desc: t('Watch this book being written, keystroke by keystroke, like a painter’s timelapse.'), value: 'history' }] : []),
+        ...(historyCanOpen() ? [{ label: t('Writing history…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
         { label: t('Remove from bookshelf'), desc: t('Takes it off your shelves. The files stay safe in your NEO Library folder on disk.'), value: 'remove' },
         { label: trashLabel, desc: window.Capacitor ? t('Moves the book folder to Deleted Books in your NEO Library, where you can recover it.') : t('Sends the book folder to your system trash, where you can recover it.'), danger: true, value: 'trash' }
       );
@@ -3144,7 +3144,7 @@ async function setRecordWriting(on) {
     toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
     return;
   }
-  toast(t('Like a painter’s timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
+  toast(t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
   if (book) await recRestart(book.id);
 }
 
@@ -3154,14 +3154,13 @@ async function setRecordWriting(on) {
 // no proofSet, so it never offers it.
 const proofFlags = () => ({
   on: !!(window.neo.proofSet && library && library.proveWriting === true && recordingWanted()),
-  bitcoin: !!(library && library.proveBitcoin === true),
   // the timestamp services the writer chose (Timestamp services…)
   tsas: library && Array.isArray(library.proofTsas) ? library.proofTsas : null
 });
 
 // Prove when I wrote: asked once, in plain words, before anything is sent.
 // Returns whether it's now on.
-async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } = {}) {
+async function setProveWriting(on) {
   if (on && library.proveWriting !== true) {
     const sure = await confirmModal({
       title: t('Prove when you wrote?'),
@@ -3176,7 +3175,6 @@ async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } =
     if (!sure) return false;
   }
   library.proveWriting = !!on;
-  library.proveBitcoin = !!bitcoin;
   writeLibrary(library);
   await window.neo.proofSet(proofFlags());
   // the book open is sealed now, rather than at the next hour
@@ -3430,7 +3428,7 @@ async function recRestart(bookId) {
 
 /* ================================================================== */
 /*  WRITING HISTORY — the dialog and its player                        */
-/*  The recording played back like a painter's timelapse: the book, or */
+/*  The recording played back: the book, or                            */
 /*  one chapter, on sheets set like the manuscript, the text and the   */
 /*  caret looking just as they did in the editor, and a timeline of    */
 /*  how busy the writing was, marked where text was                    */
@@ -3723,10 +3721,9 @@ const REPLAY_PAGE_WORDS = [
   tk('not stamped'),
   tk('Check it without this page'),
   tk('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:'),
-  tk('A seal’s .ots file, where there is one, is checked against Bitcoin with the OpenTimestamps client: ots verify 000001.ots'),
   tk('A timestamp shows the recording existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the replay and the report speak to that, and they are evidence, not proof.'),
   tk('Writing History'),
-  tk('This is a timelapse of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'),
+  tk('This is a replay of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'),
   tk('This page holds only some chapters. It replays them exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'),
   tk('Turn on JavaScript to play the replay and check it. The report below is as NEO wrote it.'),
   tk('Made with NEO {version} on {date}.')
@@ -4070,7 +4067,6 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       <label class="hs-keep"><input type="checkbox"> <span></span></label>
       <span class="hs-desc"></span>
       <label class="hs-keep hs-prove" hidden><input type="checkbox"> <span></span></label>
-      <label class="hs-keep hs-btc" hidden><input type="checkbox"> <span></span></label>
       <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
@@ -4121,7 +4117,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   strip.setAttribute('aria-label', t('Days'));
   $h('.hs-skip span').textContent = t('Skip pauses');
   $h('.hs-keep span').textContent = t('Keep a replay of my writing');
-  $h('.hs-desc').textContent = t('Like a painter’s timelapse: NEO keeps every keystroke so you can watch your book being written, and bring back any earlier version. It stays with your book and is never sent anywhere.');
+  $h('.hs-desc').textContent = t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.');
   backBtn.textContent = '← ' + t('Days');
   backBtn.title = t('Back to the days') + ' (Esc)';
   const keep = $h('.hs-keep input');
@@ -4135,18 +4131,13 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   // Prove when I wrote, beside it: off until the writer turns it on, and
   // then a line saying when the book was last sealed and who stamped it
   const prove = $h('.hs-prove input');
-  const btc = $h('.hs-btc input');
   const proofLine = $h('.hs-proof');
   $h('.hs-prove span').textContent = t('Prove when I wrote');
   $h('.hs-prove').title = t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.');
-  $h('.hs-btc span').textContent = t('Also anchor in Bitcoin');
-  $h('.hs-btc').title = t('Also sends the fingerprint to the OpenTimestamps calendars, which fix it in Bitcoin within a few hours: proof that trusts no company. NEO holds no Bitcoin and pays nothing.');
   async function renderProof() {
     const can = !!window.neo.proofSet && library.recordWriting !== false;
     $h('.hs-prove').hidden = !can;
     prove.checked = library.proveWriting === true;
-    $h('.hs-btc').hidden = !can || !prove.checked;
-    btc.checked = library.proveBitcoin === true;
     proofLine.hidden = !can || !prove.checked;
     if (proofLine.hidden) return;
     let st = null;
@@ -4163,22 +4154,16 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   function proofSays(st) {
     if (!st || !st.seals) return t('Nothing sealed yet. The first seal comes with your next words.');
     const when = snapWhen(Date.parse(st.at));
-    let say = st.stamps.length >= 2
+    return st.stamps.length >= 2
       ? t('Sealed {when}, timestamped by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
       : st.stampedAt
         ? t('Sealed {when}. Last timestamped {then}; waiting for the network for the rest.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
         : t('Sealed {when}. Waiting for the network to timestamp it.', { when });
-    if (library.proveBitcoin === true) say += ' ' + (st.bitcoin ? t('Anchored in Bitcoin.') : st.pendingBitcoin ? t('Waiting for Bitcoin.') : '');
-    return say.trim();
   }
   prove.addEventListener('change', async () => {
     await setProveWriting(prove.checked);
     bd.focus();
     renderProof(); // (unticked again if the writer said no)
-  });
-  btc.addEventListener('change', async () => {
-    await setProveWriting(true, { bitcoin: btc.checked });
-    renderProof();
   });
   renderProof();
   const proofChanged = (changed) => { if (changed === bookId && bd.isConnected) renderProof(); };
@@ -4421,7 +4406,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     loaded = { state: S.error ? 'failed' : S.building ? 'loading' : 'empty', error: S.error };
     const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : library.recordWriting === false
       ? t('Writing History is off. Turn on Keep a replay of my writing, below, and NEO starts recording the next time you write.')
-      : t('Nothing recorded yet. Write in this book and NEO keeps a replay of it here, like a painter’s timelapse.');
+      : t('Nothing recorded yet. Write in this book and NEO keeps a replay of it here.');
     paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
   }
 
@@ -6440,7 +6425,7 @@ async function openBook(bookId) {
     // and on another opening, once, what Writing History is
     library.recordHintShown = true;
     writeLibrary(library);
-    setTimeout(() => toast(t('Like a painter’s timelapse, NEO keeps a replay of your writing. It stays with your book and is never sent anywhere. File → Keep a Replay of My Writing turns it off.'), 9000), 800);
+    setTimeout(() => toast(t('NEO keeps a replay of your writing, so you can watch how it was written. It stays with your book and is never sent anywhere. File → Keep a Replay of My Writing turns it off.'), 9000), 800);
   }
   spReportState();
 }

@@ -2,15 +2,13 @@
 // Proof of when I wrote (docs/neo-recording-plan.md, part 2): seals over
 // Writing History, signed with this device's key and timestamped by
 // independent services. Opt-in. Only fingerprints leave the computer: a
-// seal's SHA-256 goes to two RFC 3161 timestamp authorities (and, when the
-// writer asks, to the OpenTimestamps calendars, which anchor it in Bitcoin).
-// Never a word of the book.
+// seal's SHA-256 goes to two RFC 3161 timestamp authorities. Never a word
+// of the book.
 //
 // A seal is recording/<device>/seals/NNNNNN.json, written once:
 //
 //   { neoSeal: 1, seq, at, book, device, publicKey,
-//     after: [{ beacon: 'drand-quicknet', round, randomness, signature },
-//             { beacon: 'bitcoin', height, hash }],      (each when it answered)
+//     after: [{ beacon: 'drand-quicknet', round, randomness, signature }],  (when it answered)
 //     heads: { <session>: <its last h line's hash> },     (those changed since the last seal)
 //     tokens: { <file in seals/>: <sha256 hex> },         (stamps written since the last seal)
 //     prev: <sha256 hex of the previous seal's bytes>, sig }
@@ -23,14 +21,12 @@
 // (RFC 4998's archive timestamps, in one field). Beside each seal:
 //
 //   NNNNNN.<tsa>.tsr     an RFC 3161 TimeStampResp, as the authority sent it
-//   NNNNNN.pending.ots   an OpenTimestamps proof waiting for Bitcoin
-//   NNNNNN.ots           the same once Bitcoin holds it (the pending one goes)
 //
 // No file is ever rewritten. Only the newest seal is stamped: each seal
 // names the one before by its hash, so a seal made offline is fixed in time
 // by the next one stamped. Anyone can check a stamp without NEO:
-// `openssl ts -verify -data NNNNNN.json -in NNNNNN.digicert.tsr -CAfile <root>`,
-// or `ots verify` on the .ots. scripts/verify-recording.js checks all of it.
+// `openssl ts -verify -data NNNNNN.json -in NNNNNN.digicert.tsr -CAfile <root>`.
+// scripts/verify-recording.js checks all of it.
 //
 // A main-process module with no Electron in it: NEO hands in the key (kept
 // with safeStorage), a clock, fetch, and its durable write.
@@ -41,7 +37,6 @@ const path = require('path');
 const zlib = require('zlib');
 const R = require('./recording.js');
 const Files = require('./recording-files.js');
-const OTS = require('./ots.js');
 
 // Node's own SHA-256 for the chains, as history-worker.js does: the same
 // hashes, much faster than recording.js's own
@@ -49,8 +44,6 @@ R.setDigest((data) => crypto.createHash('sha256').update(data).digest().subarray
 
 const SEAL = /^(\d{6})\.json$/;
 const TOKEN = /^(\d{6})\.([a-z0-9-]+)\.tsr$/;
-const OTS_FILE = /^(\d{6})\.ots$/;
-const OTS_PENDING = /^(\d{6})\.pending\.ots$/;
 // the root of a service the writer added, beside the seals it stamped
 const ROOT_FILE = /^root-[0-9a-f]{16}\.pem$/;
 const pad = (n) => String(n).padStart(6, '0');
@@ -478,11 +471,6 @@ async function getJSON(fetchFn, url, ms = 8000) {
   if (!res.ok) throw new Error(url + ' answered ' + res.status);
   return res.json();
 }
-async function getText(fetchFn, url, ms = 8000) {
-  const res = await fetchFn(url, { headers: { 'User-Agent': 'NEO' }, signal: AbortSignal.timeout(ms) });
-  if (!res.ok) throw new Error(url + ' answered ' + res.status);
-  return (await res.text()).trim();
-}
 
 // the round asked for (`round`), or the latest
 async function drandRound(fetchFn, round = 'latest') {
@@ -496,21 +484,6 @@ async function drandRound(fetchFn, round = 'latest') {
     } catch (err) { last = err; }
   }
   throw last || new Error('drand didn’t answer');
-}
-
-const EXPLORERS = ['https://blockstream.info/api', 'https://mempool.space/api'];
-// Bitcoin's newest block
-async function bitcoinTip(fetchFn) {
-  let last = null;
-  for (const api of EXPLORERS) {
-    try {
-      const height = parseInt(await getText(fetchFn, `${api}/blocks/tip/height`), 10);
-      const hash = await getText(fetchFn, `${api}/block-height/${height}`);
-      if (!Number.isInteger(height) || !/^[0-9a-f]{64}$/.test(hash)) throw new Error(api + ' answered something else');
-      return { beacon: 'bitcoin', height, hash };
-    } catch (err) { last = err; }
-  }
-  throw last || new Error('no block explorer answered');
 }
 
 /* ---------- reading a recording's heads ---------- */
@@ -542,14 +515,13 @@ const asked = new Map();
 // checkToken; the tests hand in their own.)
 class Sealer {
   constructor({ dir, book, device, key, now = () => new Date(), fetch = globalThis.fetch, write, log = () => {},
-    tsas = TSAS, bitcoin = false, anchors = null, cacheFile = null, check = checkToken }) {
-    Object.assign(this, { dir, book, device, key, now, fetch, log, tsas, bitcoin, cacheFile, check });
+    tsas = TSAS, anchors = null, cacheFile = null, check = checkToken }) {
+    Object.assign(this, { dir, book, device, key, now, fetch, log, tsas, cacheFile, check });
     this.anchors = anchors;
     this.put = (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); write(file, data); };
     this.io = Files.nodeIO({ fs, path, zlib, write: this.put, log });
     this.state = null;
     this.closedHeads = null;
-    this.upgradedAt = 0;
   }
 
   get sealsDir() { return path.join(this.dir, 'seals'); }
@@ -622,12 +594,11 @@ class Sealer {
     if (!Object.keys(changed).length && !force) return null;
     const tokens = {};
     for (const f of this.files()) {
-      if ((TOKEN.test(f) || OTS_FILE.test(f)) && !st.covered.has(f)) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
+      if (TOKEN.test(f) && !st.covered.has(f)) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
     }
     // what nobody knew before: asked first, so the seal comes after it
     const after = [];
     try { after.push(await drandRound(this.fetch)); } catch (err) { this.log('proof drand', err); }
-    if (this.bitcoin) try { after.push(await bitcoinTip(this.fetch)); } catch (err) { this.log('proof bitcoin', err); }
     const prev = this.last();
     const body = {
       neoSeal: 1,
@@ -653,9 +624,8 @@ class Sealer {
   }
 
   // The newest seal stamped by authorities until two have (one asked after
-  // another, the next tried when one fails), and, when the writer asked,
-  // sent to the OpenTimestamps calendars. Older seals are left: the newest
-  // names them. Returns the authorities that stamped it now.
+  // another, the next tried when one fails). Older seals are left: the
+  // newest names them. Returns the authorities that stamped it now.
   async stamp() {
     const seal = this.last();
     if (!seal) return [];
@@ -696,31 +666,7 @@ class Sealer {
         done.push(tsa.id);
       } catch (err) { this.log('proof stamp', err); }
     }
-    if (this.bitcoin && !this.files().some((f) => f === stem + '.ots' || f === stem + '.pending.ots')) {
-      try { this.put(path.join(this.sealsDir, stem + '.pending.ots'), await OTS.stamp(digest)); } catch (err) { this.log('proof ots', err); }
-    }
     return done;
-  }
-
-  // Pending OpenTimestamps proofs asked after, at most every `every` ms:
-  // one Bitcoin holds is written as NNNNNN.ots, and the pending one goes
-  async upgrade({ every = 3 * 3600 * 1000 } = {}) {
-    if (Date.now() - this.upgradedAt < every) return 0;
-    this.upgradedAt = Date.now();
-    let n = 0;
-    for (const f of this.files()) {
-      const m = OTS_PENDING.exec(f);
-      if (!m) continue;
-      try {
-        const r = await OTS.upgrade(fs.readFileSync(path.join(this.sealsDir, f)));
-        if (!OTS.attestations(OTS.parseProof(r.proof)).some((a) => a.type === 'bitcoin')) continue;
-        const done = path.join(this.sealsDir, m[1] + '.ots');
-        if (!fs.existsSync(done)) this.put(done, r.proof);
-        fs.rmSync(path.join(this.sealsDir, f), { force: true });
-        n++;
-      } catch (err) { this.log('proof ots', err); }
-    }
-    return n;
   }
 
   // Whether the newest seal is old enough that its stamps want a newer
@@ -747,9 +693,7 @@ class Sealer {
       seals: this.load().seals.length,
       at: l.at,
       stamps: stamps.map((id) => (this.tsas.find((t) => t.id === id) || { name: id }).name),
-      stampedAt: stamped,
-      bitcoin: files.some((f) => OTS_FILE.test(f)),
-      pendingBitcoin: files.some((f) => OTS_PENDING.test(f))
+      stampedAt: stamped
     };
   }
 }
@@ -759,8 +703,8 @@ class Sealer {
 // One device's seals checked: each one's signature, its place in the chain,
 // its stamps, its `after`, and the stamps it says it covers. `sessions`
 // maps a session to the `h` hashes its chain holds (chainHashes), to check
-// the heads; `online` asks drand and a block explorer too.
-// { device, publicKey, seals: [{ seq, at, ok, by, after, stamps, ots, problems }], problems }
+// the heads; `online` asks drand too.
+// { device, publicKey, seals: [{ seq, at, ok, by, after, stamps, problems }], problems }
 async function verifyDevice(dir, { sessions = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
   const sealsDir = path.join(dir, 'seals');
   let files = [];
@@ -780,7 +724,7 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
   for (const f of files) {
     const m = SEAL.exec(f);
     if (!m) continue;
-    const s = { file: f, seq: +m[1], at: null, ok: true, by: null, after: null, stamps: [], ots: null, problems: [] };
+    const s = { file: f, seq: +m[1], at: null, ok: true, by: null, after: null, stamps: [], problems: [] };
     out.seals.push(s);
     const bad = (why) => { s.ok = false; s.problems.push(why); };
     let bytes;
@@ -823,13 +767,6 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
         if (!ok) bad('its drand round isn’t drand’s');
         else s.after = Math.max(s.after || 0, roundTime(a.round));
         if (roundTime(a.round) > s.at + 60000) bad('its drand round is later than the seal says it was made');
-      } else if (a.beacon === 'bitcoin' && online) {
-        try {
-          const res = await fetchFn(`${EXPLORERS[0]}/block/${a.hash}`, { signal: AbortSignal.timeout(10000) });
-          const block = res.ok ? await res.json() : null;
-          if (!block || block.height !== a.height) bad('its Bitcoin block isn’t Bitcoin’s');
-          else s.after = Math.max(s.after || 0, block.timestamp * 1000);
-        } catch { s.problems.push('no block explorer could be asked about block ' + a.height); }
       }
     }
     // stamps
@@ -850,22 +787,6 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
         if (c.genTime < s.at - 5 * 60000) bad(tm[2] + ' stamped it before it says it was made');
         s.by = s.by === null ? c.genTime : Math.min(s.by, c.genTime);
       }
-    }
-    // OpenTimestamps
-    const otsFile = files.find((x) => x === pad(s.seq) + '.ots') || files.find((x) => x === pad(s.seq) + '.pending.ots');
-    if (otsFile) {
-      try {
-        const proof = OTS.parseProof(fs.readFileSync(path.join(sealsDir, otsFile)));
-        if (!proof.digest.equals(digest)) bad('its OpenTimestamps proof is for other bytes');
-        const btc = OTS.attestations(proof).filter((a) => a.type === 'bitcoin');
-        s.ots = { file: otsFile, heights: btc.map((a) => a.height), checked: null };
-        if (online && btc.length) {
-          const r = await OTS.checkBitcoin(btc[0].height, btc[0].msg);
-          s.ots.checked = r.ok;
-          if (r.ok) s.by = s.by === null ? r.time.getTime() : Math.min(s.by, r.time.getTime());
-          else if (!r.offline) bad('its OpenTimestamps proof: ' + r.reason);
-        }
-      } catch (err) { bad('its OpenTimestamps proof can’t be read (' + err.message + ')'); }
     }
   }
   // a seal not stamped itself is fixed in time by the next stamped one,
@@ -912,6 +833,6 @@ module.exports = {
   der, kids, oidOf, tsaRequest, checkToken, roots, mozilla, isPublic, pemOf, certsIn, rootFileName,
   findRoot, tryService, serviceId,
   newKey, keyOf, canonical, sign, verifySignature,
-  drandRound, roundTime, bitcoinTip, chainHashes,
+  drandRound, roundTime, chainHashes,
   Sealer, verifyDevice, sha256hex
 };

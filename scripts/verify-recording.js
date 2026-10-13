@@ -12,8 +12,7 @@
 // in proof-roots.pem, and the roots of services the writer added that are
 // in Mozilla's list) and its `after`; then the time cover: when each
 // session was sealed, and every one that went more than a day unsealed.
-// --online also asks drand for each seal's round and a block explorer for
-// its Bitcoin blocks. A session the book lacks is read from the backup
+// --online also asks drand for each seal's round. A session the book lacks is read from the backup
 // mirror (Backups/recordings/<book folder>, found beside the library, or
 // --mirror). Exits 1 when anything fails.
 
@@ -97,7 +96,7 @@ function print(r) {
       out.push(`  ${ss.length} seals, signed by key ${d.seals.publicKey}; ${stamped} stamped, ${ss.filter((s) => s.by === null && s.byLater).length} fixed in time by a later seal`);
       for (const s of ss) {
         const who = s.stamps.filter((x) => x.ok).map((x) => `${x.tsa} ${iso(x.genTime)}${x.trusted ? '' : x.added ? ' (root added by the writer, in no public list)' : ' (untrusted)'}`).join(', ');
-        out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}${s.ots ? `; Bitcoin ${s.ots.heights.join(', ') || 'pending'}` : ''}`);
+        out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}`);
       }
       const gaps = d.cover.filter((c) => c.gap);
       out.push(gaps.length ? `  Time cover: ${gaps.length} session(s) not timestamped within a day:` : '  Time cover: every closed session timestamped within a day of its end');

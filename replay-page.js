@@ -171,7 +171,7 @@
       if (!m) continue;
       const seq = +m[1];
       const bytes = byName.get(f.name);
-      const s = { seq, at: null, ok: true, problems: [], stamps: [], after: null, by: null, ots: false };
+      const s = { seq, at: null, ok: true, problems: [], stamps: [], after: null, by: null };
       out.seals.push(s);
       const bad = (why) => { s.ok = false; s.problems.push(why); };
       let body;
@@ -216,7 +216,6 @@
         if (!stamped) bad(T('a timestamp token stamps something else'));
         else if (at !== null) s.by = s.by === null ? at : Math.min(s.by, at);
       }
-      s.ots = byName.has(m[1] + '.ots');
     }
     // a seal not stamped itself is fixed in time by the next one stamped
     let later = null;
@@ -660,7 +659,7 @@
       const by = s.stamps.filter((x) => x.stamped && x.at !== null).map((x) => (TSA_NAMES[x.tsa] || x.tsa) + ' ' + fmtTime(x.at)).join(', ');
       tr.append(el('td', '', by || (s.byLater ? T('by {when} (a later seal)', { when: fmtTime(s.byLater) }) : T('not stamped'))));
       const td = el('td');
-      for (const name of [pad + '.json', ...s.stamps.map((x) => x.file), ...(s.ots ? [pad + '.ots'] : [])]) {
+      for (const name of [pad + '.json', ...s.stamps.map((x) => x.file)]) {
         const f = byName.get(name);
         if (f) td.append(download(name, fromB64(f.b64)), ' ');
       }
@@ -676,7 +675,6 @@
     box.append(el('h3', '', T('Check it without this page')));
     box.append(el('p', '', T('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:')));
     box.append(el('pre', '', 'openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem'));
-    box.append(el('p', '', T('A seal’s .ots file, where there is one, is checked against Bitcoin with the OpenTimestamps client: ots verify 000001.ots')));
     if (data.roots) {
       const p = el('p');
       p.append(download('proof-roots.pem', new TextEncoder().encode(data.roots), 'application/x-pem-file'));

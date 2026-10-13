@@ -43,6 +43,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 
 ## Writing History, the dialog
 
+- [ ] History's footer description, the History tab's tooltip, the shelf menu's **Writing history…**, the empty history and the first-run hint describe it plainly (a replay of how the book was written), in English and in French.
 - [ ] All four ways in open it: History in the footer, File → Writing History…, a book's shelf menu (without opening the book), and **Watch This Chapter Being Written** in a chapter's menu.
 - [ ] Days: ← and → move through the tiles and show each day as it ended; a tile clicked plays its day; Esc in the player goes back to the days, Esc again closes.
 - [ ] Player: play, each speed, Skip pauses, dragging the timeline, ⇧← / ⇧→ between sessions, and play running on into the next day.
@@ -103,17 +104,17 @@ Each item says what to do and what should happen. Tick it with the date and the 
 ## Proof of when I wrote (phase 5)
 
 - [ ] History's footer has **Prove when I wrote**, off. Its tooltip says what's sent. Ticking it asks first, in plain words; Cancel leaves it off, and nothing is sent (no `seals/` folder appears).
+- [ ] With proof on, History's footer has no second checkbox beside **Prove when I wrote**, and only `.json` and `.tsr` files appear in `seals/`.
 - [ ] Turn it on with a book open: within a few seconds `recording/<id>/seals/` has `000001.json` and `000001.digicert.tsr` and `000001.sectigo.tsr`, and the footer says "Sealed today at …, timestamped by DigiCert and Sectigo."
 - [ ] Check a stamp without NEO: `openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem` (from NEO's folder) says `Verification: OK`. The same for Sectigo's.
 - [ ] Write for over an hour: one new seal an hour while writing, none while not. Closing the book seals once more.
 - [ ] Tag a moment in History (a name you type): a new seal appears within a minute, not at the next hour.
 - [ ] Turn the network off (airplane mode), write, close the book: seals are written but not stamped, and the footer says it's waiting for the network. Turn the network on: within half an hour (or at the next book open), the newest seal is stamped.
 - [ ] Typing never slows or stutters when a seal is made, including offline, when the timestamp services take a while to answer.
-- [ ] **Also anchor in Bitcoin**: a `NNNNNN.pending.ots` appears with the next seal; some hours later (with NEO open, or at the next start) it's replaced by `NNNNNN.ots`, and the footer says "Anchored in Bitcoin." `ots verify 000001.ots` (OpenTimestamps client) agrees.
 - [ ] `node scripts/verify-recording.js "<library>/book-…"` on a book written for a few days with proof on says "everything checks", lists each seal with its stamps, and lists the sessions written before proof was on as "timestamped later". `--online` asks drand too and still checks.
 - [ ] Turn **Keep a replay of my writing** off: no seals are made while it's off, though **Prove when I wrote** stays ticked (and is hidden).
 - [ ] **Delete this book's history…** on a book with seals: the confirmation says its seals and timestamps go too; afterwards they're in the Recycle Bin with `recording/`.
-- [ ] `Backups/recordings/<book folder>/<id>/seals/` has every seal and stamp, never a `.pending.ots`.
+- [ ] `Backups/recordings/<book folder>/<id>/seals/` has every seal and stamp.
 - [ ] Windows: `%APPDATA%\NEO\secrets.json` holds `proofKey` encrypted (not a readable `-----BEGIN PRIVATE KEY-----`).
 - [ ] **(2 computers)** Proof on (it's a library setting, so on for both): each computer seals its own folder with its own key, and verify-recording checks both.
 - [ ] **(phone)** The phone doesn't offer proof and writes no seals; its sessions are checked as unsealed.

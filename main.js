@@ -873,7 +873,7 @@ async function recMirrorMine(bookId) {
 
 // What README.txt in a book's recording/ folder says
 const recReadme = () => [
-  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke, like a painter’s timelapse. NEO uses it to replay the writing and to bring back any earlier version of a chapter.'),
+  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to replay the writing and to bring back any earlier version of a chapter.'),
   t('Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.'),
   t('Deleting this folder deletes the history. The book itself is untouched.')
 ].join('\n\n') + '\n';
@@ -1081,7 +1081,6 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
 const Proof = require('./proof.js');
 const PROOF_HOUR = 3600 * 1000;
 let proofOn = false;
-let proofBitcoin = false;
 let proofTimer = null;
 const proofSealers = new Map(); // bookId -> { sealer, queue }
 
@@ -1089,8 +1088,6 @@ const proofSealers = new Map(); // bookId -> { sealer, queue }
 function proofSetFlags(f) {
   if (!f || typeof f !== 'object') return;
   proofOn = !!f.on;
-  proofBitcoin = !!f.bitcoin;
-  for (const p of proofSealers.values()) p.sealer.bitcoin = proofBitcoin;
   if ('tsas' in f) proofServicesUse(Array.isArray(f.tsas) ? f.tsas : null);
   // stamps that failed (offline) are asked for again every half hour
   if (proofOn && !proofTimer) {
@@ -1120,7 +1117,7 @@ function proofSealer(bookId) {
       sealer: new Proof.Sealer({
         dir: recDir(bookId, device), book: libName(bookId), device, key: proofKey(), write: writeFileDurable,
         fetch: (...a) => globalThis.fetch(...a), // (looked up each time, so the tests can stand in for the network)
-        log: (source, err) => logError(source, err), bitcoin: proofBitcoin,
+        log: (source, err) => logError(source, err),
         ...proofAsked(),
         cacheFile: path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'heads.json')
       }),
@@ -1252,7 +1249,6 @@ function proofRun(bookId, how) {
     if (how === 'start') { if (s.renewDue()) made = await s.seal({ force: true }); }
     else if (how !== 'retry') made = await s.seal();
     await s.stamp();
-    await s.upgrade();
     for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
     return made;
   }).catch((err) => { logError('proof', err); return null; });
@@ -1265,7 +1261,7 @@ ipcMain.handle('proof:set', (_e, flags) => { proofSetFlags(flags); return true; 
 ipcMain.handle('proof:seal', async (_e, bookId) => !!(await proofRun(libName(bookId), 'now')));
 // for the dialog: how many seals, the newest, who stamped it
 ipcMain.handle('proof:status', (_e, bookId) => {
-  const st = { on: proofOn, bitcoin: proofBitcoin, seals: 0 };
+  const st = { on: proofOn, seals: 0 };
   try {
     if (!fs.existsSync(path.join(recDir(bookId), 'seals'))) return st;
     return { ...st, ...proofSealer(libName(bookId)).sealer.status() };

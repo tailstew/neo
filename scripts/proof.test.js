@@ -15,7 +15,6 @@ const crypto = require('node:crypto');
 const { test } = require('node:test');
 const R = require('../recording.js');
 const P = require('../proof.js');
-const OTS = require('../ots.js');
 const { verifyBook } = require('./verify-recording.js');
 
 const FIX = path.join(__dirname, 'fixtures', 'proof');
@@ -322,15 +321,7 @@ test('the heads of closed sessions are remembered outside the library', async ()
   assert.deepEqual(Object.keys(cached).sort(), ['2026-10-06T09-14-03Z-k3f9', '2026-10-07T20-01-44Z-q7m2']);
 });
 
-/* ---------- OpenTimestamps and drand ---------- */
-
-test('the OpenTimestamps reference proof parses and round-trips byte for byte', () => {
-  const buf = fs.readFileSync(path.join(FIX, 'hello-world.txt.ots'));
-  const proof = OTS.parseProof(buf);
-  assert.ok(proof.digest.equals(OTS.sha256(fs.readFileSync(path.join(FIX, 'hello-world.txt')))));
-  assert.deepEqual(OTS.attestations(proof).filter((a) => a.type === 'bitcoin').map((a) => a.height), [358391]);
-  assert.ok(OTS.serializeProof(proof).equals(buf));
-});
+/* ---------- drand ---------- */
 
 test('a drand round’s time comes from quicknet’s genesis; a round that doesn’t hash is refused', async () => {
   assert.equal(P.roundTime(1), P.DRAND.genesis * 1000);
@@ -340,13 +331,11 @@ test('a drand round’s time comes from quicknet’s genesis; a round that doesn
 
 /* ---------- backups ---------- */
 
-test('the backup mirror copies seals and stamps once; a pending Bitcoin proof waits', async () => {
+test('the backup mirror copies seals and stamps once', async () => {
   const Files = require('../recording-files.js');
   const io = Files.nodeIO({ fs, path, zlib, write: put, log: () => {} });
   const root = path.join(tmp(), 'recording');
   copyDir(path.join(FIX, 'recording'), root);
-  const seals = path.join(root, DEV, 'seals');
-  put(path.join(seals, '000002.pending.ots'), 'waiting');
   const mirror = path.join(tmp(), 'mirror');
   await Files.sweep(io, root, mirror, DEV);
   assert.deepEqual(fs.readdirSync(path.join(mirror, DEV, 'seals')).sort(),
