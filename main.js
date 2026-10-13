@@ -930,7 +930,12 @@ const historyCleaned = new Set();
 
 function historyRequest(msg) {
   if (!historyChild) {
-    historyChild = utilityProcess.fork(path.join(__dirname, 'history-worker.js'), [], { serviceName: 'NEO Writing History' });
+    historyChild = utilityProcess.fork(path.join(__dirname, 'history-worker.js'), [], { serviceName: 'NEO Writing History', stdio: 'pipe' });
+    // what it said last, for the log if it dies
+    let said = '';
+    const hear = (d) => { said = (said + d).slice(-4000); };
+    historyChild.stdout.on('data', hear);
+    historyChild.stderr.on('data', hear);
     historyChild.on('message', (m) => {
       if (m.id) {
         const w = historyWaiting.get(m.id);
@@ -942,8 +947,9 @@ function historyRequest(msg) {
       if (m.type === 'built' && m.error) logError('history', m.error);
       for (const w of BrowserWindow.getAllWindows()) w.webContents.send('rec:progress', m);
     });
-    historyChild.on('exit', () => {
+    historyChild.on('exit', (code) => {
       historyChild = null;
+      if (code) logError('history', new Error('the history process exited with code ' + code + (said ? ':\n' + said.trim() : '')));
       for (const w of historyWaiting.values()) w.reject(new Error('the history process exited'));
       historyWaiting.clear();
     });
