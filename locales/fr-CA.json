@@ -24,20 +24,11 @@
     "one": "{n} séance; {b} à la chaîne rompue, {u} sans suite avec la précédente (il en manque une entre les deux).",
     "other": "{n} séances; {b} à la chaîne rompue, {u} sans suite avec la précédente (il en manque une entre les deux)."
   },
-  "A script exports as a PDF, Fountain or Final Draft; paperbacks are for books": "Un scénario s’exporte en PDF, Fountain ou Final Draft; les livres de poche sont pour les livres",
-  "Book restored from {when}. {undo} undoes it; the book as it was is in a snapshot too.": "Livre restauré depuis {when}. {undo} annule; le livre tel qu’il était est aussi dans un instantané.",
-  "Chapter restored from {when}. {undo} undoes it; the text it replaced is in a snapshot too.": "Chapitre restauré depuis {when}. {undo} annule; le texte remplacé est aussi dans un instantané.",
-  "Email": "Courriel",
   "From the Writing History NEO kept as it was written. Facts first; the judgements after them are labelled as judgements.": "D’après l’historique d’écriture que NEO a tenu au fil de l’écriture. Les faits d’abord; les jugements qui suivent sont présentés comme tels.",
   "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "La moitié des intervalles entre touches était entre {low} et {high}; l’intervalle médian était de {mid}.",
-  "NEO saves as you type; a snapshot keeps the book as it stands now. They’re on the Darlings tab.": "NEO enregistre pendant que vous tapez; un instantané garde le livre tel qu’il est maintenant. Ils sont dans l’onglet Chutier.",
-  "Pocket couldn't open its NEO Library folder. Force-quit and reopen the app; if it keeps happening, check that iCloud Drive is signed in (Settings → your name → iCloud), or turn it off so Pocket keeps books on the iPad itself.": "Pocket n’a pas pu ouvrir son dossier NEO Library. Forcez la fermeture de l’app et rouvrez-la; si cela se reproduit, vérifiez qu’iCloud Drive est connecté (Réglages → votre nom → iCloud), ou désactivez-le pour que Pocket garde les livres sur l’iPad lui-même.",
   "Prove when you wrote?": "Prouver quand vous avez écrit?",
   "Restore the defaults?": "Rétablir les réglages par défaut?",
   "Sealed {when}. Last timestamped {then}; waiting for the network for the rest.": "Scellé {when}. Dernier horodatage {then}; en attente du réseau pour le reste.",
   "These are judgements, not proof. A recording shows how the words were typed and when; it can’t show whose ideas they were.": "Ce sont des jugements, pas une preuve. Un enregistrement montre comment et quand les mots ont été tapés; il ne peut pas montrer de qui venaient les idées.",
-  "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Ce navigateur ne sait pas vérifier les signatures Ed25519; un Chrome, Firefox ou Safari récent le peut.",
-  "What happens in this chapter?": "Que se passe-t-il dans ce chapitre?",
-  "What happens in this scene?": "Que se passe-t-il dans cette scène?",
-  "What happens in this section?": "Que se passe-t-il dans cette section?"
+  "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Ce navigateur ne sait pas vérifier les signatures Ed25519; un Chrome, Firefox ou Safari récent le peut."
 }
