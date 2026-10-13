@@ -786,6 +786,7 @@ async function loadLibrary() {
   for (const s of untouched) s.name = own;
   if (untouched.length) await writeLibrary(library);
   if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
+  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   if (!library.firstRunDone) {
     showFirstRun();
   }
@@ -3153,7 +3154,9 @@ async function setRecordWriting(on) {
 // no proofSet, so it never offers it.
 const proofFlags = () => ({
   on: !!(window.neo.proofSet && library && library.proveWriting === true && recordingWanted()),
-  bitcoin: !!(library && library.proveBitcoin === true)
+  bitcoin: !!(library && library.proveBitcoin === true),
+  // the timestamp services the writer chose (Timestamp services…)
+  tsas: library && Array.isArray(library.proofTsas) ? library.proofTsas : null
 });
 
 // Prove when I wrote: asked once, in plain words, before anything is sent.
@@ -3185,8 +3188,8 @@ async function setProveWriting(on, { bitcoin = library.proveBitcoin === true } =
   return !!on;
 }
 
-// Who the opt-in says the fingerprint goes to: the services this computer
-// asks first (Timestamp services…), DigiCert and Sectigo unless changed
+// Who the opt-in says the fingerprint goes to: the services the writer's
+// library asks first (Timestamp services…), DigiCert and Sectigo unless changed
 async function proofWhoSays() {
   let on = [];
   try { on = (await window.neo.proofServices()).filter((s) => s.on); } catch { /* the defaults, then */ }
@@ -3201,11 +3204,23 @@ async function proofWhoSays() {
 // services): who stamps the seals, opened from the proof line in History's
 // footer. NEO's three and any the writer added, in the order they're
 // asked; the first two that answer stamp each seal. Every change is kept at
-// once, on this computer (main.js, settings.json). Resolves when closed.
+// once, in library.proofTsas, so the writer's other computers ask the same
+// services; main.js hands back each change as keep, roots and all.
+// Resolves when closed.
 async function openTsaServices() {
   if (!window.neo.proofServices) return;
   let list = [];
-  try { list = await window.neo.proofServices(); } catch { return; }
+  try {
+    await window.neo.proofSet(proofFlags()); // (the library as it is now)
+    list = await window.neo.proofServices();
+  } catch { return; }
+  const kept = (r) => {
+    if (!r || !Array.isArray(r.list)) return list;
+    if (r.keep) library.proofTsas = r.keep;
+    else delete library.proofTsas;
+    writeLibrary(library);
+    return r.list;
+  };
   return new Promise((resolve) => {
     const bd = document.createElement('div');
     bd.className = 'modal-backdrop tsa-backdrop';
@@ -3243,7 +3258,7 @@ async function openTsaServices() {
     const warn = $q('.tsa-warn');
 
     const save = async (next) => {
-      try { list = await window.neo.proofServicesSet(next.map((s) => ({ id: s.id, on: s.on }))); } catch { /* shown as it was */ }
+      try { list = kept(await window.neo.proofServicesSet(next.map((s) => ({ id: s.id, on: s.on })))); } catch { /* shown as it was */ }
       render();
     };
     function render(focusId = null, focusSel = null) {
@@ -3290,7 +3305,7 @@ async function openTsaServices() {
         btn('↓', t('Move down'), 'tsa-down', i === list.length - 1, move(1, '.tsa-down'));
         if (s.added) {
           btn('×', t('Take out'), 'tsa-x', false, async () => {
-            try { list = await window.neo.proofServiceRemove(s.id); } catch { /* as it was */ }
+            try { list = kept(await window.neo.proofServiceRemove(s.id)); } catch { /* as it was */ }
             render();
             $q('.tsa-new').focus();
           });
@@ -3346,7 +3361,7 @@ async function openTsaServices() {
       tried = r;
       said.textContent = r.public
         ? t('{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.', { name: r.name, root: r.rootName })
-        : t('{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.', { name: r.name, root: r.rootName });
+        : t('{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.', { name: r.name, root: r.rootName });
       $q('.tsa-ok').textContent = r.public ? t('Add') : t('Add anyway');
       yes.hidden = false;
       $q('.tsa-ok').focus();
@@ -3366,7 +3381,7 @@ async function openTsaServices() {
     $q('.tsa-cancel').addEventListener('click', closeAdd);
     $q('.tsa-ok').addEventListener('click', async () => {
       if (!tried) return;
-      try { list = await window.neo.proofServiceAdd(tried.url); } catch { /* as it was */ }
+      try { list = kept(await window.neo.proofServiceAdd(tried.url)); } catch { /* as it was */ }
       closeAdd();
       render();
     });
@@ -3384,7 +3399,7 @@ async function openTsaServices() {
         });
         if (!sure || !bd.isConnected) { $q('.tsa-reset').focus(); return; }
       }
-      try { list = await window.neo.proofServicesReset(); } catch { /* as it was */ }
+      try { list = kept(await window.neo.proofServicesReset()); } catch { /* as it was */ }
       render();
       $q('.tsa-reset').focus();
     });
@@ -15845,6 +15860,8 @@ async function refreshFromDisk() {
         if (gen !== libraryGeneration || libraryWritesPending) return;
         if (lib && lib.firstRunDone && JSON.stringify(lib) !== JSON.stringify(library)) {
           library = lib;
+          // proof, and the timestamp services, as another computer left them
+          if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
           const shelf = $('#bookshelf-view');
           const keep = shelf.scrollTop;
           await renderShelves();

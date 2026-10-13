@@ -912,7 +912,7 @@
     "other": "{n} sesiones; {b} con la cadena rota, {u} sin seguir a la anterior (falta una en medio)."
   },
   "{name} (deleted)": "{name} (eliminado)",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} respondió con un sello de tiempo válido, pero su raíz, {root}, no está en ninguna lista pública. NEO guarda la raíz en este ordenador y en cada libro que sella, para que sus sellos se puedan comprobar, pero solo son prueba independiente para quien confíe en {name}.",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} respondió con un sello de tiempo válido, pero su raíz, {root}, no está en ninguna lista pública. NEO guarda la raíz en tu biblioteca y en cada libro que sella, para que sus sellos se puedan comprobar, pero solo son prueba independiente para quien confíe en {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} respondió con un sello de tiempo válido. Su raíz, {root}, está en la lista de raíces de confianza de Mozilla.",
   "{title} — Writing History": "{title} — Historial de escritura",
   "1 character typed": "1 carácter escrito",

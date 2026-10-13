@@ -985,7 +985,7 @@
     "other": "Сеансов: {n}; с разорванной цепочкой — {b}, не продолжают предыдущий — {u} (между ними одного не хватает)."
   },
   "{name} (deleted)": "{name} (удалено)",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} ответил действительной меткой времени, но его корневой сертификат, {root}, нет ни в одном публичном списке. NEO хранит его на этом компьютере и в каждой книге, которую заверяет, чтобы его метки можно было проверить, но независимым доказательством они служат только для того, кто доверяет {name}.",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} ответил действительной меткой времени, но его корневой сертификат, {root}, нет ни в одном публичном списке. NEO хранит его в вашей библиотеке и в каждой книге, которую заверяет, чтобы его метки можно было проверить, но независимым доказательством они служат только для того, кто доверяет {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} ответил действительной меткой времени. Его корневой сертификат, {root}, есть в списке доверенных корневых сертификатов Mozilla.",
   "{title} — Writing History": "{title} — История письма",
   "1 character typed": "Набран 1 символ",

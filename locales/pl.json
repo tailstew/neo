@@ -967,7 +967,7 @@
     "other": "{n} sesji; z przerwanym łańcuchem: {b}, nienastępujące po poprzedniej: {u} (brakuje jednej pomiędzy)."
   },
   "{name} (deleted)": "{name} (usunięty)",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} odpowiedział ważnym znacznikiem czasu, ale jego certyfikat główny, {root}, nie jest na żadnej publicznej liście. NEO przechowuje go na tym komputerze i w każdej książce, którą opatruje znacznikiem, aby dało się sprawdzić jego znaczniki, ale są one niezależnym dowodem tylko dla kogoś, kto ufa {name}.",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} odpowiedział ważnym znacznikiem czasu, ale jego certyfikat główny, {root}, nie jest na żadnej publicznej liście. NEO przechowuje go w Twojej bibliotece i w każdej książce, którą opatruje znacznikiem, aby dało się sprawdzić jego znaczniki, ale są one niezależnym dowodem tylko dla kogoś, kto ufa {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} odpowiedział ważnym znacznikiem czasu. Jego certyfikat główny, {root}, jest na liście zaufanych certyfikatów głównych Mozilli.",
   "{title} — Writing History": "{title} — Historia pisania",
   "1 character typed": "Wpisano 1 znak",

@@ -1091,6 +1091,7 @@ function proofSetFlags(f) {
   proofOn = !!f.on;
   proofBitcoin = !!f.bitcoin;
   for (const p of proofSealers.values()) p.sealer.bitcoin = proofBitcoin;
+  if ('tsas' in f) proofServicesUse(Array.isArray(f.tsas) ? f.tsas : null);
   // stamps that failed (offline) are asked for again every half hour
   if (proofOn && !proofTimer) {
     proofTimer = setInterval(() => {
@@ -1131,24 +1132,26 @@ function proofSealer(bookId) {
 }
 
 // The timestamp services, as the writer arranged them in Timestamp
-// services…: proofTsas in settings.json, this computer's choice like its
-// key. Each is { id, on } for one of NEO's three, or { id, name, url, on,
-// added: true, public, rootName } for one the writer added, whose root is
-// userData/timestamp-roots/<id>.pem. NEO's three that the list lacks
-// (none saved yet, or a fourth in a later NEO) come after, on.
-const tsaRootsDir = () => path.join(app.getPath('userData'), 'timestamp-roots');
+// services…: library.proofTsas, which the window reads and writes with the
+// rest of library.json, so the writer's other computers ask the same ones.
+// Each is { id, on } for one of NEO's three, or { id, name, url, on,
+// added: true, public, rootName, root } for one the writer added, with its
+// root's PEM, which its stamps are checked against. NEO's three that the
+// list lacks (none saved yet, or a fourth in a later NEO) come after, on.
+let proofTsasSaved = null;
 function proofServices() {
-  const saved = readSettings().proofTsas;
   const out = [];
   const seen = new Set();
-  for (const s of Array.isArray(saved) ? saved : []) {
+  for (const s of proofTsasSaved || []) {
     if (!s || typeof s.id !== 'string' || seen.has(s.id)) continue;
     const ours = Proof.TSAS.find((t) => t.id === s.id);
     if (ours) out.push({ ...ours, on: s.on !== false, public: true });
     else {
       if (!s.added || !/^[a-z0-9-]{1,48}$/.test(s.id) || !/^https?:\/\//i.test(s.url || '')) continue;
-      let root = null;
-      try { root = fs.readFileSync(path.join(tsaRootsDir(), s.id + '.pem'), 'latin1'); } catch { continue; } // can't be checked without it
+      const root = typeof s.root === 'string' && s.root.length < 65536 ? s.root : '';
+      let certs = [];
+      try { certs = Proof.certsIn(root); } catch { /* none */ }
+      if (!certs.length) continue; // can't be checked without it
       out.push({ id: s.id, name: String(s.name || s.id), url: s.url, on: s.on !== false, added: true, public: !!s.public, rootName: String(s.rootName || ''), root });
     }
     seen.add(s.id);
@@ -1164,16 +1167,22 @@ function proofAsked() {
     anchors: [...Proof.roots(), ...list.filter((s) => s.added).flatMap((s) => Proof.certsIn(s.root))]
   };
 }
-function proofServicesSave(list) {
-  const settings = readSettings();
-  if (list) {
-    settings.proofTsas = list.map((s) => (s.added
-      ? { id: s.id, name: s.name, url: s.url, on: s.on, added: true, public: s.public, rootName: s.rootName }
-      : { id: s.id, on: s.on }));
-  } else delete settings.proofTsas;
-  writeSettings(settings);
+// the list in library.json, as the window last gave it (null: the defaults)
+function proofServicesUse(saved) {
+  proofTsasSaved = saved;
   const asked = proofAsked();
   for (const p of proofSealers.values()) Object.assign(p.sealer, asked);
+}
+// A change in the dialog: kept here at once, and handed back for the window
+// to write into library.json as keep (null takes it out)
+function proofServicesSave(list) {
+  const keep = list
+    ? list.map((s) => (s.added
+      ? { id: s.id, name: s.name, url: s.url, on: s.on, added: true, public: s.public, rootName: s.rootName, root: s.root }
+      : { id: s.id, on: s.on }))
+    : null;
+  proofServicesUse(keep);
+  return { list: proofServicesShown(), keep };
 }
 // for the window: never the root itself
 const proofServicesShown = () => proofServices().map(({ root, gap, ...s }) => s);
@@ -1184,7 +1193,7 @@ const proofTried = new Map();
 ipcMain.handle('proof:services', () => proofServicesShown());
 // the order and on/off the writer chose: [{ id, on }]
 ipcMain.handle('proof:servicesSet', (_e, order) => {
-  if (!Array.isArray(order)) return proofServicesShown();
+  if (!Array.isArray(order)) return { list: proofServicesShown(), keep: proofTsasSaved };
   const now = proofServices();
   const list = [];
   for (const o of order) {
@@ -1192,17 +1201,10 @@ ipcMain.handle('proof:servicesSet', (_e, order) => {
     if (s && !list.includes(s)) list.push({ ...s, on: !!o.on });
   }
   for (const s of now) if (!list.some((x) => x.id === s.id)) list.push(s);
-  proofServicesSave(list);
-  return proofServicesShown();
+  return proofServicesSave(list);
 });
 // Restore the defaults: NEO's three, on, and none of the writer's
-ipcMain.handle('proof:servicesReset', () => {
-  for (const s of proofServices()) {
-    if (s.added) fs.rmSync(path.join(tsaRootsDir(), s.id + '.pem'), { force: true });
-  }
-  proofServicesSave(null);
-  return proofServicesShown();
-});
+ipcMain.handle('proof:servicesReset', () => proofServicesSave(null));
 // one test request to a service the writer gives, and its root found:
 // { ok, url, name, public, rootName, problems }. Nothing is kept yet.
 ipcMain.handle('proof:serviceTry', async (_e, url) => {
@@ -1220,25 +1222,19 @@ ipcMain.handle('proof:serviceTry', async (_e, url) => {
 // the writer said yes: the service at the end of the list, on
 ipcMain.handle('proof:serviceAdd', (_e, url) => {
   const tried = proofTried.get(url);
-  if (!tried) return proofServicesShown();
+  if (!tried) return { list: proofServicesShown(), keep: proofTsasSaved };
   proofTried.delete(url);
   const now = proofServices();
   const id = Proof.serviceId(tried.url, [...Proof.TSAS.map((t) => t.id), ...now.map((s) => s.id)]);
-  fs.mkdirSync(tsaRootsDir(), { recursive: true });
-  writeFileDurable(path.join(tsaRootsDir(), id + '.pem'), tried.root);
-  proofServicesSave([...now, { id, name: tried.name, url: tried.url, on: true, added: true, public: tried.public, rootName: tried.rootName }]);
-  return proofServicesShown();
+  return proofServicesSave([...now, { id, name: tried.name, url: tried.url, on: true, added: true, public: tried.public, rootName: tried.rootName, root: tried.root }]);
 });
 // one the writer added, taken out of the list. Its stamps already in a
 // book keep their root there, so they can still be checked.
 ipcMain.handle('proof:serviceRemove', (_e, id) => {
   const now = proofServices();
   const s = now.find((x) => x.id === id && x.added);
-  if (s) {
-    proofServicesSave(now.filter((x) => x !== s));
-    fs.rmSync(path.join(tsaRootsDir(), s.id + '.pem'), { force: true });
-  }
-  return proofServicesShown();
+  if (!s) return { list: proofServicesShown(), keep: proofTsasSaved };
+  return proofServicesSave(now.filter((x) => x !== s));
 });
 
 // A book's seals, one call at a time: `hourly` seals what changed once the

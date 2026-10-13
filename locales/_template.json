@@ -52,7 +52,7 @@
   "{n} words · exported from NEO on {date}": "",
   "{name} (deleted)": "",
   "{name} (this computer)": "",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "",
   "{name} key ({hint})": "",
   "{name} removed — its words are in Darlings, or {key} to undo": "",

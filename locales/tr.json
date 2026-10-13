@@ -835,7 +835,7 @@
   "{n} sessions, each hash chain whole and each following the one before it.": "Oturum: {n}, her karma zinciri sağlam ve her biri bir öncekinin devamı.",
   "{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between).": "Oturum: {n}; zinciri kopuk: {b}, öncekinin devamı olmayan: {u} (arada bir tane eksik).",
   "{name} (deleted)": "{name} (silindi)",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} geçerli bir zaman damgasıyla yanıt verdi, ama kök sertifikası {root} hiçbir genel listede yok. NEO kökü bu bilgisayarda ve damgaladığı her kitapta saklar ki damgaları denetlenebilsin; ancak bu damgalar yalnızca {name} hizmetine güvenen biri için bağımsız kanıttır.",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} geçerli bir zaman damgasıyla yanıt verdi, ama kök sertifikası {root} hiçbir genel listede yok. NEO kökü kitaplığınızda ve damgaladığı her kitapta saklar ki damgaları denetlenebilsin; ancak bu damgalar yalnızca {name} hizmetine güvenen biri için bağımsız kanıttır.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} geçerli bir zaman damgasıyla yanıt verdi. Kök sertifikası {root}, Mozilla’nın güvenilir kökler listesinde.",
   "{title} — Writing History": "{title} — Yazım Geçmişi",
   "1 character typed": "1 karakter yazıldı",

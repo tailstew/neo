@@ -911,7 +911,7 @@
     "other": "{n} sessões; {b} com a cadeia quebrada, {u} sem seguir a anterior (falta uma no meio)."
   },
   "{name} (deleted)": "{name} (excluído)",
-  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root on this computer and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} respondeu com um carimbo de tempo válido, mas sua raiz, {root}, não está em nenhuma lista pública. O NEO guarda a raiz neste computador e em cada livro que carimba, para que seus carimbos possam ser verificados, mas eles só são prova independente para quem confia em {name}.",
+  "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} respondeu com um carimbo de tempo válido, mas sua raiz, {root}, não está em nenhuma lista pública. O NEO guarda a raiz na sua biblioteca e em cada livro que carimba, para que seus carimbos possam ser verificados, mas eles só são prova independente para quem confia em {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} respondeu com um carimbo de tempo válido. Sua raiz, {root}, está na lista de raízes confiáveis da Mozilla.",
   "{title} — Writing History": "{title} — Histórico de escrita",
   "1 character typed": "1 caractere digitado",
