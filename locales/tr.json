@@ -794,7 +794,6 @@
   "“{title}”, open now, is saved and closed first.": "Şu an açık olan “{title}” önce kaydedilip kapatılır.",
   "Open and Restore": "Aç ve Geri Yükle",
   "Snapshots": "Anlık görüntüler",
-  "The snapshots of this book, on the Darlings tab. {key} while writing takes one.": "Bu kitabın anlık görüntüleri, Darlings sekmesinde. Yazarken {key} bir tane alır.",
   "The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.": "Kitabın kendisine dokunulmaz: her bölüm, not ve Darling olduğu gibi kalır; Darlings sekmesindeki anlık görüntüleri de.",
   "Its {n} tags go with it.": {
     "one": "Etiketi de onunla gider.",

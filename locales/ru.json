@@ -907,7 +907,6 @@
   "“{title}”, open now, is saved and closed first.": "«{title}», открытая сейчас, сначала сохраняется и закрывается.",
   "Open and Restore": "Открыть и вернуть",
   "Snapshots": "Снимки",
-  "The snapshots of this book, on the Darlings tab. {key} while writing takes one.": "Снимки этой книги, на вкладке «Любимцы». {key} во время письма делает снимок.",
   "The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.": "Сама книга не затрагивается: каждая глава, заметка и любимец остаются как есть, как и её снимки на вкладке «Любимцы».",
   "Its {n} tags go with it.": {
     "one": "Её {n} метка исчезает вместе с ней.",

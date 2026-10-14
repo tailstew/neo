@@ -4070,7 +4070,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
-      <button class="hs-snaps" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
   const $h = (sel) => bd.querySelector(sel);
@@ -5420,19 +5419,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       window.neo.logError('export replay: ' + (err && err.stack || err));
       toast(t('The replay couldn’t be exported.'));
     }
-  });
-
-  // Snapshots: the other way back, kept as plain files, listed on the
-  // Darlings tab of the open book
-  const snapsBtn = $h('.hs-snaps');
-  snapsBtn.hidden = !here || !snapsCan();
-  snapsBtn.textContent = t('Snapshots');
-  snapsBtn.title = t('The snapshots of this book, on the Darlings tab. {key} while writing takes one.', { key: IS_MAC ? '⌘S' : 'Ctrl+S' });
-  snapsBtn.addEventListener('click', () => {
-    close();
-    if (!book || book.id !== bookId) return;
-    switchTab('darlings');
-    showDarlingsAgain();
   });
 
   // Delete this book's history: to the system trash, once the writer has

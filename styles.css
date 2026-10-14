@@ -649,13 +649,7 @@ body.light .modal .tsa-warn { color: #a8642a; }
 /* a day with tags: a flag in its tile's corner */
 .hs-tile { position: relative; }
 .hs-tile.hs-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; width: 0; height: 0; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
-.hs-snaps {
-  flex: none; background: transparent; border: none; color: #a9a294; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
-}
-.hs-snaps:hover, .hs-snaps:focus-visible { color: var(--accent); }
-.hs-snaps:not([hidden]) + .hs-delete { margin-left: 0; }
-.hs-foot .hs-snaps { margin-left: auto; }
-/* the evidence report and Export replay…, beside Snapshots */
+/* the evidence report and Export replay… */
 .hs-evidence, .hs-export {
   flex: none; background: transparent; border: none; color: #a9a294; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
 }

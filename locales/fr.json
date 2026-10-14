@@ -851,7 +851,6 @@
   "“{title}”, open now, is saved and closed first.": "« {title} », ouvert maintenant, est d’abord enregistré et fermé.",
   "Open and Restore": "Ouvrir et restaurer",
   "Snapshots": "Instantanés",
-  "The snapshots of this book, on the Darlings tab. {key} while writing takes one.": "Les instantanés de ce livre, dans l’onglet Chutier. {key} pendant l’écriture en prend un.",
   "The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.": "Le livre lui-même n’est pas touché : chaque chapitre, note et passage du chutier reste tel quel, de même que ses instantanés dans l’onglet Chutier.",
   "Its {n} tags go with it.": {
     "one": "Son repère part avec lui.",

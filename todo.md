@@ -67,9 +67,9 @@ These are people who already use NEO and update to the first version with Writin
 - [ ] Safety net: `onMenu` ignores every other message while `historyShown` is set.
 - [ ] Decide: do Evidence…, Timestamp services… and Export… block the menus the same way?
 
-## 5. No Snapshots button in History
-- [ ] Remove `.hs-snaps` and its handler (`app.js:5424–5435`), its markup and its string.
-- [ ] Keep: Watch from Here on the Darlings tab, and snapshots shown as tags in History.
+## 5. No Snapshots button in History ✅
+- [x] Remove `.hs-snaps` and its handler (`app.js:5424–5435`), its markup and its string.
+- [x] Keep: Watch from Here on the Darlings tab, and snapshots shown as tags in History.
 
 ## 6. One set of words
 

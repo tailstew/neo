@@ -850,7 +850,6 @@
   "“{title}”, open now, is saved and closed first.": "«{title}», abierto ahora, se guarda y se cierra primero.",
   "Open and Restore": "Abrir y restaurar",
   "Snapshots": "Instantáneas",
-  "The snapshots of this book, on the Darlings tab. {key} while writing takes one.": "Las instantáneas de este libro, en la pestaña Descartes. {key} mientras escribes toma una.",
   "The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.": "El libro en sí no se toca: cada capítulo, nota y descarte se queda como está, y también sus instantáneas en la pestaña Descartes.",
   "Its {n} tags go with it.": {
     "one": "Su marca se va con él.",
