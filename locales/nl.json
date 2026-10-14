@@ -1078,5 +1078,21 @@
     "one": "Geschreven op {n} dag tussen {first} en {last}.",
     "other": "Geschreven op {n} dagen tussen {first} en {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Je zegels zijn ondertekend met een sleutel die op deze computer staat, en blijven bij je boek in zijn schrijfgeschiedenis. Iedereen kan ze controleren, zonder NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Je zegels zijn ondertekend met een sleutel die op deze computer staat, en blijven bij je boek in zijn schrijfgeschiedenis. Iedereen kan ze controleren, zonder NEO.",
+  "Record Writing History": "Schrijfgeschiedenis opnemen",
+  "Record Only": "Alleen opnemen",
+  "Record and Timestamp": "Opnemen en tijdstempelen",
+  "Record only": "Alleen opnemen",
+  "Record and timestamp": "Opnemen en tijdstempelen",
+  "NEO keeps no history. Snapshots still work.": "NEO houdt geen geschiedenis bij. Momentopnamen werken gewoon.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Elke toetsaanslag wordt bij het boek bewaard, op deze computer, zodat je kunt zien hoe het geschreven is en elke eerdere versie kunt terughalen. Er wordt niets verstuurd.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Opgenomen zoals hierboven, en elk uur dat je schrijft gaat er een vingerafdruk (nooit je woorden) naar twee tijdstempeldiensten. Hun bewijzen tonen dat je tekst toen al bestond: wanneer hij geschreven is, niet wie hem schreef.",
+  "Timestamps cover your writing from the day they’re turned on.": "Tijdstempels dekken je schrijven vanaf de dag dat je ze aanzet.",
+  "New: your writing history": "Nieuw: je schrijfgeschiedenis",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "NEO kan nu opnemen hoe je schrijft, toetsaanslag voor toetsaanslag, zodat je elk hoofdstuk kunt zien ontstaan en elke eerdere versie kunt terughalen. Het begint vanaf nu: wat je al geschreven hebt, is waar de geschiedenis begint.",
+  "NEO couldn’t save your choice. Try again.": "NEO kon je keuze niet bewaren. Probeer het opnieuw.",
+  "Next": "Volgende",
+  "Your writing history": "Je schrijfgeschiedenis",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO kan opnemen hoe je schrijft, toetsaanslag voor toetsaanslag, zodat je elk hoofdstuk kunt zien ontstaan en elke eerdere versie kunt terughalen. Kies hoe. (Altijd te wijzigen: Bestand → Schrijfgeschiedenis opnemen.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO kan opnemen hoe je schrijft, toetsaanslag voor toetsaanslag, zodat je elk hoofdstuk kunt zien ontstaan en elke eerdere versie kunt terughalen. Kies hoe. (Altijd te wijzigen: ⋯ → Schrijfgeschiedenis opnemen.)"
 }

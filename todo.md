@@ -3,7 +3,7 @@
 Commit each step separately. After each commit: `npm test`, `npm run test:recording`, `npm run package:win`.
 The order is set by the dependencies: steps 2, 3 and 5 are small and stand alone; step 4 next; steps 1 and 6 last, because they touch the same strings and share one translation pass.
 
-## 1. One setting, three levels, asked once
+## 1. One setting, three levels, asked once ✅
 
 The levels are **Off**, **Record only** and **Record and timestamp**. Recording stays on this computer. Timestamping sends fingerprints out, so it's never on unless the writer chose it. The writer chooses before writing a word, not after the book is finished.
 
@@ -17,36 +17,36 @@ The levels are **Off**, **Record only** and **Record and timestamp**. Recording 
 
 One helper sets the level, `setHistoryLevel('off' | 'record' | 'timestamp', { asked })`. Every place that changes the setting calls it instead of `setRecordWriting` or `setProveWriting`.
 
-- [ ] **File menu** (`main.js:2883`): one entry, **Record Writing History ▸**, with three radio items: **Off**, **Record Only**, **Record and Timestamp**. It replaces "Keep a Replay of My Writing". **Writing History…** (opens the dialog) stays a separate item above it.
+- [x] **File menu** (`main.js:2883`): one entry, **Record Writing History ▸**, with three radio items: **Off**, **Record Only**, **Record and Timestamp**. It replaces "Keep a Replay of My Writing". **Writing History…** (opens the dialog) stays a separate item above it.
   - main.js reads the level from library.json when it builds the menu. The window sends the level whenever it changes (reusing `rec:state`), so the tick stays right when it's changed in the footer or on another device.
   - Picking **Record and Timestamp** from the menu asks with the existing `confirmModal` (the points `setProveWriting` shows), unless the writer chose that level when they were asked.
   - Pocket has no timestamping, so its ⋯ sheet (`pocket/www/index.html:244`) offers only **Off** and **Record only**.
-- [ ] **First run, step 3: "Your writing history"** (`#firstrun` in `index.html`, `showFirstRun` in `app.js:796`). It comes after the fonts step, before **Start writing**. The three levels are cards, like the pantser/plotter ones, with **Record only** selected:
+- [x] **First run, step 3: "Your writing history"** (`#firstrun` in `index.html`, `showFirstRun` in `app.js:796`). It comes after the fonts step, before **Start writing**. The three levels are cards, like the pantser/plotter ones, with **Record only** selected:
   - **Off**: NEO keeps no history. Snapshots still work.
   - **Record only**: every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.
   - **Record and timestamp**: as above. Also, every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show the writing existed by then. They show when it was written, not who wrote it.
   - The choice made here *is* the consent (`asked: true`), so nothing asks again. Pocket shows two cards.
-- [ ] **History footer** (`app.js:4119–4145`): the two checkboxes become the same three-level choice (a small segmented control or a select). At the timestamp level, the line saying when the book was last sealed stays under it; clicking it opens Timestamp services….
-- [ ] Drop the `recordHintShown` toast (`app.js:6424–6428`); the question replaces it.
+- [x] **History footer** (`app.js:4119–4145`): the two checkboxes become the same three-level choice (a small segmented control or a select). At the timestamp level, the line saying when the book was last sealed stays under it; clicking it opens Timestamp services….
+- [x] Drop the `recordHintShown` toast (`app.js:6424–6428`); the question replaces it.
 
 ### Existing users
 
 These are people who already use NEO and update to the first version with Writing History. They've finished first run, so they'd never see step 3. They're asked once whether to start recording from now on.
 
-- [ ] **Nothing records until they've answered.** Today `recordWriting` that isn't set means on (`recordingWanted`, `app.js:2555`). Change it: a library with `firstRunDone` but no `historyAsked` doesn't record. Recording starts after they answer, and only if they chose to. Nothing is recorded behind their back for a session first.
-- [ ] **Ask once, on the shelf, at the first launch after the update.** NEO starts on the shelf, so the question is there before any book is open and never interrupts writing. If `firstRunDone` is set and `historyAsked` isn't, show step 3 on its own as a dialog:
+- [x] **Nothing records until they've answered.** Today `recordWriting` that isn't set means on (`recordingWanted`, `app.js:2555`). Change it: a library with `firstRunDone` but no `historyAsked` doesn't record. Recording starts after they answer, and only if they chose to. Nothing is recorded behind their back for a session first.
+- [x] **Ask once, on the shelf, at the first launch after the update.** NEO starts on the shelf, so the question is there before any book is open and never interrupts writing. If `firstRunDone` is set and `historyAsked` isn't, show step 3 on its own as a dialog:
   - It has the three cards and no close button or Esc, so it can't be skipped.
   - **Record only** is selected, the same as for a new writer; the writer can pick another level.
   - On Continue, set the level and `library.historyAsked = true`, and write library.json before the shelf can be used.
-- [ ] **Wording for them:**
+- [x] **Wording for them:**
   - Title: "New: your writing history"
   - Above the cards: "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now; what you've already written is where the history begins."
   - On the timestamp card: "Timestamps cover your writing from the day they're turned on."
-- [ ] **Once per library, not per device.** `historyAsked` lives in library.json:
+- [x] **Once per library, not per device.** `historyAsked` lives in library.json:
   - A second computer or Pocket sharing the library isn't asked again; it follows the answer.
   - A device still on an older version doesn't record anything, because that version has no Writing History.
-- [ ] **Release note:** the release notes and README say what's new, that it stays on the computer unless timestamping is chosen, and that File → Record Writing History changes it.
-- [ ] **My own library** (the developer's) has no `historyAsked`, so it gets the question too. That's a way to test the question by hand.
+- [x] **Release note:** the release notes and README say what's new, that it stays on the computer unless timestamping is chosen, and that File → Record Writing History changes it.
+- [x] **My own library** (the developer's) has no `historyAsked`, so it gets the question too. That's a way to test the question by hand.
 
 ## 2. Writing History… is never greyed out ✅
 - [x] `main.js:2879`: remove `enabled: recState.book`.

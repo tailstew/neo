@@ -1083,5 +1083,21 @@
     "one": "Écrit sur {n} jour entre le {first} et le {last}.",
     "other": "Écrit sur {n} jours entre le {first} et le {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Vos sceaux sont signés avec une clé gardée sur cet ordinateur, et restent avec votre livre dans son historique d’écriture. N’importe qui peut les vérifier, sans NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Vos sceaux sont signés avec une clé gardée sur cet ordinateur, et restent avec votre livre dans son historique d’écriture. N’importe qui peut les vérifier, sans NEO.",
+  "Record Writing History": "Enregistrer l’historique d’écriture",
+  "Record Only": "Enregistrer seulement",
+  "Record and Timestamp": "Enregistrer et horodater",
+  "Record only": "Enregistrer seulement",
+  "Record and timestamp": "Enregistrer et horodater",
+  "NEO keeps no history. Snapshots still work.": "NEO ne garde aucun historique. Les instantanés fonctionnent toujours.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Chaque frappe est gardée avec le livre, sur cet ordinateur, pour que vous puissiez voir comment il a été écrit et retrouver n’importe quelle version antérieure. Rien n’est envoyé nulle part.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Enregistré comme ci-dessus et, chaque heure où vous écrivez, une empreinte (jamais vos mots) part vers deux services d’horodatage. Leurs reçus montrent que votre texte existait à ce moment-là : quand il a été écrit, pas qui l’a écrit.",
+  "Timestamps cover your writing from the day they’re turned on.": "L’horodatage couvre votre écriture à partir du jour où il est activé.",
+  "New: your writing history": "Nouveau : votre historique d’écriture",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "NEO peut désormais enregistrer votre façon d’écrire, frappe par frappe, pour que vous puissiez voir chaque chapitre s’écrire et retrouver n’importe quelle version antérieure. Cela commence maintenant : ce que vous avez déjà écrit est le point de départ de l’historique.",
+  "NEO couldn’t save your choice. Try again.": "NEO n’a pas pu enregistrer votre choix. Réessayez.",
+  "Next": "Suivant",
+  "Your writing history": "Votre historique d’écriture",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO peut enregistrer votre façon d’écrire, frappe par frappe, pour que vous puissiez voir chaque chapitre s’écrire et retrouver n’importe quelle version antérieure. Choisissez comment. (Modifiable à tout moment : Fichier → Enregistrer l’historique d’écriture.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO peut enregistrer votre façon d’écrire, frappe par frappe, pour que vous puissiez voir chaque chapitre s’écrire et retrouver n’importe quelle version antérieure. Choisissez comment. (Modifiable à tout moment : ⋯ → Enregistrer l’historique d’écriture.)"
 }

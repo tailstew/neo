@@ -1011,5 +1011,21 @@
   "Writing history…": "Írástörténet…",
   "Writing History…": "Írástörténet…",
   "Written before the recording began": "A felvétel kezdete előtt írva",
-  "Written out": "Kivéve"
+  "Written out": "Kivéve",
+  "Record Writing History": "Írástörténet rögzítése",
+  "Record Only": "Csak rögzítés",
+  "Record and Timestamp": "Rögzítés és időbélyeg",
+  "Record only": "Csak rögzítés",
+  "Record and timestamp": "Rögzítés és időbélyeg",
+  "NEO keeps no history. Snapshots still work.": "A NEO nem őriz előzményt. A pillanatképek továbbra is működnek.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Minden billentyűleütés a könyvvel együtt marad ezen a számítógépen, így megnézheted, hogyan készült, és visszahozhatod bármelyik korábbi változatát. Semmi sem megy el sehová.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Rögzítés, mint fent, és minden órában, amikor írsz, egy ujjlenyomat (soha nem a szavaid) megy két időbélyeg-szolgáltatáshoz. Az igazolásaik azt mutatják, hogy az írásod addigra létezett: azt, hogy mikor készült, nem azt, hogy ki írta.",
+  "Timestamps cover your writing from the day they’re turned on.": "Az időbélyegek attól a naptól fedik le az írásodat, amikor bekapcsolod őket.",
+  "New: your writing history": "Új: az írástörténeted",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "A NEO mostantól rögzíteni tudja, hogyan írsz, leütésről leütésre, így bármelyik fejezet születését végignézheted, és visszahozhatod bármelyik korábbi változatát. Mostantól indul: amit eddig megírtál, onnan kezdődik a történet.",
+  "NEO couldn’t save your choice. Try again.": "A NEO nem tudta menteni a választásodat. Próbáld újra.",
+  "Next": "Tovább",
+  "Your writing history": "Az írástörténeted",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "A NEO rögzíteni tudja, hogyan írsz, leütésről leütésre, így bármelyik fejezet születését végignézheted, és visszahozhatod bármelyik korábbi változatát. Válaszd ki, hogyan. (Bármikor módosítható: Fájl → Írástörténet rögzítése.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "A NEO rögzíteni tudja, hogyan írsz, leütésről leütésre, így bármelyik fejezet születését végignézheted, és visszahozhatod bármelyik korábbi változatát. Válaszd ki, hogyan. (Bármikor módosítható: ⋯ → Írástörténet rögzítése.)"
 }

@@ -2904,10 +2904,16 @@ function buildMenu() {
           click: () => sendToWindow({ type: 'history' })
         },
         {
-          label: t('Keep a Replay of My Writing'),
-          type: 'checkbox',
-          checked: readJSON(LIBRARY_FILE, {}).recordWriting !== false,
-          click: (item) => sendToWindow({ type: 'recordWriting', checked: item.checked })
+          // one setting, three levels, kept in library.json as the window
+          // writes them (setHistoryLevel); nothing until the writer's asked
+          label: t('Record Writing History'),
+          submenu: (() => {
+            const lib = readJSON(LIBRARY_FILE, {});
+            const level = lib.historyAsked !== true || lib.recordWriting === false ? 'off' : lib.proveWriting === true ? 'timestamp' : 'record';
+            return [['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
+              label, type: 'radio', checked: level === value, click: () => sendToWindow({ type: 'historyLevel', value })
+            }));
+          })()
         },
         {
           label: t('New Books Open To'),

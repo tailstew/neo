@@ -1145,5 +1145,21 @@
     "many": "Pisano przez {n} dni między {first} a {last}.",
     "other": "Pisano przez {n} dnia między {first} a {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Twoje pieczęcie są podpisane kluczem przechowywanym na tym komputerze i zostają z książką w jej historii pisania. Każdy może je sprawdzić, bez NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Twoje pieczęcie są podpisane kluczem przechowywanym na tym komputerze i zostają z książką w jej historii pisania. Każdy może je sprawdzić, bez NEO.",
+  "Record Writing History": "Nagrywaj historię pisania",
+  "Record Only": "Tylko nagrywanie",
+  "Record and Timestamp": "Nagrywanie i znaczniki czasu",
+  "Record only": "Tylko nagrywanie",
+  "Record and timestamp": "Nagrywanie i znaczniki czasu",
+  "NEO keeps no history. Snapshots still work.": "NEO nie prowadzi historii. Migawki nadal działają.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Każde naciśnięcie klawisza zostaje z książką, na tym komputerze, więc możesz zobaczyć, jak powstawała, i przywrócić każdą wcześniejszą wersję. Nic nie jest nigdzie wysyłane.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Nagrywane jak wyżej, a w każdej godzinie pisania odcisk (nigdy twoje słowa) trafia do dwóch usług znaczników czasu. Ich potwierdzenia pokazują, że twój tekst już wtedy istniał: kiedy powstał, a nie kto go napisał.",
+  "Timestamps cover your writing from the day they’re turned on.": "Znaczniki czasu obejmują twoje pisanie od dnia, w którym je włączysz.",
+  "New: your writing history": "Nowość: twoja historia pisania",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "NEO może teraz nagrywać, jak piszesz, klawisz po klawiszu, więc możesz oglądać powstawanie każdego rozdziału i przywrócić każdą wcześniejszą wersję. Zaczyna się od teraz: to, co już napisałeś, jest początkiem historii.",
+  "NEO couldn’t save your choice. Try again.": "NEO nie mógł zapisać twojego wyboru. Spróbuj ponownie.",
+  "Next": "Dalej",
+  "Your writing history": "Twoja historia pisania",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO może nagrywać, jak piszesz, klawisz po klawiszu, więc możesz oglądać powstawanie każdego rozdziału i przywrócić każdą wcześniejszą wersję. Wybierz, jak. (Można zmienić w każdej chwili: Plik → Nagrywaj historię pisania.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO może nagrywać, jak piszesz, klawisz po klawiszu, więc możesz oglądać powstawanie każdego rozdziału i przywrócić każdą wcześniejszą wersję. Wybierz, jak. (Można zmienić w każdej chwili: ⋯ → Nagrywaj historię pisania.)"
 }

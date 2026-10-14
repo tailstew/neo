@@ -39,7 +39,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(LIB);
 fs.writeFileSync(path.join(LIB, 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 const loadFile = BrowserWindow.prototype.loadFile;
@@ -752,14 +752,14 @@ test('NEO killed after a chapter’s save, before the recording’s flush: the w
 });
 
 test('turning the recording off stops it; turning it on catches up', async () => {
-  await js('setRecordWriting(false)');
+  await js('setHistoryLevel("off")');
   await tick(300);
   assert.equal(await js('rec.on'), false);
   await caretAt(0, 0, -1);
   await type(' Unrecorded.');
   await flush();
   assert.deepEqual(openSessions(), []);
-  await js('setRecordWriting(true)');
+  await js('setHistoryLevel("record")');
   await tick(300);
   assert.equal(await js('rec.on'), true);
   await type(' Recorded.');
@@ -770,6 +770,43 @@ test('turning the recording off stops it; turning it on catches up', async () =>
   assert.match(lines[i + 1][4], /Unrecorded/);
   replayAll([text]);
   assert.equal(JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8')).recordWriting, true);
+  // the File menu's level follows
+  assert.equal(menuItem('Record Only').checked, true);
+});
+
+test('a library from before Writing History records nothing until asked, once, on the shelf, and the question can’t be put aside', async () => {
+  await js('backToShelf()');
+  await tick(800);
+  // as an older NEO left it: never asked
+  await js('library.historyAsked = undefined; delete library.recordWriting; writeLibrary(library); 0');
+  await tick(300);
+  assert.equal(await js('recordingWanted()'), false, 'nothing records until it’s answered');
+  await js('askHistoryLevel(); 0');
+  await tick(200);
+  assert.ok(await js('!!document.querySelector("#history-ask")'));
+  assert.deepEqual(await js('[...document.querySelectorAll("#history-ask .fr-choice")].map((b) => b.dataset.level)'), ['off', 'record', 'timestamp']);
+  assert.equal(await js('document.querySelector("#history-ask .fr-choice.sel").dataset.level'), 'record', 'Record only, to start with');
+  assert.match(await js('document.querySelector("#history-ask .fr-choice[data-level=timestamp] span").textContent'), /from the day they’re turned on/);
+  // neither Esc nor a click outside puts it aside
+  key('Escape');
+  await js('document.querySelector("#history-ask").dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); 0');
+  await tick(200);
+  assert.ok(await js('!!document.querySelector("#history-ask")'));
+  // Off chosen: nothing records, and nothing asks again
+  await js('document.querySelector("#history-ask .fr-choice[data-level=off]").click(); document.querySelector("#history-ask .btn-gold").click(); 0');
+  await waitFor('!document.querySelector("#history-ask")');
+  const lib = JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8'));
+  assert.equal(lib.historyAsked, true);
+  assert.equal(lib.recordWriting, false);
+  assert.equal(menuItem('Off').checked, true);
+  await js('askHistoryLevel(); 0');
+  await tick(200);
+  assert.ok(await js('!document.querySelector("#history-ask")'), 'asked once');
+  // and back to recording, for the tests after this one
+  await js('setHistoryLevel("record")');
+  await js(`openBook(${JSON.stringify(BOOK)})`);
+  await tick(800);
+  assert.equal(await js('rec.on'), true);
 });
 
 /* ---------- Writing History: the dialog, its days and its player ---------- */
@@ -1309,7 +1346,7 @@ test('with recording off, a History restore keeps the chapter in a “Before a r
   await tick(200);
   key('Escape');
   await tick(300);
-  await js('setRecordWriting(false)');
+  await js('setHistoryLevel("off")');
   await tick(300);
   try {
     const darlingsBefore = await js('darlings.length');
@@ -1336,7 +1373,7 @@ test('with recording off, a History restore keeps the chapter in a “Before a r
     await tick(300);
     assert.equal(await html(0), now);
   } finally {
-    await js('setRecordWriting(true)');
+    await js('setHistoryLevel("record")');
     await tick(500);
   }
 });
@@ -1640,12 +1677,12 @@ test('proof turned on seals the session being written; a named tag seals it agai
     await type(' Proven.');
     await flush();
     // asked first, in plain words; nothing is sent until the writer says yes
-    await js('setProveWriting(true).then((on) => { window.__proved = on; }); 0');
+    await js('setHistoryLevel("timestamp").then((on) => { window.__proved = on; }); 0');
     const asked = await confirmShown();
     assert.ok(asked.points.some((x) => /never your words/.test(x)));
     assert.equal(sent.length, 0, 'nothing sent while asking');
     await answer(true);
-    await waitFor('window.__proved === true');
+    await waitFor('window.__proved === "timestamp"');
     assert.equal(await js('library.proveWriting'), true);
     for (let i = 0; i < 300 && !fs.existsSync(path.join(sealsDir(), '000001.json')); i++) await tick(100);
     const first = seal(1);
@@ -1677,7 +1714,7 @@ test('proof turned on seals the session being written; a named tag seals it agai
     await js('openHistory()');
     await daysReady();
     await waitFor('/Waiting for the network/.test(document.querySelector(".hs-proof").textContent)');
-    assert.equal(await js('document.querySelector(".hs-prove input").checked'), true);
+    assert.equal(await js('document.querySelector(".hs-level select").value'), 'timestamp');
     key('Escape');
     await tick(300);
 
@@ -1688,7 +1725,7 @@ test('proof turned on seals the session being written; a named tag seals it agai
     assert.equal(mine.seals.seals.length, 2);
     for (const s of mine.seals.seals) assert.equal(s.ok, true, s.problems.join('; '));
   } finally {
-    await js('setProveWriting(false); 0');
+    await js('setHistoryLevel("record"); 0');
     globalThis.fetch = realFetch;
   }
   assert.equal(await js('library.proveWriting'), false);

@@ -1019,5 +1019,21 @@
     "one": "Γράφτηκε σε {n} ημέρα, από {first} έως {last}.",
     "other": "Γράφτηκε σε {n} ημέρες, από {first} έως {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Οι σφραγίδες σας υπογράφονται με κλειδί που φυλάσσεται σε αυτόν τον υπολογιστή, και μένουν με το βιβλίο σας στο ιστορικό γραφής του. Οποιοσδήποτε μπορεί να τις ελέγξει, χωρίς το NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Οι σφραγίδες σας υπογράφονται με κλειδί που φυλάσσεται σε αυτόν τον υπολογιστή, και μένουν με το βιβλίο σας στο ιστορικό γραφής του. Οποιοσδήποτε μπορεί να τις ελέγξει, χωρίς το NEO.",
+  "Record Writing History": "Καταγραφή Ιστορικού γραφής",
+  "Record Only": "Μόνο καταγραφή",
+  "Record and Timestamp": "Καταγραφή και χρονοσήμανση",
+  "Record only": "Μόνο καταγραφή",
+  "Record and timestamp": "Καταγραφή και χρονοσήμανση",
+  "NEO keeps no history. Snapshots still work.": "Το NEO δεν κρατά ιστορικό. Τα στιγμιότυπα λειτουργούν κανονικά.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Κάθε πάτημα πλήκτρου φυλάγεται μαζί με το βιβλίο, σε αυτόν τον υπολογιστή, ώστε να βλέπετε πώς γράφτηκε και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή. Τίποτα δεν αποστέλλεται πουθενά.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Καταγράφεται όπως παραπάνω, και κάθε ώρα που γράφετε, ένα αποτύπωμα (ποτέ οι λέξεις σας) πηγαίνει σε δύο υπηρεσίες χρονοσήμανσης. Οι αποδείξεις τους δείχνουν ότι το κείμενό σας υπήρχε ως τότε: πότε γράφτηκε, όχι ποιος το έγραψε.",
+  "Timestamps cover your writing from the day they’re turned on.": "Οι χρονοσημάνσεις καλύπτουν τη γραφή σας από την ημέρα που ενεργοποιούνται.",
+  "New: your writing history": "Νέο: το ιστορικό γραφής σας",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "Το NEO μπορεί πλέον να καταγράφει πώς γράφετε, πλήκτρο προς πλήκτρο, ώστε να βλέπετε κάθε κεφάλαιο να γράφεται και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή. Ξεκινά από τώρα: ό,τι έχετε ήδη γράψει είναι η αρχή του ιστορικού.",
+  "NEO couldn’t save your choice. Try again.": "Το NEO δεν μπόρεσε να αποθηκεύσει την επιλογή σας. Δοκιμάστε ξανά.",
+  "Next": "Επόμενο",
+  "Your writing history": "Το ιστορικό γραφής σας",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "Το NEO μπορεί να καταγράφει πώς γράφετε, πλήκτρο προς πλήκτρο, ώστε να βλέπετε κάθε κεφάλαιο να γράφεται και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή. Επιλέξτε πώς. (Αλλάζει οποτεδήποτε: Αρχείο → Καταγραφή Ιστορικού γραφής.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "Το NEO μπορεί να καταγράφει πώς γράφετε, πλήκτρο προς πλήκτρο, ώστε να βλέπετε κάθε κεφάλαιο να γράφεται και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή. Επιλέξτε πώς. (Αλλάζει οποτεδήποτε: ⋯ → Καταγραφή Ιστορικού γραφής.)"
 }

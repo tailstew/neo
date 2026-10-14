@@ -789,7 +789,10 @@ async function loadLibrary() {
   if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   if (!library.firstRunDone) {
     showFirstRun();
+  } else if (library.historyAsked !== true) {
+    askHistoryLevel(); // a library from before Writing History, asked once
   }
+  if (window.neo.recState) window.neo.recState(); // the File menu's level
   renderShelves();
 }
 
@@ -856,9 +859,23 @@ function showFirstRun() {
     preview();
   }
 
+  // Step 3: Writing History, chosen before a word is written. Where it can't
+  // record (an old iOS), there's nothing to choose.
+  let level = 'record';
+  $('#fr-next').onclick = () => {
+    if (!historyCan()) { $('#fr-done').click(); return; }
+    $('#fr-step2').hidden = true;
+    $('#fr-step3').hidden = false;
+    historyLevelCards($('#fr-levels'), level, (v) => { level = v; });
+  };
+
   $('#fr-done').onclick = async () => {
     library.fonts = { body: picked.body, dropcap: picked.dropcap };
     library.firstRunDone = true;
+    // the choice made here is the consent: nothing asks again
+    library.historyAsked = true;
+    library.recordWriting = level !== 'off';
+    library.proveWriting = level === 'timestamp' && !!window.neo.proofSet;
     // the shelf was drawn (and the author record seeded as Anonymous) before
     // the name was typed — carry the name across
     currentAuthor().name = library.authorName || (library.penNames || [])[0] || t('Anonymous');
@@ -877,6 +894,8 @@ function showFirstRun() {
     note.hidden = true;
     applyFonts();
     fr.hidden = true;
+    if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+    if (window.neo.recState) window.neo.recState();
     renderShelves();
   };
 }
@@ -2552,7 +2571,14 @@ const REC_IDLE = 60000;         // no keys or edits this long: an `idle` line
 const REC_WALL = 5 * 60000;     // a wall-clock line this often
 const REC_ROLLUP = 10 * 60000;  // chunks joined into one file this often
 
-const recordingWanted = () => !!(Rec && window.neo.recStart && library && library.recordWriting !== false);
+// Writing History's one setting (File → Record Writing History) has three
+// levels: 'off', 'record', and 'timestamp' (recorded, then sealed and
+// timestamped: Proof of when I wrote). It's kept as recordWriting and
+// proveWriting, which a NEO from before reads. Nothing is recorded in a
+// library whose writer hasn't been asked yet (historyAsked, askHistoryLevel).
+const historyCan = () => !!(Rec && window.neo.recStart);
+const recordingWanted = () => !!(historyCan() && library && library.historyAsked === true && library.recordWriting !== false);
+const historyLevel = () => (!recordingWanted() ? 'off' : window.neo.proofSet && library.proveWriting === true ? 'timestamp' : 'record');
 
 function recSessionId() {
   return new Date().toISOString().replace(/\.\d+Z$/, 'Z').replace(/:/g, '-') + '-' +
@@ -3134,18 +3160,106 @@ document.addEventListener('visibilitychange', () => rec.context(document.visibil
 setInterval(() => rec.wallClock(), REC_WALL);
 setInterval(() => rec.rollup(), REC_ROLLUP);
 
-// File → Keep a Replay of My Writing
-async function setRecordWriting(on) {
-  library.recordWriting = !!on;
-  writeLibrary(library);
-  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
-  if (!on) {
-    rec.end();
-    toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
-    return;
+// Off, Record only, or Record and timestamp: from the File menu, History's
+// footer, Pocket's ⋯ sheet, and the question NEO asks once. With `asked`
+// the writer chose it there, having read what each level means; otherwise
+// timestamping asks first, in plain words, before anything is sent.
+// Returns the level it's at now.
+async function setHistoryLevel(level, { asked = false } = {}) {
+  if (level === 'timestamp' && !window.neo.proofSet) level = 'record';
+  const wasRecording = recordingWanted();
+  const wasProving = proofFlags().on;
+  if (level === 'timestamp' && !wasProving && !asked && !await proofConsent()) {
+    if (window.neo.recState) window.neo.recState(); // the menu's tick goes back
+    return historyLevel();
   }
-  toast(t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
-  if (book) await recRestart(book.id);
+  library.historyAsked = true;
+  library.recordWriting = level !== 'off';
+  // (Pocket can't timestamp: it leaves the desktop's choice alone, unless off)
+  if (window.neo.proofSet || level === 'off') library.proveWriting = level === 'timestamp';
+  await writeLibrary(library);
+  if (window.neo.proofSet) await window.neo.proofSet(proofFlags()).catch(() => {});
+  if (window.neo.recState) window.neo.recState();
+  if (wasRecording && level === 'off') {
+    rec.end();
+    if (!asked) toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
+  } else if (!wasRecording && level !== 'off') {
+    if (!asked) toast(t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
+    if (book) await recRestart(book.id);
+  }
+  // the book open is sealed now, rather than at the next hour
+  if (level === 'timestamp' && !wasProving && book && rec.on && rec.bookId === book.id) {
+    const c = rec.flush();
+    if (c) await c.saved;
+    window.neo.proofSeal(book.id).catch(() => {});
+  }
+  return level;
+}
+
+// The three levels as cards to pick from: first run's last step, and the
+// question asked once in a library from before Writing History
+function historyLevelCards(box, picked, onPick, { existing = false } = {}) {
+  const levels = [
+    ['off', t('Off'), t('NEO keeps no history. Snapshots still work.')],
+    ['record', t('Record only'), t('Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.')],
+    ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp'),
+      t('Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.') +
+      (existing ? ' ' + t('Timestamps cover your writing from the day they’re turned on.') : '')]] : [])
+  ];
+  const pick = (value) => box.querySelectorAll('.fr-choice').forEach((b) => {
+    b.classList.toggle('sel', b.dataset.level === value);
+    b.setAttribute('aria-pressed', String(b.dataset.level === value));
+  });
+  box.replaceChildren(...levels.map(([value, name, desc]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fr-choice';
+    b.dataset.level = value;
+    b.innerHTML = '<strong></strong><span></span>';
+    b.firstChild.textContent = name;
+    b.lastChild.textContent = desc;
+    b.onclick = () => { pick(value); onPick(value); };
+    return b;
+  }));
+  pick(picked);
+}
+
+// A library from before Writing History: asked once, on the shelf, whether to
+// record from now on. Nothing records until it's answered (recordingWanted),
+// and it can't be put aside: the cards and Continue, no Esc, no click outside.
+// One answer serves every device that shares the library.
+function askHistoryLevel() {
+  if (!historyCan() || library.historyAsked === true || $('#history-ask')) return;
+  let picked = 'record';
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'history-ask';
+  bd.dataset.stay = '1';
+  bd.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:620px">
+    <h2></h2><p></p><div class="fr-choices hl-cards"></div>
+    <p class="hl-error" role="alert" hidden></p>
+    <div style="text-align:right;margin-top:20px"><button class="btn-gold" type="button"></button></div>
+  </div>`;
+  bd.querySelector('h2').textContent = t('New: your writing history');
+  bd.querySelector('p').textContent = t('NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.');
+  historyLevelCards(bd.querySelector('.hl-cards'), picked, (v) => { picked = v; }, { existing: true });
+  const go = bd.querySelector('.btn-gold');
+  go.textContent = t('Continue');
+  go.onclick = async () => {
+    go.disabled = true;
+    try {
+      await setHistoryLevel(picked, { asked: true });
+      bd.remove();
+    } catch (err) {
+      window.neo.logError('history ask: ' + ((err && err.message) || err));
+      const note = bd.querySelector('.hl-error');
+      note.textContent = t('NEO couldn’t save your choice. Try again.');
+      note.hidden = false;
+      go.disabled = false;
+    }
+  };
+  document.body.appendChild(bd);
+  go.focus();
 }
 
 // Proof of when I wrote (docs/neo-recording-plan.md, part 2): off unless
@@ -3158,32 +3272,20 @@ const proofFlags = () => ({
   tsas: library && Array.isArray(library.proofTsas) ? library.proofTsas : null
 });
 
-// Prove when I wrote: asked once, in plain words, before anything is sent.
-// Returns whether it's now on.
-async function setProveWriting(on) {
-  if (on && library.proveWriting !== true) {
-    const sure = await confirmModal({
-      title: t('Prove when you wrote?'),
-      points: [
-        t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
-        ...await proofWhoSays(),
-        t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
-        t('A timestamp shows when your writing existed, not who wrote it. The replay of how you wrote it is what speaks to that.')
-      ],
-      ok: t('Turn on proof')
-    });
-    if (!sure) return false;
-  }
-  library.proveWriting = !!on;
-  writeLibrary(library);
-  await window.neo.proofSet(proofFlags());
-  // the book open is sealed now, rather than at the next hour
-  if (on && book && rec.on && rec.bookId === book.id) {
-    const c = rec.flush();
-    if (c) await c.saved;
-    window.neo.proofSeal(book.id).catch(() => {});
-  }
-  return !!on;
+// Record and timestamp, from the menu or History's footer: asked in plain
+// words before anything is sent. Returns whether the writer said yes.
+async function proofConsent() {
+  const sure = await confirmModal({
+    title: t('Prove when you wrote?'),
+    points: [
+      t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
+      ...await proofWhoSays(),
+      t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
+      t('A timestamp shows when your writing existed, not who wrote it. The replay of how you wrote it is what speaks to that.')
+    ],
+    ok: t('Turn on proof')
+  });
+  return !!sure;
 }
 
 // Who the opt-in says the fingerprint goes to: the services the writer's
@@ -4064,9 +4166,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       </div>
     </div>
     <div class="hs-foot">
-      <label class="hs-keep"><input type="checkbox"> <span></span></label>
+      <label class="hs-keep hs-level"><span></span> <select></select></label>
       <span class="hs-desc"></span>
-      <label class="hs-keep hs-prove" hidden><input type="checkbox"> <span></span></label>
       <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
@@ -4115,29 +4216,27 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   timeline.setAttribute('aria-label', t('Timeline'));
   strip.setAttribute('aria-label', t('Days'));
   $h('.hs-skip span').textContent = t('Skip pauses');
-  $h('.hs-keep span').textContent = t('Keep a replay of my writing');
+  $h('.hs-level span').textContent = t('Record Writing History');
   $h('.hs-desc').textContent = t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.');
   backBtn.textContent = '← ' + t('Days');
   backBtn.title = t('Back to the days') + ' (Esc)';
-  const keep = $h('.hs-keep input');
-  keep.checked = library.recordWriting !== false;
-  keep.addEventListener('change', async () => {
-    await setRecordWriting(keep.checked);
-    if (window.neo.recState) window.neo.recState();
+  // the File menu's Record Writing History: Off, Record only, Record and
+  // timestamp (Pocket can't timestamp)
+  const level = $h('.hs-level select');
+  for (const [value, name] of [['off', t('Off')], ['record', t('Record only')], ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp')]] : [])]) {
+    level.add(new Option(name, value));
+  }
+  level.value = historyLevel();
+  level.addEventListener('change', async () => {
+    level.value = await setHistoryLevel(level.value); // (back again if the writer said no)
+    bd.focus();
     renderProof();
   });
 
-  // Prove when I wrote, beside it: off until the writer turns it on, and
-  // then a line saying when the book was last sealed and who stamped it
-  const prove = $h('.hs-prove input');
+  // Timestamped: a line saying when the book was last sealed and who stamped it
   const proofLine = $h('.hs-proof');
-  $h('.hs-prove span').textContent = t('Prove when I wrote');
-  $h('.hs-prove').title = t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.');
   async function renderProof() {
-    const can = !!window.neo.proofSet && library.recordWriting !== false;
-    $h('.hs-prove').hidden = !can;
-    prove.checked = library.proveWriting === true;
-    proofLine.hidden = !can || !prove.checked;
+    proofLine.hidden = historyLevel() !== 'timestamp';
     if (proofLine.hidden) return;
     let st = null;
     try { st = await window.neo.proofStatus(bookId); } catch { /* said below */ }
@@ -4159,11 +4258,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         ? t('Sealed {when}. Last timestamped {then}; waiting for the network for the rest.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
         : t('Sealed {when}. Waiting for the network to timestamp it.', { when });
   }
-  prove.addEventListener('change', async () => {
-    await setProveWriting(prove.checked);
-    bd.focus();
-    renderProof(); // (unticked again if the writer said no)
-  });
   renderProof();
   const proofChanged = (changed) => { if (changed === bookId && bd.isConnected) renderProof(); };
   proofListeners.add(proofChanged);
@@ -6409,11 +6503,6 @@ async function openBook(bookId) {
     library.hintShown = true;
     writeLibrary(library);
     setTimeout(() => toast(t('Enter twice = section break · three times = new chapter · {key} shows everything else', { key: KHELP }), 7000), 800);
-  } else if (rec.on && !library.recordHintShown) {
-    // and on another opening, once, what Writing History is
-    library.recordHintShown = true;
-    writeLibrary(library);
-    setTimeout(() => toast(t('NEO keeps a replay of your writing, so you can watch how it was written. It stays with your book and is never sent anywhere. File → Keep a Replay of My Writing turns it off.'), 9000), 800);
   }
   spReportState();
 }
@@ -15835,6 +15924,9 @@ async function refreshFromDisk() {
           library = lib;
           // proof, and the timestamp services, as another computer left them
           if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+          if (window.neo.recState) window.neo.recState();
+          // answered there: the question here goes
+          if (library.historyAsked === true && $('#history-ask')) $('#history-ask').remove();
           const shelf = $('#bookshelf-view');
           const keep = shelf.scrollTop;
           await renderShelves();
@@ -19954,7 +20046,7 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'focusCycle') cycleFocus();
   if (msg.type === 'import') importBooks();
   if (msg.type === 'stats') openStats();
-  if (msg.type === 'recordWriting') setRecordWriting(msg.checked);
+  if (msg.type === 'historyLevel') setHistoryLevel(msg.value);
   // never greyed out: with no book open it says so, as Export does
   if (msg.type === 'history') { if (book && !$('#editor-view').hidden) openHistory(); else toast(t('Open a book first')); }
   if (msg.type === 'chapterStep') gotoChapter(msg.value);

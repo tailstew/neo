@@ -993,5 +993,21 @@
   "Words there before the recording began: {before}. Words that came while nothing was recording: {outside}. Neither is counted above.": "Kayıt başlamadan önce orada olan sözcükler: {before}. Hiçbir şey kayıtta değilken gelen sözcükler: {outside}. İkisi de yukarıda sayılmadı.",
   "Written on {date}.": "{date} tarihinde yazıldı.",
   "Written on {n} days between {first} and {last}.": "{first} ile {last} arasında {n} günde yazıldı.",
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Mühürleriniz bu bilgisayarda tutulan bir anahtarla imzalanır ve kitabınızla birlikte onun yazım geçmişinde kalır. Herkes onları NEO olmadan denetleyebilir."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Mühürleriniz bu bilgisayarda tutulan bir anahtarla imzalanır ve kitabınızla birlikte onun yazım geçmişinde kalır. Herkes onları NEO olmadan denetleyebilir.",
+  "Record Writing History": "Yazım Geçmişini Kaydet",
+  "Record Only": "Yalnızca Kaydet",
+  "Record and Timestamp": "Kaydet ve Zaman Damgası Al",
+  "Record only": "Yalnızca kaydet",
+  "Record and timestamp": "Kaydet ve zaman damgası al",
+  "NEO keeps no history. Snapshots still work.": "NEO geçmiş tutmaz. Anlık görüntüler çalışmaya devam eder.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Her tuş vuruşu kitapla birlikte bu bilgisayarda saklanır; böylece nasıl yazıldığını izleyebilir ve önceki herhangi bir sürümü geri getirebilirsiniz. Hiçbir şey hiçbir yere gönderilmez.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Yukarıdaki gibi kaydedilir ve yazdığınız her saat, bir parmak izi (asla sözcükleriniz değil) iki zaman damgası hizmetine gider. Makbuzları yazınızın o zamana kadar var olduğunu gösterir: ne zaman yazıldığını, kimin yazdığını değil.",
+  "Timestamps cover your writing from the day they’re turned on.": "Zaman damgaları, açıldıkları günden itibaren yazınızı kapsar.",
+  "New: your writing history": "Yeni: yazım geçmişiniz",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "NEO artık nasıl yazdığınızı tuş tuş kaydedebilir; böylece her bölümün yazılışını izleyebilir ve önceki herhangi bir sürümü geri getirebilirsiniz. Şimdiden başlar: şimdiye kadar yazdıklarınız geçmişin başladığı yerdir.",
+  "NEO couldn’t save your choice. Try again.": "NEO seçiminizi kaydedemedi. Yeniden deneyin.",
+  "Next": "İleri",
+  "Your writing history": "Yazım geçmişiniz",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO nasıl yazdığınızı tuş tuş kaydedebilir; böylece her bölümün yazılışını izleyebilir ve önceki herhangi bir sürümü geri getirebilirsiniz. Nasıl olacağını seçin. (İstediğiniz zaman değiştirilebilir: Dosya → Yazım Geçmişini Kaydet.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO nasıl yazdığınızı tuş tuş kaydedebilir; böylece her bölümün yazılışını izleyebilir ve önceki herhangi bir sürümü geri getirebilirsiniz. Nasıl olacağını seçin. (İstediğiniz zaman değiştirilebilir: ⋯ → Yazım Geçmişini Kaydet.)"
 }

@@ -1163,5 +1163,21 @@
     "many": "Писалась {n} дней, с {first} по {last}.",
     "other": "Писалась {n} дня, с {first} по {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Ваши печати подписаны ключом, который хранится на этом компьютере, и остаются с книгой в её истории письма. Любой может их проверить, без NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Ваши печати подписаны ключом, который хранится на этом компьютере, и остаются с книгой в её истории письма. Любой может их проверить, без NEO.",
+  "Record Writing History": "Записывать историю письма",
+  "Record Only": "Только запись",
+  "Record and Timestamp": "Запись и метки времени",
+  "Record only": "Только запись",
+  "Record and timestamp": "Запись и метки времени",
+  "NEO keeps no history. Snapshots still work.": "NEO не ведёт историю. Снимки работают как прежде.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Каждое нажатие клавиши хранится вместе с книгой на этом компьютере, чтобы вы могли посмотреть, как она писалась, и вернуть любую прежнюю версию. Ничего никуда не отправляется.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Запись, как выше, и каждый час, когда вы пишете, отпечаток (никогда не ваши слова) уходит в две службы меток времени. Их квитанции показывают, что ваш текст к тому времени существовал: когда он написан, а не кем.",
+  "Timestamps cover your writing from the day they’re turned on.": "Метки времени охватывают ваш текст начиная с того дня, когда их включили.",
+  "New: your writing history": "Новое: история вашего письма",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "Теперь NEO может записывать, как вы пишете, нажатие за нажатием, чтобы вы могли посмотреть, как писалась любая глава, и вернуть любую прежнюю версию. Запись начинается сейчас: уже написанное станет началом истории.",
+  "NEO couldn’t save your choice. Try again.": "NEO не удалось сохранить ваш выбор. Попробуйте ещё раз.",
+  "Next": "Далее",
+  "Your writing history": "История вашего письма",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO может записывать, как вы пишете, нажатие за нажатием, чтобы вы могли посмотреть, как писалась любая глава, и вернуть любую прежнюю версию. Выберите как. (Можно изменить в любой момент: Файл → Записывать историю письма.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO может записывать, как вы пишете, нажатие за нажатием, чтобы вы могли посмотреть, как писалась любая глава, и вернуть любую прежнюю версию. Выберите как. (Можно изменить в любой момент: ⋯ → Записывать историю письма.)"
 }

@@ -1126,5 +1126,21 @@
     "few": "Scris în {n} zile, între {first} și {last}.",
     "other": "Scris în {n} de zile, între {first} și {last}."
   },
-  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Sigiliile tale sunt semnate cu o cheie păstrată pe acest computer și rămân cu cartea ta în istoricul ei de scriere. Oricine le poate verifica, fără NEO."
+  "Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Sigiliile tale sunt semnate cu o cheie păstrată pe acest computer și rămân cu cartea ta în istoricul ei de scriere. Oricine le poate verifica, fără NEO.",
+  "Record Writing History": "Înregistrează istoricul scrisului",
+  "Record Only": "Doar înregistrare",
+  "Record and Timestamp": "Înregistrare și marcaj temporal",
+  "Record only": "Doar înregistrare",
+  "Record and timestamp": "Înregistrare și marcaj temporal",
+  "NEO keeps no history. Snapshots still work.": "NEO nu păstrează istoric. Instantaneele funcționează în continuare.",
+  "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Fiecare apăsare de tastă rămâne cu cartea, pe acest computer, ca să poți vedea cum a fost scrisă și să aduci înapoi orice versiune anterioară. Nimic nu este trimis nicăieri.",
+  "Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.": "Înregistrat ca mai sus și, în fiecare oră în care scrii, o amprentă (niciodată cuvintele tale) pleacă spre două servicii de marcaj temporal. Chitanțele lor arată că textul tău exista până atunci: când a fost scris, nu cine l-a scris.",
+  "Timestamps cover your writing from the day they’re turned on.": "Marcajele temporale acoperă scrisul tău din ziua în care sunt pornite.",
+  "New: your writing history": "Nou: istoricul scrisului tău",
+  "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.": "NEO poate acum înregistra cum scrii, tastă cu tastă, ca să poți urmări cum se scrie orice capitol și să aduci înapoi orice versiune anterioară. Începe de acum: ce ai scris deja este punctul de pornire al istoricului.",
+  "NEO couldn’t save your choice. Try again.": "NEO nu a putut salva alegerea ta. Încearcă din nou.",
+  "Next": "Înainte",
+  "Your writing history": "Istoricul scrisului tău",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)": "NEO poate înregistra cum scrii, tastă cu tastă, ca să poți urmări cum se scrie orice capitol și să aduci înapoi orice versiune anterioară. Alege cum. (Se poate schimba oricând: Fișier → Înregistrează istoricul scrisului.)",
+  "NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)": "NEO poate înregistra cum scrii, tastă cu tastă, ca să poți urmări cum se scrie orice capitol și să aduci înapoi orice versiune anterioară. Alege cum. (Se poate schimba oricând: ⋯ → Înregistrează istoricul scrisului.)"
 }
