@@ -45,7 +45,7 @@ These are people who already use NEO and update to the first version with Writin
 - [x] **Once per library, not per device.** `historyAsked` lives in library.json:
   - A second computer or Pocket sharing the library isn't asked again; it follows the answer.
   - A device still on an older version doesn't record anything, because that version has no Writing History.
-- [x] **Release note:** the release notes and README say what's new, that it stays on the computer unless timestamping is chosen, and that File → Record Writing History changes it.
+- [x] **Release note:** the README says what's new, that it stays on the computer unless timestamping is chosen, and that File → Record Writing History changes it. (There's no release notes file; they're written at release.)
 - [x] **My own library** (the developer's) has no `historyAsked`, so it gets the question too. That's a way to test the question by hand.
 
 ## 2. Writing History… is never greyed out ✅
@@ -71,7 +71,7 @@ These are people who already use NEO and update to the first version with Writin
 - [x] Remove `.hs-snaps` and its handler (`app.js:5424–5435`), its markup and its string.
 - [x] Keep: Watch from Here on the Darlings tab, and snapshots shown as tags in History.
 
-## 6. One set of words
+## 6. One set of words ✅
 
 | Meaning | Word |
 |---|---|
@@ -81,12 +81,13 @@ These are people who already use NEO and update to the first version with Writin
 | Watching it | **play / watch** |
 | The exported file | **Export Writing History…**, "a page that plays it" |
 
-- [ ] "replay" as a noun goes from everything the writer sees. "Export replay…" becomes "Export Writing History…", "Making the replay page…" becomes "Making the page…". "Keep a replay of my writing" goes (step 1).
-- [ ] "recording" as a noun goes from everything the writer sees. "the recording began" becomes "NEO started recording". The backup README keeps the real folder names (`recordings/`, `recording/`) and calls what's in them the history.
-- [ ] "Prove when I wrote" goes; the three levels replace it (step 1).
-- [ ] Shelf menu "Writing history…" becomes "Writing History…".
-- [ ] Go through every string from `grep -ohiE "t\('[^']*(replay|record|history)[^']*'"` across `app.js main.js index.html pocket/www/*`, plus `REPLAY_PAGE_WORDS` and `replay-page.js` (`scripts/replay-page.test.js` checks that list).
-- [ ] Internal names stay: `neo-replay-*`, `rec:`, `proof:`, file names.
+- [x] "replay" as a noun goes from everything the writer sees. "Export replay…" becomes "Export Writing History…", "Making the replay page…" becomes "Making the page…". "Keep a replay of my writing" goes (step 1).
+- [x] "recording" as a noun goes from everything the writer sees. "the recording began" becomes "NEO started recording". The backup README keeps the real folder names (`recordings/`, `recording/`) and calls what's in them the history.
+- [x] "Prove when I wrote" goes; the three levels replace it (step 1).
+- [x] Shelf menu "Writing history…" becomes "Writing History…".
+- [x] Go through every string from `grep -ohiE "t\('[^']*(replay|record|history)[^']*'"` across `app.js main.js index.html pocket/www/*`, plus `REPLAY_PAGE_WORDS` and `replay-page.js` (`scripts/replay-page.test.js` checks that list).
+- [x] Internal names stay: `neo-replay-*`, `rec:`, `proof:`, file names, the `recordings/` folder and `verify-recording`.
+- [x] Done as 31 strings renamed in the code and every locale (plural entries keep their forms; `en.json` says "Played back"), and the keys nothing uses any more dropped.
 
 ## 7. Translations, docs, tests, build
 - [ ] `node scripts/i18n.js template`; translate every new or changed string into every locale.

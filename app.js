@@ -2031,7 +2031,7 @@ function bookTile(meta, opts = {}) {
       if (coverItems.length) options.push({ label: t('Cover'), desc: t('A new cover, your own art, or a saved image.'), value: 'coverMenu' });
       options.push(
         { label: t('Set word goal…'), desc: t('Adds the subtle progress bar to the cover.'), value: 'goal' },
-        ...(historyCanOpen() ? [{ label: t('Writing history…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
+        ...(historyCanOpen() ? [{ label: t('Writing History…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
         { label: t('Remove from bookshelf'), desc: t('Takes it off your shelves. The files stay safe in your NEO Library folder on disk.'), value: 'remove' },
         { label: trashLabel, desc: window.Capacitor ? t('Moves the book folder to Deleted Books in your NEO Library, where you can recover it.') : t('Sends the book folder to your system trash, where you can recover it.'), danger: true, value: 'trash' }
       );
@@ -2044,7 +2044,7 @@ function bookTile(meta, opts = {}) {
       items.push({ label: t('Export…'), value: 'export' });
       if (canCopy) items.push({ label: t('Duplicate'), value: 'duplicate' });
       items.push({ label: t('Set word goal…'), value: 'goal' });
-      if (historyCanOpen()) items.push({ label: t('Writing history…'), value: 'history' });
+      if (historyCanOpen()) items.push({ label: t('Writing History…'), value: 'history' });
       if (coverItems.length) items.push({ label: t('Cover') + '  ›', value: 'coverMenu' });
       items.push('-', { label: t('Remove from bookshelf'), value: 'remove' }, { label: trashLabel, value: 'trash', danger: true });
       const x = e.clientX;
@@ -3184,7 +3184,7 @@ async function setHistoryLevel(level, { asked = false } = {}) {
     rec.end();
     if (!asked) toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
   } else if (!wasRecording && level !== 'off') {
-    if (!asked) toast(t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.'), 8000);
+    if (!asked) toast(t('NEO records every keystroke so you can watch how your book was written, and bring back any earlier version. It stays with your book, and your words are never sent anywhere.'), 8000);
     if (book) await recRestart(book.id);
   }
   // the book open is sealed now, rather than at the next hour
@@ -3276,14 +3276,14 @@ const proofFlags = () => ({
 // words before anything is sent. Returns whether the writer said yes.
 async function proofConsent() {
   const sure = await confirmModal({
-    title: t('Prove when you wrote?'),
+    title: t('Timestamp your writing history?'),
     points: [
       t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
       ...await proofWhoSays(),
       t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
-      t('A timestamp shows when your writing existed, not who wrote it. The replay of how you wrote it is what speaks to that.')
+      t('A timestamp shows when your writing existed, not who wrote it. Your Writing History, which shows how you wrote it, speaks to that.')
     ],
-    ok: t('Turn on proof')
+    ok: t('Turn on timestamping')
   });
   return !!sure;
 }
@@ -3562,7 +3562,7 @@ const HISTORY_CAUSES = {
   'darling-out': tk('Sent to Darlings'), 'darling-in': tk('Back from Darlings'), 'darling-delete': tk('Sent to Darlings'),
   'replace-all': tk('Replace All'), 'undo-structural': tk('Undone'), snapshot: tk('Snapshot restored'), outline: tk('Moved in the Outline'),
   'disk-adopt': tk('From another device'), 'disk-twin': tk('From another device, kept beside this one'), 'disk-new': tk('From another device'),
-  'catch-up': tk('Changed while nothing was recording'), restore: tk('Restored'), unobserved: tk('A change the recorder didn’t see'),
+  'catch-up': tk('Changed while NEO wasn’t recording'), restore: tk('Restored'), unobserved: tk('A change the recorder didn’t see'),
   anchor: tk('Kept whole again')
 };
 const HISTORY_SYNC = ['disk-adopt', 'disk-twin', 'disk-new'];
@@ -3706,7 +3706,7 @@ const historyWords = (added, removed) => t('+{added} −{removed} words', { adde
 
 /* ---------- the evidence report (plan, part 2) ---------- */
 
-// Export replay…: which chapters go. { chapters: null } for the whole book
+// Export Writing History…: which chapters go. { chapters: null } for the whole book
 // (with its seals), { chapters: [ids] } for some, null on cancel.
 function exportReplayAsk(meta, name) {
   return new Promise((resolve) => {
@@ -3725,14 +3725,14 @@ function exportReplayAsk(meta, name) {
           <button class="m-ok btn-gold"></button>
         </div>
       </div>`;
-    const title = t('Export a replay of “{title}”', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
+    const title = t('Export the Writing History of “{title}”', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
     bd.querySelector('h2').textContent = title;
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
     bd.querySelector('.ex-book').textContent = t('The whole book, with its seals, so its timestamps can be checked');
     bd.querySelector('.ex-some').textContent = t('Only these chapters:');
     const note = bd.querySelector('.ex-note');
-    note.textContent = t('A page of some chapters replays them exactly, but can’t show they belong to a sealed whole, so nothing on it fixes them in time.');
+    note.textContent = t('A page of some chapters plays them back exactly, but can’t show they belong to a sealed whole, so nothing on it fixes them in time.');
     const box = bd.querySelector('.ex-chapters');
     for (const ch of meta.chapterOrder) {
       const l = document.createElement('label');
@@ -3779,7 +3779,7 @@ const REPLAY_PAGE_WORDS = [
   tk('its drand round isn’t drand’s'),
   tk('its drand round is later than the seal says it was made'),
   tk('a timestamp token stamps something else'),
-  tk('This page couldn’t read its recording: {why}'),
+  tk('This page couldn’t read its history: {why}'),
   tk('this browser is too old to read it'),
   tk('Nothing was recorded.'),
   tk('Chapter'),
@@ -3802,16 +3802,16 @@ const REPLAY_PAGE_WORDS = [
   tk('Checking… {pct}'),
   tk('{n} sessions, each hash chain whole and each following the one before it.'),
   tk('{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between).'),
-  tk('Replayed: {bad} of {n} chapter writes don’t come out as recorded.'),
-  tk('Replayed: all {n} chapter writes come out exactly as recorded.'),
+  tk('Played back: {bad} of {n} chapter writes don’t come out as recorded.'),
+  tk('Played back: all {n} chapter writes come out exactly as recorded.'),
   tk('This page holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
-  tk('Proof of when it was written wasn’t turned on, so nothing on this page fixes the recording in time. It shows how the book was written, not when.'),
+  tk('Timestamping wasn’t turned on, so nothing on this page fixes the history in time. It shows how the book was written, not when.'),
   tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
   tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),
   tk('This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.'),
   tk('Seal {n}: {why}'),
-  tk('The figures below were worked out again from the recording on this page, and match.'),
-  tk('The figures below don’t match the recording on this page.'),
+  tk('The figures below were worked out again from the history on this page, and match.'),
+  tk('The figures below don’t match the history on this page.'),
   tk('Seals of {device}'),
   tk('Every seal'),
   tk('Seal'),
@@ -3823,11 +3823,11 @@ const REPLAY_PAGE_WORDS = [
   tk('not stamped'),
   tk('Check it without this page'),
   tk('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:'),
-  tk('A timestamp shows the recording existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the replay and the report speak to that, and they are evidence, not proof.'),
+  tk('A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.'),
   tk('Writing History'),
-  tk('This is a replay of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'),
-  tk('This page holds only some chapters. It replays them exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'),
-  tk('Turn on JavaScript to play the replay and check it. The report below is as NEO wrote it.'),
+  tk('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'),
+  tk('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'),
+  tk('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'),
   tk('Made with NEO {version} on {date}.')
 ];
 const replayPageStrings = () => Object.fromEntries(REPLAY_PAGE_WORDS.map((en) => [en, t(en)]));
@@ -3837,7 +3837,7 @@ const replayPageStrings = () => Object.fromEntries(REPLAY_PAGE_WORDS.map((en) =>
 // Rec.evidence's figures (`ev`), the time cover from the seals (`cover`,
 // null when nothing was sealed), `scope` (null: the book; else a chapter
 // id), `title`, and `name(ch)` for the chapter table. The History dialog
-// shows it, and Export replay… puts it in the page.
+// shows it, and Export Writing History… puts it in the page.
 function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, order = [], partial = false } = {}) {
   const e = escHtml;
   const n = (x) => fmtNum(Math.round(x || 0));
@@ -3874,10 +3874,10 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
     ? t('Changes with no key pressed: {n}, {chars} characters ({kinds}). Dictation, the system’s autocorrect and other tools make these.', { n: n(r.nokey), chars: n(r.nokeyChars), kinds })
     : t('Every change to the text was made with a key, a paste, or one of NEO’s own commands.')) +
     (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : ''));
-  row(t('Not recorded'), t('Words there before the recording began: {before}. Words that came while nothing was recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
+  row(t('Not recorded'), t('Words there before NEO started recording: {before}. Words that came while NEO wasn’t recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
   // the time cover: how much of the writing is fixed in time
   if (!cover || !cover.length) {
-    row(t('Timestamps'), t('Not sealed: proof of when it was written wasn’t turned on, so nothing fixes this recording in time.'));
+    row(t('Timestamps'), t('Not sealed: timestamping wasn’t turned on, so nothing fixes this history in time.'));
   } else {
     const typedIn = new Map(ev.sessions.map((s) => [s.device + '/' + s.id, s]));
     const all = cover.flatMap((d) => d.cover.map((c) => ({ ...c, device: d.device })));
@@ -3890,7 +3890,7 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
       ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(gaps.length), all: n(all.length) })
       : t('Every session was timestamped within a day of ending.'));
     if (cover.some((d) => d.bad)) text += ' ' + t('Some seals don’t check: run verify-recording on the book to see why.');
-    if (partial) text += ' ' + t('NEO checked the seals against the whole recording when it made this page. The page holds only some chapters, so it can’t check them itself.');
+    if (partial) text += ' ' + t('NEO checked the seals against the whole history when it made this page. The page holds only some chapters, so it can’t check them itself.');
     let list = '';
     if (gaps.length) {
       list = '<ul>' + gaps.slice(0, 50).map((c) => {
@@ -3913,7 +3913,7 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
     <h3>${e(t('Facts'))}</h3><table class="ev-facts">${rows.join('')}</table>
     <h3>${e(t('Judgement'))}</h3>
     <ul class="ev-judge">${judged.join('') || `<li>${e(t('Too little was written here for a judgement.'))}</li>`}</ul>
-    <p class="ev-small">${e(t('These are judgements, not proof. A recording shows how the words were typed and when; it can’t show whose ideas they were.'))}</p>`;
+    <p class="ev-small">${e(t('These are judgements, not proof. Writing History shows how the words were typed and when; it can’t show whose ideas they were.'))}</p>`;
   if (!scope) {
     const ids = [...order.filter((ch) => ev.chapters[ch] || ev.words[ch] !== undefined), ...Object.keys(ev.chapters).filter((ch) => !order.includes(ch))];
     if (ids.length > 1) {
@@ -4217,7 +4217,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   strip.setAttribute('aria-label', t('Days'));
   $h('.hs-skip span').textContent = t('Skip pauses');
   $h('.hs-level span').textContent = t('Record Writing History');
-  $h('.hs-desc').textContent = t('NEO records every keystroke so you can replay how your book was written, and bring back any earlier version. It stays with your book and is never sent anywhere.');
+  $h('.hs-desc').textContent = t('NEO records every keystroke so you can watch how your book was written, and bring back any earlier version. It stays with your book, and your words are never sent anywhere.');
   backBtn.textContent = '← ' + t('Days');
   backBtn.title = t('Back to the days') + ' (Esc)';
   // the File menu's Record Writing History: Off, Record only, Record and
@@ -4501,8 +4501,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     shown = {};
     loaded = { state: S.error ? 'failed' : S.building ? 'loading' : 'empty', error: S.error };
     const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : library.recordWriting === false
-      ? t('Writing History is off. Turn on Keep a replay of my writing, below, and NEO starts recording the next time you write.')
-      : t('Nothing recorded yet. Write in this book and NEO keeps a replay of it here.');
+      ? t('Writing History is off. Turn on Record Writing History, below, and NEO starts recording the next time you write.')
+      : t('Nothing recorded yet. Write in this book and its history shows here.');
     paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
   }
 
@@ -4806,7 +4806,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       } else if (s.k === 'b' && !onPage(s)) {
         // (a chapter the page already showed)
       } else if (s.k === 'b' && s.cause === 'baseline') {
-        markers.push({ x, kind: 'catch', step: i, label: t('Written before the recording began') });
+        markers.push({ x, kind: 'catch', step: i, label: t('Written before NEO started recording') });
       } else if (s.k === 'b' && HISTORY_SYNC.includes(s.cause)) {
         markers.push({ x, kind: 'sync', step: i, label: t(HISTORY_CAUSES[s.cause]) });
       } else if (s.k === 'f' && (s.what === 'blur' || s.what === 'hidden')) {
@@ -5437,7 +5437,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   evBtn.textContent = t('Evidence…');
   evBtn.title = t('How this book was written, in figures: the rhythm of the keys, the revising, what was pasted, and when it was timestamped');
   exBtn.hidden = !window.neo.recExport;
-  exBtn.textContent = t('Export replay…');
+  exBtn.textContent = t('Export Writing History…');
   exBtn.title = t('One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize');
   const evName = (ch) => (meta.chapterOrder.includes(ch) ? chapterLabel(ch, meta.chapterOrder) : goneLead(ch) || t('Untitled'));
   const evTitle = () => t('How “{title}” was written', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
@@ -5492,7 +5492,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     show(null);
   });
 
-  // Export replay…: the history as one web page anyone can open, that plays
+  // Export Writing History…: the history as one web page anyone can open, that plays
   // and checks itself. The whole book carries its seals; chosen chapters
   // only their lines.
   exBtn.addEventListener('click', async () => {
@@ -5500,7 +5500,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const picked = await exportReplayAsk(meta, evName);
     bd.focus();
     if (!picked) return;
-    toast(t('Making the replay page…'));
+    toast(t('Making the page…'));
     try {
       await evFlush();
       const res = await window.neo.recEvidence(bookId, picked.chapters);
@@ -5514,7 +5514,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
     } catch (err) {
       window.neo.logError('export replay: ' + (err && err.stack || err));
-      toast(t('The replay couldn’t be exported.'));
+      toast(t('The Writing History couldn’t be exported.'));
     }
   });
 
@@ -5530,7 +5530,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const sure = await confirmModal({
       title: t('Delete the Writing History of “{title}”?', { title: isUntitled(meta.title) ? t('Untitled') : meta.title }),
       points: [
-        t('Every replay of how this book was written goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
+        t('All of this book’s Writing History goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
         t('The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.'),
         ...(tags.length ? [t('Its {n} tags go with it.', { n: tags.length })] : []),
         ...(sealed ? [t('Its seals and timestamps go with it, so nothing will show when the book was written up to now.')] : []),
@@ -6095,7 +6095,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // and removed here by a new line in the session being recorded, so only
   // while this book is open and recording.
   const canTag = () => !!(rec.on && rec.bookId === bookId && book && book.id === bookId);
-  const tagWhy = () => (library.recordWriting === false ? t('Turn on Keep a replay of my writing, below, to tag moments.')
+  const tagWhy = () => (library.recordWriting === false ? t('Turn on Record Writing History, below, to tag moments.')
     : t('Open this book to tag its moments.'));
   // the tags written since the history was read, until it's read again
   let localTags = [];

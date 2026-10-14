@@ -26,9 +26,9 @@
   },
   "From the Writing History NEO kept as it was written. Facts first; the judgements after them are labelled as judgements.": "D’après l’historique d’écriture que NEO a tenu au fil de l’écriture. Les faits d’abord; les jugements qui suivent sont présentés comme tels.",
   "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "La moitié des intervalles entre touches était entre {low} et {high}; l’intervalle médian était de {mid}.",
-  "Prove when you wrote?": "Prouver quand vous avez écrit?",
+  "Timestamp your writing history?": "Horodater votre historique d’écriture?",
   "Restore the defaults?": "Rétablir les réglages par défaut?",
   "Sealed {when}. Last timestamped {then}; waiting for the network for the rest.": "Scellé {when}. Dernier horodatage {then}; en attente du réseau pour le reste.",
-  "These are judgements, not proof. A recording shows how the words were typed and when; it can’t show whose ideas they were.": "Ce sont des jugements, pas une preuve. Un enregistrement montre comment et quand les mots ont été tapés; il ne peut pas montrer de qui venaient les idées.",
+  "These are judgements, not proof. Writing History shows how the words were typed and when; it can’t show whose ideas they were.": "Ce sont des jugements, pas une preuve. L’historique d’écriture montre comment et quand les mots ont été tapés; il ne peut pas montrer de qui venaient les idées.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Ce navigateur ne sait pas vérifier les signatures Ed25519; un Chrome, Firefox ou Safari récent le peut."
 }

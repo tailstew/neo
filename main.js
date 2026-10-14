@@ -873,7 +873,7 @@ async function recMirrorMine(bookId) {
 
 // What README.txt in a book's recording/ folder says
 const recReadme = () => [
-  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to replay the writing and to bring back any earlier version of a chapter.'),
+  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to play the writing back and to bring back any earlier version of a chapter.'),
   t('Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.'),
   t('Deleting this folder deletes the history. The book itself is untouched.')
 ].join('\n\n') + '\n';
@@ -1035,7 +1035,7 @@ const recChapters = (chapters) => (Array.isArray(chapters) ? chapters.slice(0, 5
 ipcMain.handle('rec:evidence', (_e, bookId, chapters) =>
   historyRequest({ type: 'evidence', chapters: recChapters(chapters), ...historyTarget(bookId) }));
 
-// Export replay…: the history as one HTML page anyone can open
+// Export Writing History…: the history as one HTML page anyone can open
 // (replay-export.js). The window sends the report as it showed it and the
 // page's words in the writer's language; the sessions, the seals and the
 // player are read here. The whole book carries its seals; chosen chapters
@@ -2447,7 +2447,7 @@ async function dailyBackup() {
       }
     };
     walk(LIBRARY_DIR, '');
-    zip.file('_recordings.txt', t('Writing History isn’t in this zip. Each book’s recording is in Backups/recordings/, beside the zips, and Backups/README.txt says how to put it back.') + '\n');
+    zip.file('_recordings.txt', t('Writing History isn’t in this zip. Each book’s history is in Backups/recordings/, beside the zips, and Backups/README.txt says how to put it back.') + '\n');
     if (missed.length) {
       zip.file('_left-out-of-this-backup.txt', missed.join('\n') + '\n');
       logError('backup', new Error('left out of today\'s backup: ' + missed.join(', ')));

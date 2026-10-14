@@ -1,4 +1,4 @@
-// The exported replay page's own script (Export replay…, replay-export.js):
+// The exported replay page's own script (Export Writing History…, replay-export.js):
 // it plays a book's Writing History in any browser, and checks what it
 // holds without trusting NEO: each session's hash chain, that replaying the
 // sessions gives every chapter write they recorded, each seal's Ed25519
@@ -316,7 +316,7 @@
     const p = doc.getElementById('rx-checks');
     if (!p) return;
     p.hidden = false;
-    p.textContent = T('This page couldn’t read its recording: {why}', { why: String(err && err.message || err) });
+    p.textContent = T('This page couldn’t read its history: {why}', { why: String(err && err.message || err) });
   }
 
   async function start(doc) {
@@ -603,15 +603,15 @@
       }
       const r = res.replays[d];
       line(!r.bad && !r.problems, who(d) + (r.bad || r.problems
-        ? T('Replayed: {bad} of {n} chapter writes don’t come out as recorded.', { bad: fmtNum(r.bad + r.problems), n: fmtNum(r.writes) })
-        : T('Replayed: all {n} chapter writes come out exactly as recorded.', { n: fmtNum(r.writes) })));
+        ? T('Played back: {bad} of {n} chapter writes don’t come out as recorded.', { bad: fmtNum(r.bad + r.problems), n: fmtNum(r.writes) })
+        : T('Played back: all {n} chapter writes come out exactly as recorded.', { n: fmtNum(r.writes) })));
     }
     if (data.partial) line(null, T('This page holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
 
     // seals
     if (!data.partial) {
       const devices = Object.keys(res.seals);
-      if (!devices.length) line(null, T('Proof of when it was written wasn’t turned on, so nothing on this page fixes the recording in time. It shows how the book was written, not when.'));
+      if (!devices.length) line(null, T('Timestamping wasn’t turned on, so nothing on this page fixes the history in time. It shows how the book was written, not when.'));
       for (const d of devices) {
         const r = res.seals[d];
         const stamped = r.seals.filter((s) => s.by !== null);
@@ -630,8 +630,8 @@
     // the report's figures
     if (res.evidence !== null) {
       const p = el('p', res.evidence ? 'rx-same ok' : 'rx-same bad', res.evidence
-        ? T('The figures below were worked out again from the recording on this page, and match.')
-        : T('The figures below don’t match the recording on this page.'));
+        ? T('The figures below were worked out again from the history on this page, and match.')
+        : T('The figures below don’t match the history on this page.'));
       const report = doc.getElementById('rx-report');
       report.insertBefore(p, report.firstChild);
     }
@@ -680,7 +680,7 @@
       p.append(download('proof-roots.pem', new TextEncoder().encode(data.roots), 'application/x-pem-file'));
       box.append(p);
     }
-    box.append(el('p', 'rx-small', T('A timestamp shows the recording existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the replay and the report speak to that, and they are evidence, not proof.')));
+    box.append(el('p', 'rx-small', T('A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.')));
     return box;
   }
 

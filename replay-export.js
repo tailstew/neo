@@ -1,5 +1,5 @@
 'use strict';
-// Export replay… (docs/neo-recording-plan.md, part 2, Sharing): a book's
+// Export Writing History… (docs/neo-recording-plan.md, part 2, Sharing): a book's
 // Writing History as one HTML file that anyone can open in a browser, with
 // no NEO and no network. It holds the sessions (gzip, base64), the player
 // (replay-page.js over recording.js), the evidence report as NEO wrote it,
@@ -74,9 +74,9 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 <header class="rx-top">
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
-  <p class="rx-lede">${esc(T('This is a replay of how this book was written, keystroke by keystroke, recorded by NEO as it happened.'))}</p>
-  ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It replays them exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'))}</p>` : ''}
-  <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the replay and check it. The report below is as NEO wrote it.'))}</p></noscript>
+  <p class="rx-lede">${esc(T('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'))}</p>
+  ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'))}</p>` : ''}
+  <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>
 <main>
   <section id="rx-player" class="rx-player" hidden></section>

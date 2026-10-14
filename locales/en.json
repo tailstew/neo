@@ -134,12 +134,12 @@
     "one": "{n} session; {b} with a broken chain, {u} not following the one before (one is missing between).",
     "other": "{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between)."
   },
-  "Replayed: {bad} of {n} chapter writes don’t come out as recorded.": {
-    "one": "Replayed: {bad} of {n} chapter write doesn’t come out as recorded.",
-    "other": "Replayed: {bad} of {n} chapter writes don’t come out as recorded."
+  "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
+    "one": "Played back: {bad} of {n} chapter write doesn’t come out as recorded.",
+    "other": "Played back: {bad} of {n} chapter writes don’t come out as recorded."
   },
-  "Replayed: all {n} chapter writes come out exactly as recorded.": {
-    "one": "Replayed: the {n} chapter write comes out exactly as recorded.",
-    "other": "Replayed: all {n} chapter writes come out exactly as recorded."
+  "Played back: all {n} chapter writes come out exactly as recorded.": {
+    "one": "Played back: the {n} chapter write comes out exactly as recorded.",
+    "other": "Played back: all {n} chapter writes come out exactly as recorded."
   }
 }

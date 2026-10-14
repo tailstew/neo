@@ -611,7 +611,7 @@
   }
   // README.txt in a book's recording/ folder: main.js's words (and its translations)
   const recReadme = () => [
-    'This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to replay the writing and to bring back any earlier version of a chapter.',
+    'This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to play the writing back and to bring back any earlier version of a chapter.',
     'Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.',
     'Deleting this folder deletes the history. The book itself is untouched.'
   ].map((s) => (typeof NeoI18n !== 'undefined' ? NeoI18n.t(s) : s)).join('\n\n') + '\n';
