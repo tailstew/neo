@@ -89,11 +89,11 @@ These are people who already use NEO and update to the first version with Writin
 - [x] Internal names stay: `neo-replay-*`, `rec:`, `proof:`, file names, the `recordings/` folder and `verify-recording`.
 - [x] Done as 31 strings renamed in the code and every locale (plural entries keep their forms; `en.json` says "Played back"), and the keys nothing uses any more dropped.
 
-## 7. Translations, docs, tests, build
-- [ ] `node scripts/i18n.js template`; translate every new or changed string into every locale.
-- [ ] `node scripts/pocket-www.js`.
-- [ ] AGENTS.md: the Writing History and Proof sections (the first-run step, the three levels, `historyAsked`, the menu names, no Snapshots button in History).
-- [ ] `docs/manual-tests.md`:
+## 7. Translations, docs, tests, build ✅
+- [x] `node scripts/i18n.js template`; translate every new or changed string into every locale.
+- [x] `node scripts/pocket-www.js`.
+- [x] AGENTS.md: the Writing History and Proof sections (the first-run step, the three levels, `historyAsked`, the menu names, no Snapshots button in History).
+- [x] `docs/manual-tests.md`:
   - a new library asks the question in first run
   - a library from before Writing History records nothing until asked, then asks once on the shelf, and the question can't be skipped
   - after the answer, another device sharing the library isn't asked

@@ -20,7 +20,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 
 ## Recording, while writing
 
-- [ ] Writing feels the same with **Keep a Replay of My Writing** on and off: no lag while typing, even in a long chapter or a 100-page script.
+- [ ] Writing feels the same with **Record Writing History** at Off and at Record Only: no lag while typing, even in a long chapter or a 100-page script.
 - [ ] Turn the setting off, write, turn it on. Nothing is recorded while off; History shows the text that changed meanwhile as a catch-up, not as typing.
 - [ ] Dead keys and AltGr (é, ñ, ă, ș), and the Windows emoji panel (Win+.) replay as typed.
 - [ ] An input method (Microsoft Pinyin or Japanese IME): composed text replays and the chapter matches.
@@ -41,11 +41,23 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] With the library on iCloud or Syncthing, a week of normal use leaves no conflict copies in any `recording/` folder.
 - [ ] File → Library Folder… to another folder: recording, History and the backup mirror follow the new library.
 
+## Record Writing History, the setting
+
+- [ ] A new library (move `library.json` aside, or File → Library Folder… to an empty folder): first run's third step, **Your writing history**, offers Off, Record only and Record and timestamp as cards, Record only picked. **Start writing** with each in turn: the File menu's **Record Writing History** shows the same, and History's footer too. Record and timestamp chosen there asks nothing more; the first book written is sealed.
+- [ ] A library from before Writing History (take `historyAsked` out of `library.json`, then start NEO): nothing records (no new session in a book's `recording/`) until a question on the shelf, **New: your writing history**, is answered. Esc and a click outside leave it there; it has no close button. Record only is picked to start with; the timestamp card says timestamps cover the writing from the day they're turned on. **Continue** writes `historyAsked: true` and the level, and NEO doesn't ask again.
+- [ ] **(2 computers)** Answer the question on one computer: once the library has synced, the other isn't asked (an open question there goes away) and follows the answer.
+- [ ] File → **Record Writing History ▸ Record and Timestamp** asks first, in plain words; Cancel leaves the tick on Record Only and sends nothing. Off stops recording at once and says nothing already recorded is touched; Record Only again catches up what changed meanwhile.
+- [ ] Change the level in History's footer: the File menu's tick follows, and the other way round.
+- [ ] File → **Writing History…** is never greyed out. On the shelf it says "Open a book first"; with a book open it opens History.
+- [ ] **(phone)** The ⋯ sheet's **Record Writing History** offers Off and Record only, and follows the desktop's choice (Record and timestamp on the desktop shows as Record only).
+
 ## Writing History, the dialog
 
-- [ ] History's footer description, the History tab's tooltip, the shelf menu's **Writing history…**, the empty history and the first-run hint describe it plainly (a replay of how the book was written), in English and in French.
+- [ ] History's footer description, the History tab's tooltip, the shelf menu's **Writing History…** and the empty history describe it plainly (how the book was written), in English and in French. Nowhere does the interface say "replay" or "recording" as a noun; it says Writing History, record, play and watch.
 - [ ] All four ways in open it: History in the footer, File → Writing History…, a book's shelf menu (without opening the book), and **Watch This Chapter Being Written** in a chapter's menu.
-- [ ] Days: ← and → move through the tiles and show each day as it ended; a tile clicked plays its day; Esc in the player goes back to the days, Esc again closes.
+- [ ] Days: ← and → move through the tiles and show each day as it ended; a tile clicked (or Space/Enter on it) opens its day paused, and nothing plays until Play or Space; Esc in the player goes back to the days, Esc again closes.
+- [ ] **Watch This Chapter Being Written** opens the player at the chapter's first day, paused.
+- [ ] While History is open, the menus are greyed out except the Edit menu, Find (which searches the history), **Tag This Moment…** (Ctrl+S, where Take Snapshot was), Quit and the Window menu. Goals, Export, Format and the rest do nothing until History closes; then the menus come back as they were.
 - [ ] Player: play, each speed, Skip pauses, dragging the timeline, ⇧← / ⇧→ between sessions, and play running on into the next day.
 - [ ] Click a paragraph on the sheet: it's highlighted, and ‹ › (or [ ]) step back and forward through the times it changed, going off when there's nothing more that way.
 - [ ] Search (Ctrl+F in the dialog): a name finds first written, last written, written out and moved; the toggles for Match case and Whole words work; picking a finding lands on the moment with the phrase highlighted; Stop leaves "perhaps earlier/later".
@@ -64,7 +76,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] In the player, pause on an earlier moment of a chapter and click **Restore This Chapter**. No confirmation: the dialog closes, the chapter reads as it did then, and a toast says "Chapter restored from …", that Ctrl+Z undoes it, and that the text it replaced is in Writing History at "Before restoring to …". Darlings and the snapshot list are unchanged.
 - [ ] Open History again: that day has a **Before restoring to …** tag (in Tags in the side pane, a flag on the timeline and on the day's tile). Picking it shows the chapter exactly as it was before the restore.
 - [ ] Ctrl+Z (with the caret outside the text) puts the chapter back as it was.
-- [ ] Turn **Keep a replay of my writing** off, then restore a chapter from History (it still plays what was recorded). The toast says the replaced text is in a snapshot too; the Darlings tab's list has a new **Before a restore** snapshot holding it; Darlings is unchanged; Ctrl+Z undoes it.
+- [ ] Set **Record Writing History** to Off, then restore a chapter from History (it still plays what was recorded). The toast says the replaced text is in a snapshot too; the Darlings tab's list has a new **Before a restore** snapshot holding it; Darlings is unchanged; Ctrl+Z undoes it.
 - [ ] In the days, ← to an earlier day and restore from there (the day as it ended).
 - [ ] In the whole book, click a paragraph of chapter 3: the restore goes to Chapter 3 (its name is in the button's tooltip); with nothing picked, to the caret's chapter.
 - [ ] At the moment that's the chapter as it is now, the button says **Same as now** and does nothing.
@@ -95,7 +107,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] The first change of a writing day takes a "Start of the day" snapshot at the writer's day (`library.dayEndsAt`): with the day ending at 4am, writing at 1am and 3am takes no second one; at 5am it does.
 - [ ] On the Darlings tab, show a snapshot: **Watch from Here** is in its band (only while the book has a history) and opens History in the player at the snapshot's tag. Right-click a snapshot in the list: **Watch from Here** does the same. A snapshot older than the history opens at its first day.
 - [ ] With recording off, or History opened on a book from the shelf without opening it, **Tag This Moment…** is dimmed and its tooltip says why; Ctrl+S in History says the same and tags nothing.
-- [ ] History's footer has **Snapshots** (only for the open book): it closes History and shows the Darlings tab's snapshot list. With no snapshots, the list's hint mentions Writing History.
+- [ ] History's footer has no **Snapshots** button. On the Darlings tab with no snapshots, the list's hint mentions Writing History.
 - [ ] Duplicate a book from the shelf: the copy has no `recording/` folder, opens with no history, and records its own from then on; the original's history is unchanged.
 - [ ] **(2 computers)** Tag on one computer, rename the tag on the other: once both have synced, History on each shows the newer name.
 - [ ] In German and Russian, Tags, the tag dialog and the restore toasts read right and fit.
@@ -103,8 +115,8 @@ Each item says what to do and what should happen. Tick it with the date and the 
 
 ## Proof of when I wrote (phase 5)
 
-- [ ] History's footer has **Prove when I wrote**, off. Its tooltip says what's sent. Ticking it asks first, in plain words; Cancel leaves it off, and nothing is sent (no `seals/` folder appears).
-- [ ] With proof on, History's footer has no second checkbox beside **Prove when I wrote**, and only `.json` and `.tsr` files appear in `seals/`.
+- [ ] At Record Only, History's footer level menu offers **Record and timestamp**. Choosing it asks first, in plain words (title "Timestamp your writing history?"); Cancel leaves it at Record only, and nothing is sent (no `seals/` folder appears).
+- [ ] With timestamping on, only `.json` and `.tsr` files appear in `seals/`.
 - [ ] Turn it on with a book open: within a few seconds `recording/<id>/seals/` has `000001.json` and `000001.digicert.tsr` and `000001.sectigo.tsr`, and the footer says "Sealed today at …, timestamped by DigiCert and Sectigo."
 - [ ] Check a stamp without NEO: `openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem` (from NEO's folder) says `Verification: OK`. The same for Sectigo's.
 - [ ] Write for over an hour: one new seal an hour while writing, none while not. Closing the book seals once more.
@@ -112,7 +124,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Turn the network off (airplane mode), write, close the book: seals are written but not stamped, and the footer says it's waiting for the network. Turn the network on: within half an hour (or at the next book open), the newest seal is stamped.
 - [ ] Typing never slows or stutters when a seal is made, including offline, when the timestamp services take a while to answer.
 - [ ] `node scripts/verify-recording.js "<library>/book-…"` on a book written for a few days with proof on says "everything checks", lists each seal with its stamps, and lists the sessions written before proof was on as "timestamped later". `--online` asks drand too and still checks.
-- [ ] Turn **Keep a replay of my writing** off: no seals are made while it's off, though **Prove when I wrote** stays ticked (and is hidden).
+- [ ] Set **Record Writing History** to Off: no seals are made, and choosing Record and Timestamp again asks first.
 - [ ] **Delete this book's history…** on a book with seals: the confirmation says its seals and timestamps go too; afterwards they're in the Recycle Bin with `recording/`.
 - [ ] `Backups/recordings/<book folder>/<id>/seals/` has every seal and stamp.
 - [ ] Windows: `%APPDATA%\NEO\secrets.json` holds `proofKey` encrypted (not a readable `-----BEGIN PRIVATE KEY-----`).
@@ -135,18 +147,18 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] **(2 computers)** With the other on the shelf, change the order on the first: once the shelf picks up the library (within 30 s, or on focus), a book opened there seals in the new order.
 - [ ] **(phone)** Pocket opens and saves the library without dropping `proofTsas`.
 
-## Evidence report and exported replay (phase 6)
+## Evidence report and exported Writing History (phase 6)
 
-- [ ] History's footer has **Evidence…** and **Export replay…** beside Snapshots, and the footer still fits at the window's smallest width (nothing overlaps the proof line).
+- [ ] History's footer has **Evidence…** and **Export Writing History…**, and the footer still fits at the window's smallest width (nothing overlaps the proof line).
 - [ ] **Evidence…** on a book written for a few days: "Reading every session…", then How "…" was written: Facts (time, keys, rhythm, pauses, revision, going back, pasted, without a key, not recorded, timestamps), then Judgement, then "These are judgements, not proof." Numbers look right for what you did (paste a paragraph from a web page: it shows under Pasted).
 - [ ] Paste a long passage from another app within a few seconds of switching back to NEO: the report counts it as "within ten seconds of coming back to NEO".
 - [ ] Dictate a sentence (Windows: Win+H; macOS: Fn Fn): it's counted under **Without a key**.
 - [ ] The chapter table: click a row, see that chapter's report; **← The whole book** goes back; Esc or Done closes the report and leaves History open.
 - [ ] On a book with a year of writing, the report takes no more than half a minute, and NEO stays responsive meanwhile (you can type in another book's window, scroll History).
 - [ ] With proof on for a while: the report's Timestamps row names DigiCert and Sectigo and lists sessions written before proof was on as "timestamped later, on …". With proof never on: "Not sealed…".
-- [ ] **Export replay…**, the whole book: the save dialog opens in the last export folder, named "<title> — Writing History.html". Open the file in Chrome, Firefox, Safari and Edge, with the network off: it opens on the book as it is now, plays (Play, speeds, Skip pauses, the slider, the days, ‹ ›), and "What this page checks" ends with green ticks and "The figures below … match."
+- [ ] **Export Writing History…**, the whole book: the save dialog opens in the last export folder, named "<title> — Writing History.html". Open the file in Chrome, Firefox, Safari and Edge, with the network off: it opens on the book as it is now, plays (Play, speeds, Skip pauses, the slider, the days, ‹ ›), and "What this page checks" ends with green ticks and "The figures below … match."
 - [ ] In the exported page, with proof on: each seal's files download from **Every seal**, and `openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem` (with the page's own proof-roots.pem) says `Verification: OK`.
-- [ ] **Export replay…**, only some chapters: the page shows and plays only them; searching the file (open it in a text editor and look for a phrase from a chapter left out) finds nothing; the page says nothing on it fixes them in time.
+- [ ] **Export Writing History…**, only some chapters: the page shows and plays only them; searching the file (open it in a text editor and look for a phrase from a chapter left out) finds nothing; the page says nothing on it fixes them in time.
 - [ ] Edit one character in an exported page's data with a text editor (inside a session's base64 is hard; change a seal's `"seq"` instead): the page shows a red ✗.
 - [ ] The exported page in your interface language (Language menu, then export): its buttons and checks are translated where the language has them.
 - [ ] The exported page on a phone's browser (email it to yourself): readable, plays, no sideways scrolling.
@@ -175,7 +187,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 
 - [ ] **(phone)** Android: write in a book, close it, reopen. History is in the footer and the book menu and plays the session; the back gesture leaves the player, then the dialog.
 - [ ] **(phone)** iPhone (iOS 16.4 or later): the same. On iOS 15 or 16.3 History isn't offered and nothing is recorded.
-- [ ] **(phone)** **Keep a replay of my writing** in the ⋯ sheet turns recording off and on.
+- [ ] **(phone)** **Record Writing History** in the ⋯ sheet turns recording off and on.
 - [ ] **(phone)** iPhone with the library in iCloud: History fetches the desktop's sessions first, and shows them.
 - [ ] **(phone)** Open and close History several times on a long book: it doesn't get slower, and the app's memory goes back down once it closes.
 - [ ] **(phone)** Kill the app mid-session, reopen the book: the session is closed as crashed and plays.
