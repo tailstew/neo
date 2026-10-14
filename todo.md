@@ -61,11 +61,11 @@ These are people who already use NEO and update to the first version with Writin
 - [x] Keep as is (they only continue play the writer started): running into the next day (`4793`), the earlier/later tiles (`4533`).
 - [x] Rename `openHistory`'s `play` option: it's `firstDay` now.
 
-## 4. History blocks the global menus
-- [ ] The window tells main when History opens and closes (`ui:modal`, a new preload method).
-- [ ] `buildMenu()` greys out everything while it's open, except: Copy, Select All, Find (searches the history), ⌘S shown as **Tag This Moment**, Quit, Window, Help.
-- [ ] Safety net: `onMenu` ignores every other message while `historyShown` is set.
-- [ ] Decide: do Evidence…, Timestamp services… and Export… block the menus the same way?
+## 4. History blocks the global menus ✅
+- [x] The window tells main when History opens and closes (`ui:modal`, a new preload method).
+- [x] `buildMenu()` greys out everything while it's open, except: the Edit menu's own items (the search field needs them), Find (searches the history), ⌘S shown as **Tag This Moment…**, Quit, and the Window menu. Help is greyed out too: its items open windows of their own. A reload gives the menus back (`did-start-loading`).
+- [x] Safety net: `onMenu` ignores every other message while `historyShown` is set.
+- [x] Evidence…, Timestamp services… and Export… open only from inside History, so the lock already covers them.
 
 ## 5. No Snapshots button in History ✅
 - [x] Remove `.hs-snaps` and its handler (`app.js:5424–5435`), its markup and its string.

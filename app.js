@@ -4264,9 +4264,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     if (window.neo.recHistoryClosed) window.neo.recHistoryClosed();
     bd.remove();
     historyShown = null;
+    if (window.neo.uiModal) window.neo.uiModal(false);
     if (caret && book && book.id === bookId) restoreCaret(caret);
   };
   historyShown = close;
+  // the menus are the dialog's while it's open: the rest is greyed out
+  if (window.neo.uiModal) window.neo.uiModal(true);
   // Esc, or Pocket's back gesture: from the player to the days, then closed
   close.back = () => { if (part) clearPart(); else if (view === 'player') showDays(curDay()); else close(); };
   // Find, from the menu or ⌘F: the history's own search
@@ -19908,6 +19911,10 @@ window.neo.onMenu(async (msg) => {
   // full screen and focus mode together hide the bottom bar until hovered
   // (styles.css); the window says when it goes in and out, whatever is open
   if (msg.type === 'fullScreen') { document.body.classList.toggle('full-screen', !!msg.value); return; }
+  // Writing History open: only its own (Find, ⌘S to tag) and the news the
+  // main process sends of itself. The menu greys the rest out; a key that
+  // still reaches here does nothing behind the dialog.
+  if (historyShown && !['find', 'snapshot', 'update', 'uiLanguage'].includes(msg.type)) return;
   if ($('#keyboard-shortcuts') && msg.type !== 'help') return;
   // a window the menu opens (⌘, for Goals, say) never stacks on one that's
   // already open: pressing it again used to pile up overlays

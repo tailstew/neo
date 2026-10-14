@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('neo', {
   recExport: (bookId, opts) => ipcRenderer.invoke('rec:export', bookId, opts),
   onRecProgress: (cb) => ipcRenderer.on('rec:progress', (_e, msg) => cb(msg)),
   recState: (st) => ipcRenderer.send('rec:state', st),
+  uiModal: (on) => ipcRenderer.send('ui:modal', !!on),
   proofSet: (flags) => ipcRenderer.invoke('proof:set', flags),
   proofSeal: (bookId) => ipcRenderer.invoke('proof:seal', bookId),
   proofStatus: (bookId) => ipcRenderer.invoke('proof:status', bookId),

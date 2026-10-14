@@ -1283,6 +1283,27 @@ ipcMain.on('rec:state', () => {
   try { buildMenu(); } catch (err) { logError('menu', err); }
 });
 
+// While Writing History is open the menus are its own: the window says when
+// it opens and closes, and buildMenu greys out the rest (lockMenu)
+let historyOpen = false;
+ipcMain.on('ui:modal', (_e, on) => {
+  if (historyOpen === !!on) return;
+  historyOpen = !!on;
+  try { buildMenu(); } catch (err) { logError('menu', err); }
+});
+// what stays on: editing the search field, Find (the history's search),
+// ⌘S (Tag This Moment), and the window's and the app's own
+const MODAL_ROLES = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'pasteAndMatchStyle', 'selectAll', 'quit', 'close', 'minimize', 'zoom', 'front', 'hide', 'hideOthers', 'unhide', 'services']);
+const MODAL_IDS = new Set(['find', 'snapshot']);
+function lockMenu(items) {
+  for (const item of items) {
+    if (item.type === 'separator') continue;
+    if (Array.isArray(item.submenu)) { lockMenu(item.submenu); continue; }
+    if (item.role && item.role !== 'about' ? MODAL_ROLES.has(item.role) : MODAL_IDS.has(item.id)) continue;
+    item.enabled = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cover art: images live inside the book's folder, so covers travel with
 // the library. Timestamped filenames sidestep every caching gremlin.
@@ -2518,6 +2539,12 @@ function createWindow() {
   win.on('enter-full-screen', () => fullScreenChanged(true));
   win.on('leave-full-screen', () => fullScreenChanged(false));
   win.webContents.on('did-finish-load', () => { if (win.isFullScreen()) fullScreenChanged(true); });
+  // a page loaded afresh has no Writing History open: give the menus back
+  win.webContents.on('did-start-loading', () => {
+    if (!historyOpen) return;
+    historyOpen = false;
+    try { buildMenu(); } catch (err) { logError('menu', err); }
+  });
   const remember = () => {
     clearTimeout(rememberTimer);
     if (win.isDestroyed() || win.isFullScreen() || win.isMinimized()) return;
@@ -2863,7 +2890,8 @@ function buildMenu() {
         { type: 'separator' },
         // shown, not registered: the window answers ⌘S itself, so it works the
         // same in Pocket with a keyboard and never fires twice
-        { label: t('Take Snapshot'), accelerator: 'CmdOrCtrl+S', registerAccelerator: false, click: () => sendToWindow({ type: 'snapshot' }) },
+        // (in Writing History, ⌘S tags the moment on the sheet)
+        { id: 'snapshot', label: historyOpen ? t('Tag This Moment…') : t('Take Snapshot'), accelerator: 'CmdOrCtrl+S', registerAccelerator: false, click: () => sendToWindow({ type: 'snapshot' }) },
         { type: 'separator' },
         { label: t('Cover Art…'), click: () => sendToWindow({ type: 'coverArt' }) },
         {
@@ -2912,6 +2940,7 @@ function buildMenu() {
         { role: 'pasteAndMatchStyle', label: t('Paste and Match Style') }, { role: 'selectAll', label: t('Select All') },
         { type: 'separator' },
         {
+          id: 'find',
           label: isMac ? t('Find & Replace') : t('Find & Replace').replace(/&/g, '&&'),
           accelerator: 'CmdOrCtrl+F',
           click: () => sendToWindow({ type: 'find' })
@@ -3145,6 +3174,7 @@ function buildMenu() {
       ]
     }
   ];
+  if (historyOpen) lockMenu(template);
   const menu = Menu.buildFromTemplate(template);
   editMenuState.edit = null; // the old menu bar is going: forget its Edit menu first
   Menu.setApplicationMenu(menu);

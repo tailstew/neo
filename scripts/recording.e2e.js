@@ -1078,6 +1078,29 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await tick(300);
 });
 
+test('while History is open the menus are its own: Find and ⌘S (to tag) stay, the rest is greyed out', async () => {
+  assert.equal(menuItem('Goals…').enabled, true);
+  await js('openHistory()');
+  await daysReady();
+  await tick(300);
+  assert.equal(menuItem('Goals…').enabled, false);
+  assert.equal(menuItem('Writing History…').enabled, false);
+  assert.equal(menuItem('Copy').enabled, true);
+  assert.ok(menuItem('Find & Replace') || menuItem('Find && Replace'));
+  assert.equal((menuItem('Find & Replace') || menuItem('Find && Replace')).enabled, true);
+  assert.equal(menuItem('Tag This Moment…').enabled, true, '⌘S tags the moment');
+  // a message that still reaches the window does nothing behind the dialog
+  const backdrops = await js('document.querySelectorAll(".modal-backdrop").length');
+  menuItem('Goals…').click();
+  await tick(300);
+  assert.equal(await js('document.querySelectorAll(".modal-backdrop").length'), backdrops, 'Goals didn’t open behind it');
+  key('Escape');
+  await tick(400);
+  assert.equal(await js('!!historyShown'), false);
+  assert.equal(menuItem('Goals…').enabled, true, 'the menus come back when it closes');
+  assert.equal(menuItem('Take Snapshot').enabled, true);
+});
+
 test('the days are cached in userData, and the cache plays the same', async () => {
   const cacheDir = path.join(tmp, 'app', 'recording-cache', BOOK);
   const names = fs.readdirSync(cacheDir);
