@@ -1045,13 +1045,20 @@ test('one chapter on its own; Esc goes back to the days, then puts the caret bac
   assert.equal(await js(`document.activeElement.closest('.chapter') && document.activeElement.closest('.chapter').dataset.id`), chId);
 });
 
-test('a deleted chapter is listed, and a chapter’s menu plays it from the start', async () => {
+test('a deleted chapter is listed, and a chapter’s menu opens it at the start, paused', async () => {
   await js('openHistory()');
   await daysReady();
   // the chapter typed in and deleted earlier
   assert.ok(await js(`[...document.querySelectorAll('.hs-list-head')].some((x) => x.textContent === 'Deleted')`));
   // the days: a tile for today, with what was written
   assert.ok(await js(`document.querySelectorAll('.hs-strip .hs-tile[data-day]').length >= 1`));
+  // a day picked opens the player on it, paused: nothing plays until Play
+  await js(`document.querySelector('.hs-strip .hs-tile[data-day]').click()`);
+  await playerReady({ drawn: false });
+  await tick(300);
+  assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'a day picked doesn’t play');
+  key('Escape');
+  await tick(300);
   key('Escape');
   await tick(300);
   const chId = (await chapterIds())[0];
@@ -1060,11 +1067,11 @@ test('a deleted chapter is listed, and a chapter’s menu plays it from the star
     popMenu = async () => { popMenu = realPop; return 'history'; };
     return chapterMenu(${JSON.stringify(chId)});
   })()`);
-  await playerReady();
+  await playerReady({ drawn: false }); // at its very start the chapter isn't written yet
   await tick(200);
   assert.ok(await js('historyShown.player.pos() < historyShown.player.steps().length'), 'it starts at the beginning');
   assert.equal(await js('historyShown.player.mode()'), chId);
-  assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Pause');
+  assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'it waits for Play');
   key('Escape');
   await tick(300);
   key('Escape');

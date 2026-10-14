@@ -4026,9 +4026,9 @@ async function historyRestoreParagraphs({ ch, html, wall, ref, paras }) {
 // named). It opens on the days: the chapter the writer is in (or the
 // book) as it is now, with a tile for each day it was written on below.
 // A day picked opens the player on it, with its typing timeline, play and
-// speed. With `play`, straight into the player at the first day the
-// chapter was written, playing.
-async function openHistory({ bookId = book && book.id, chId = null, play = false, snapshot = null } = {}) {
+// speed. Nothing plays until the writer presses Play. With `firstDay`,
+// straight into the player at the first day the chapter was written.
+async function openHistory({ bookId = book && book.id, chId = null, firstDay = false, snapshot = null } = {}) {
   if (!bookId || !historyCanOpen() || historyShown) return;
   const here = !!(book && book.id === bookId && !$('#editor-view').hidden);
   const caret = here ? captureCaret() : null;
@@ -4243,7 +4243,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     S.building = false;
     S.open = m.open || [];
     if (m.error) S.error = m.error;
-    if (play && chId) { play = false; reindex({ show: false }); startWatching(); } else if (snapshot) {
+    if (firstDay && chId) { firstDay = false; reindex({ show: false }); startWatching(); } else if (snapshot) {
       const s = snapshot;
       snapshot = null;
       reindex({ show: false });
@@ -4505,7 +4505,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
     const made = fitting().map((di) => {
       const d = S.days[di];
       const key = mode + '|' + dayKey(d) + '|' + (tagsByDay.get(d.day) || []).map((x) => x.id + ':' + tagName(x)).join(',');
-      const b = tiles.get(key) || dayTile(d, () => { const i = dayIndex(d.day); if (i >= 0) openPlayer(S.days[i].from, { playIt: true }); });
+      const b = tiles.get(key) || dayTile(d, () => { const i = dayIndex(d.day); if (i >= 0) openPlayer(S.days[i].from); });
       keep.set(key, b);
       return b;
     });
@@ -5546,7 +5546,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
       const fits = fitting();
       const at = fits.indexOf(dsel);
       const go = (k) => { const di = fits[Math.max(0, Math.min(k, fits.length - 1))]; if (di !== undefined && di !== dsel) showDays(di); };
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (S.days[dsel]) openPlayer(S.days[dsel].from, { playIt: true }); } else if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); } else if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); } else if (e.key === 'Home') { e.preventDefault(); go(0); } else if (e.key === 'End') { e.preventDefault(); go(fits.length - 1); }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (S.days[dsel]) openPlayer(S.days[dsel].from); } else if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); } else if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); } else if (e.key === 'Home') { e.preventDefault(); go(0); } else if (e.key === 'End') { e.preventDefault(); go(fits.length - 1); }
       return;
     }
     if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); return; }
@@ -6261,10 +6261,10 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
 
   /* ---------- the recording itself ---------- */
 
-  // Watch This Chapter Being Written: the first day it was written, playing
+  // Watch This Chapter Being Written: the first day it was written, ready to play
   function startWatching() {
     const i = S.sessions.findIndex((s) => s.stats.chapters[chId]);
-    if (i >= 0) openPlayer(i, { ch: chId, playIt: true }); else showDays(dsel);
+    if (i >= 0) openPlayer(i, { ch: chId }); else showDays(dsel);
   }
 
   // Every device's sessions, as one history: the devices that wrote it are
@@ -6616,7 +6616,7 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   const choice = await popMenu(x, y, items, { title: chapterName(chId), from: from || document.querySelector(`.nav-item[data-id="${chId}"] .n-row`) });
   if (!choice || choice === kind) return null;
   if (choice === 'history') {
-    openHistory({ chId, play: true });
+    openHistory({ chId, firstDay: true });
     return null;
   }
   if (choice === 'export') {

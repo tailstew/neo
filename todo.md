@@ -53,13 +53,13 @@ These are people who already use NEO and update to the first version with Writin
 - [x] `app.js:19967`: with no book open, `toast(t('Open a book first'))`, as `doExport` does (`app.js:19666`).
 - [x] `rec:state` no longer enables the item. It only rebuilds the menu now; step 1 reuses it for the level's tick.
 
-## 3. Nothing plays until the writer presses Play
-- [ ] `playIt: false` in:
+## 3. Nothing plays until the writer presses Play ✅
+- [x] `playIt: false` in:
   - clicking a day tile (`app.js:4508`)
   - Space/Enter on a day (`app.js:5549`)
   - `startWatching` (`app.js:6267`); the `play: true` from Watch This Chapter Being Written (`app.js:6620`) opens paused at the chapter's first day
-- [ ] Keep as is (they only continue play the writer started): running into the next day (`4793`), the earlier/later tiles (`4533`).
-- [ ] Rename `openHistory`'s `play` option to say "start at", not "play".
+- [x] Keep as is (they only continue play the writer started): running into the next day (`4793`), the earlier/later tiles (`4533`).
+- [x] Rename `openHistory`'s `play` option: it's `firstDay` now.
 
 ## 4. History blocks the global menus
 - [ ] The window tells main when History opens and closes (`ui:modal`, a new preload method).
