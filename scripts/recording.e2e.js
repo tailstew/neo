@@ -819,12 +819,16 @@ const playLatest = async () => {
   await playerReady();
 };
 
-test('File → Writing History… is there for an open book, and not on the shelf', async () => {
+test('File → Writing History… is never greyed out; on the shelf it says to open a book first', async () => {
   await tick(300);
   assert.equal(menuItem('Writing History…').enabled, true);
   await js('backToShelf()');
   await tick(800);
-  assert.equal(menuItem('Writing History…').enabled, false);
+  assert.equal(menuItem('Writing History…').enabled, true);
+  menuItem('Writing History…').click();
+  await tick(300);
+  assert.equal(await js('!!historyShown'), false, 'no dialog without a book');
+  assert.equal(await js('$("#hint").hidden ? "" : $("#hint").textContent'), 'Open a book first');
   await js(`openBook(${JSON.stringify(BOOK)})`);
   await tick(500);
   assert.equal(menuItem('Writing History…').enabled, true);
