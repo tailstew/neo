@@ -4124,7 +4124,7 @@ async function openHistory({ bookId = book && book.id, chId = null, play = false
   keep.checked = library.recordWriting !== false;
   keep.addEventListener('change', async () => {
     await setRecordWriting(keep.checked);
-    if (window.neo.recState) window.neo.recState({ book: !!book && !$('#editor-view').hidden, menu: true });
+    if (window.neo.recState) window.neo.recState();
     renderProof();
   });
 
@@ -6371,7 +6371,6 @@ async function openBook(bookId) {
 
   $('#bookshelf-view').hidden = true;
   $('#editor-view').hidden = false;
-  if (window.neo.recState) window.neo.recState({ book: true });
   applyBright();
   document.execCommand('defaultParagraphSeparator', false, 'p');
 
@@ -16089,7 +16088,6 @@ async function backToShelf() {
   undoStack = [];
   $('#editor-view').hidden = true;
   $('#bookshelf-view').hidden = false;
-  if (window.neo.recState) window.neo.recState({ book: false });
   applyBright();
   spEditorMode(); // a script's pane, page and title page go
   spReportState();
@@ -19964,7 +19962,8 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'import') importBooks();
   if (msg.type === 'stats') openStats();
   if (msg.type === 'recordWriting') setRecordWriting(msg.checked);
-  if (msg.type === 'history' && book && !$('#editor-view').hidden) openHistory();
+  // never greyed out: with no book open it says so, as Export does
+  if (msg.type === 'history') { if (book && !$('#editor-view').hidden) openHistory(); else toast(t('Open a book first')); }
   if (msg.type === 'chapterStep') gotoChapter(msg.value);
   if (msg.type === 'writingStyle') {
     library.writingStyle = msg.value;

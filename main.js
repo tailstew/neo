@@ -1277,12 +1277,9 @@ ipcMain.handle('proof:status', (_e, bookId) => {
   }
 });
 
-// File → Writing History… is for the open book: the window says when one is
-let recState = { book: false };
-ipcMain.on('rec:state', (_e, st) => {
-  const next = { book: !!(st && st.book) };
-  if (next.book === recState.book && !(st && st.menu)) return;
-  recState = next;
+// The window says when the recording setting changed, so the File menu's
+// tick follows it
+ipcMain.on('rec:state', () => {
   try { buildMenu(); } catch (err) { logError('menu', err); }
 });
 
@@ -2876,7 +2873,6 @@ function buildMenu() {
         },
         {
           label: t('Writing History…'),
-          enabled: recState.book,
           click: () => sendToWindow({ type: 'history' })
         },
         {
