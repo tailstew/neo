@@ -3203,7 +3203,7 @@ function historyLevelCards(box, picked, onPick, { existing = false } = {}) {
     ['off', t('Off'), t('NEO keeps no history. Snapshots still work.')],
     ['record', t('Record only'), t('Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.')],
     ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp'),
-      t('Every keystroke is recorded as above, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove when it was written.') +
+      t('Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.') +
       (existing ? ' ' + t('Timestamps cover your writing from the day they’re turned on.') : '')]] : [])
   ];
   const pick = (value) => box.querySelectorAll('.fr-choice').forEach((b) => {
@@ -3242,7 +3242,7 @@ function askHistoryLevel() {
   </div>`;
   bd.querySelector('h2').textContent = t('New: your writing history');
   bd.querySelector('p').textContent = t('NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.') +
-    (window.neo.proofSet ? ' ' + t('With timestamps, you also have proof of when your work was written.') : '') +
+    (window.neo.proofSet ? ' ' + t('With timestamps, you also have proof that your work was written over time.') : '') +
     ' ' + t('It starts when you turn it on: what you’ve already written is where the history begins.');
   historyLevelCards(bd.querySelector('.hl-cards'), picked, (v) => { picked = v; }, { existing: true });
   const go = bd.querySelector('.btn-gold');
@@ -3282,7 +3282,7 @@ async function proofConsent() {
     points: [
       t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
       ...await proofWhoSays(),
-      t('Your seals are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
+      t('Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
       t('A timestamp shows when your writing existed, not who wrote it. Your Writing History, which shows how you wrote it, speaks to that.')
     ],
     ok: t('Turn on timestamping')
@@ -3296,10 +3296,10 @@ async function proofWhoSays() {
   let on = [];
   try { on = (await window.neo.proofServices()).filter((s) => s.on); } catch { /* the defaults, then */ }
   if (!on.length || on.slice(0, 2).map((s) => s.id).join() === 'digicert,sectigo') {
-    return [t('The fingerprint goes to DigiCert and Sectigo, the companies that timestamp signed software, and each seal carries a public random number from drand, so it can’t have been made before then.')];
+    return [t('The fingerprint goes to DigiCert and Sectigo, the companies that timestamp signed software, and each timestamp carries a public random number from drand, so it can’t have been made before then.')];
   }
   const names = new Intl.ListFormat(NeoI18n.getLocale(), { type: 'conjunction' }).format(on.map((s) => s.name));
-  return [t('The fingerprint goes to {services}, the timestamp services you chose, and each seal carries a public random number from drand, so it can’t have been made before then.', { services: names })];
+  return [t('The fingerprint goes to {services}, the timestamp services you chose, and each timestamp carries a public random number from drand, so it can’t have been made before then.', { services: names })];
 }
 
 // Timestamp services… (docs/neo-recording-plan.md, The writer's own
@@ -3347,7 +3347,7 @@ async function openTsaServices() {
     const title = t('Timestamp services');
     $q('h2').textContent = title;
     $q('.modal').setAttribute('aria-label', title);
-    $q('.tsa-lede').textContent = t('Each seal’s fingerprint, never your words, goes to these services in this order, until two have timestamped it. A service whose box is clear is never asked.');
+    $q('.tsa-lede').textContent = t('Each hour’s fingerprint, never your words, goes to these services in this order, until two have timestamped it. A service whose box is clear is never asked.');
     $q('.tsa-new').textContent = t('Add a service…');
     $q('.tsa-reset').textContent = t('Restore the defaults');
     $q('.m-ok').textContent = t('Done');
@@ -3419,9 +3419,9 @@ async function openTsaServices() {
       const on = list.filter((s) => s.on);
       const notPublic = on.slice(0, 2).find((s) => s.added && !s.public);
       warn.textContent = !on.length
-        ? t('With none on, your writing is still sealed, but nothing timestamps it.')
+        ? t('With none on, your writing is still recorded, but nothing timestamps it.')
         : on.length < 2
-          ? t('With one on, each seal has one timestamp. Two services from different companies make a much harder story to argue with.')
+          ? t('With one on, your writing gets one timestamp each hour instead of two. Two services from different companies make a much harder story to argue with.')
           : notPublic
             ? t('Stamps from {name} rest on a root you added, so they don’t count toward the time cover in Evidence.', { name: notPublic.name })
             : '';
@@ -3548,11 +3548,11 @@ async function recRestart(bookId) {
 /*  nothing that looks after the manuscript mistakes them for it.      */
 /* ================================================================== */
 
-const HISTORY_SPEEDS = [1, 2, 4, 8, 32];
-const HISTORY_SKIP = 3000;    // with Skip Pauses on, a pause longer than this…
+const HISTORY_FAST = 8;       // ▶▶ plays this many times as fast as it was written
+const HISTORY_SKIP = 3000;    // a pause longer than this…
 const HISTORY_SKIP_TO = 500;  // …plays this long, and a badge says how long it was
 const HISTORY_INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
-const historyPrefs = { speed: 8, skip: true }; // kept while NEO runs
+const historyPrefs = { speed: 1, skip: true }; // the speed is kept while NEO runs
 const historyCanOpen = () => !!(Rec && window.neo.recList && window.neo.recRead && window.neo.recDays && window.neo.recDayStart);
 let historyShown = null; // the open dialog's close()
 let historyFindSeq = 0;  // each search's number, so the worker's news reaches the search it's for
@@ -3731,10 +3731,10 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('h2').textContent = title;
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
-    bd.querySelector('.ex-book').textContent = t('The whole book, with its seals, so its timestamps can be checked');
+    bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
     bd.querySelector('.ex-some').textContent = t('Only these chapters:');
     const note = bd.querySelector('.ex-note');
-    note.textContent = t('A page of some chapters plays them back exactly, but can’t show they belong to a sealed whole, so nothing on it fixes them in time.');
+    note.textContent = t('A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.');
     const box = bd.querySelector('.ex-chapters');
     for (const ch of meta.chapterOrder) {
       const l = document.createElement('label');
@@ -3828,7 +3828,7 @@ const REPLAY_PAGE_WORDS = [
   tk('A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.'),
   tk('Writing History'),
   tk('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'),
-  tk('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'),
+  tk('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to the timestamped whole, so nothing on it fixes them in time.'),
   tk('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'),
   tk('Made with NEO {version} on {date}.')
 ];
@@ -3879,20 +3879,20 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
   row(t('Not recorded'), t('Words there before NEO started recording: {before}. Words that came while NEO wasn’t recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
   // the time cover: how much of the writing is fixed in time
   if (!cover || !cover.length) {
-    row(t('Timestamps'), t('Not sealed: timestamping wasn’t turned on, so nothing fixes this history in time.'));
+    row(t('Timestamps'), t('None: timestamping wasn’t turned on, so nothing fixes this history in time.'));
   } else {
     const typedIn = new Map(ev.sessions.map((s) => [s.device + '/' + s.id, s]));
     const all = cover.flatMap((d) => d.cover.map((c) => ({ ...c, device: d.device })));
     const gaps = all.filter((c) => c.gap && (typedIn.get(c.device + '/' + c.session) || {}).typed);
     const stamps = [...new Set(cover.flatMap((d) => d.stamps))];
-    let text = t('Seals: {seals}, from {first} to {last}, timestamped by {stamps}.', {
+    let text = t('Timestamps: {seals}, from {first} to {last}, by {stamps}.', {
       seals: n(cover.reduce((a, d) => a + d.seals, 0)), first: date(Math.min(...cover.map((d) => Date.parse(d.first)))),
       last: date(Math.max(...cover.map((d) => Date.parse(d.last)))), stamps: stamps.join(', ') || '—'
     }) + ' ' + (gaps.length
       ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(gaps.length), all: n(all.length) })
       : t('Every session was timestamped within a day of ending.'));
-    if (cover.some((d) => d.bad)) text += ' ' + t('Some seals don’t check: run verify-recording on the book to see why.');
-    if (partial) text += ' ' + t('NEO checked the seals against the whole history when it made this page. The page holds only some chapters, so it can’t check them itself.');
+    if (cover.some((d) => d.bad)) text += ' ' + t('Some timestamps don’t check: run verify-recording on the book to see why.');
+    if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this page. The page holds only some chapters, so it can’t check them itself.');
     let list = '';
     if (gaps.length) {
       list = '<ul>' + gaps.slice(0, 50).map((c) => {
@@ -4145,17 +4145,16 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <div class="hs-list" role="listbox"></div>
     </div>
     <div class="hs-main">
-      <div class="hs-scroll"><div class="hs-paper"></div></div>
+      <div class="hs-scroll"><div class="hs-paper"></div>
+        <div class="hs-part" hidden><button class="hs-part-prev" type="button">‹</button><button class="hs-part-restore" type="button"></button></div>
+        <div class="hs-part hs-part-r" hidden><button class="hs-part-next" type="button">›</button></div>
+      </div>
       <div class="hs-badge" hidden></div>
-      <div class="hs-acts"><button class="hs-tag" type="button" hidden></button><button class="hs-restore" type="button" hidden></button></div>
       <div class="hs-bottom">
         <div class="hs-controls" hidden>
-          <button class="hs-back"></button>
-          <button class="hs-play"></button>
-          <span class="hs-speeds" role="group"></span>
-          <label class="hs-skip"><input type="checkbox"> <span></span></label>
-          <span class="hs-part"><button class="hs-part-prev">‹</button><span class="hs-part-name"></span><button class="hs-part-next">›</button><button class="hs-part-x">×</button></span>
-          <span class="hs-when"></span>
+          <button class="hs-back" type="button"></button>
+          <button class="hs-play" type="button"></button>
+          <button class="hs-fast" type="button">▶▶</button>
         </div>
         <div class="hs-dayline" hidden>
           <span class="hs-prevday"></span>
@@ -4168,8 +4167,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       </div>
     </div>
     <div class="hs-foot">
-      <label class="hs-keep hs-level"><span></span> <select></select></label>
-      <span class="hs-desc"></span>
+      <span class="hs-when"></span>
+      <button class="hs-tag" type="button" hidden></button>
+      <button class="hs-restore" type="button" hidden></button>
       <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
@@ -4180,6 +4180,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const scroller = $h('.hs-scroll');
   const paper = $h('.hs-paper');
   const playBtn = $h('.hs-play');
+  const fastBtn = $h('.hs-fast');
   const backBtn = $h('.hs-back');
   const controls = $h('.hs-controls');
   const dayline = $h('.hs-dayline');
@@ -4193,7 +4194,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const badgeEl = $h('.hs-badge');
   const qIn = $h('.hs-q');
   const results = $h('.hs-results');
-  const partEl = $h('.hs-part');
+  const partL = $h('.hs-part:not(.hs-part-r)'); // beside the paragraphs picked: ‹ and restore them…
+  const partR = $h('.hs-part-r');               // …and ›
+  const partRestore = $h('.hs-part-restore');
   const restoreBtn = $h('.hs-restore');
   const tagBtn = $h('.hs-tag');
   const deleteBtn = $h('.hs-delete');
@@ -4217,25 +4220,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   list.setAttribute('aria-label', t('Chapters'));
   timeline.setAttribute('aria-label', t('Timeline'));
   strip.setAttribute('aria-label', t('Days'));
-  $h('.hs-skip span').textContent = t('Skip pauses');
-  $h('.hs-level span').textContent = t('Record Writing History');
-  $h('.hs-desc').textContent = t('NEO records every keystroke so you can watch how your book was written, and bring back any earlier version. It stays with your book, and your words are never sent anywhere.');
   backBtn.textContent = '← ' + t('Days');
   backBtn.title = t('Back to the days') + ' (Esc)';
-  // the File menu's Record Writing History: Off, Record only, Record and
-  // timestamp (Pocket can't timestamp)
-  const level = $h('.hs-level select');
-  for (const [value, name] of [['off', t('Off')], ['record', t('Record only')], ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp')]] : [])]) {
-    level.add(new Option(name, value));
-  }
-  level.value = historyLevel();
-  level.addEventListener('change', async () => {
-    level.value = await setHistoryLevel(level.value); // (back again if the writer said no)
-    bd.focus();
-    renderProof();
-  });
 
-  // Timestamped: a line saying when the book was last sealed and who stamped it
+  // Timestamped: a line saying when the book was last timestamped, and by whom
   const proofLine = $h('.hs-proof');
   async function renderProof() {
     proofLine.hidden = historyLevel() !== 'timestamp';
@@ -4245,20 +4233,20 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     if (!bd.isConnected) return;
     proofLine.textContent = proofSays(st);
   }
-  // the line that says who stamped the last seal is the way to choose who does
+  // the line that says who timestamped it last is the way to choose who does
   proofLine.title = t('Timestamp services…');
   proofLine.addEventListener('click', async () => {
     await openTsaServices();
     if (bd.isConnected) { bd.focus(); renderProof(); }
   });
   function proofSays(st) {
-    if (!st || !st.seals) return t('Nothing sealed yet. The first seal comes with your next words.');
+    if (!st || !st.seals) return t('Not timestamped yet. The first timestamp comes with your next words.');
     const when = snapWhen(Date.parse(st.at));
     return st.stamps.length >= 2
-      ? t('Sealed {when}, timestamped by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
+      ? t('Last timestamped {when}, by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
       : st.stampedAt
-        ? t('Sealed {when}. Last timestamped {then}; waiting for the network for the rest.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
-        : t('Sealed {when}. Waiting for the network to timestamp it.', { when });
+        ? t('Last timestamped {then}. Your writing up to {when} is waiting for the network to timestamp it.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
+        : t('Your writing up to {when} is waiting for the network to timestamp it.', { when });
   }
   renderProof();
   const proofChanged = (changed) => { if (changed === bookId && bd.isConnected) renderProof(); };
@@ -4308,6 +4296,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   let find = null;        // a search: { phrase ({ text, word, cs }), sid, findings, within: { done, total }, finished, stopped, error }
   let part = null;        // paragraphs picked on the sheet, to step through their changes: { ch, a, b (Rec's part), h, n (where it is once n steps of h played) }
   let partSeq = 0;        // each step through them, so a newer one makes an older one moot
+  let partWas = '';       // what the badge says of them, when they aren't in the text
   let tags = [];          // the history's tags (Rec.tagsOf), oldest moment first
   let tagsByDay = new Map(); // day -> its tags
   const resize = new ResizeObserver(() => { if (bd.isConnected) drawAll(); });
@@ -4377,7 +4366,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     sessions: () => S.sessions, days: () => S.days, day: () => dsel, building: () => S.building,
     seek, setMode, setPlaying, openPlayer, showDays, skipSession, paper,
     find: () => find, runFind: (q) => runFind(q), goFind: (kind, x) => goFind(kind, x),
-    part: () => part, pickPart, partGo
+    part: () => part, pickPart, partGo,
+    speed: (x) => { if (x) historyPrefs.speed = x; return historyPrefs.speed; }
   };
   $h('.ps-done').onclick = close;
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) close(); });
@@ -4503,7 +4493,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     shown = {};
     loaded = { state: S.error ? 'failed' : S.building ? 'loading' : 'empty', error: S.error };
     const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : library.recordWriting === false
-      ? t('Writing History is off. Turn on Record Writing History, below, and NEO starts recording the next time you write.')
+      ? (IS_POCKET ? t('Writing History is off. Turn it on in ⋯ → Record Writing History, and NEO starts recording the next time you write.')
+        : t('Writing History is off. Turn it on in File → Record Writing History, and NEO starts recording the next time you write.'))
       : t('Nothing recorded yet. Write in this book and its history shows here.');
     paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
   }
@@ -4514,6 +4505,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     dayline.hidden = v !== 'player';
     strip.hidden = v !== 'days';
     if (v === 'days') badgeEl.hidden = true;
+    renderPart();
   }
 
   function describeDay(d) {
@@ -4901,11 +4893,13 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (pos >= steps.length) seek(0);
     }
     playing = on;
-    if (!on) { badgeEl.hidden = true; badgeUntil = 0; }
+    if (!on) { badgeEl.hidden = true; badgeUntil = 0; partWas = ''; }
     renderRestore();
+    renderPart();
     playBtn.textContent = on ? '❚❚' : '▶';
     playBtn.setAttribute('aria-label', on ? t('Pause') : t('Play'));
     playBtn.title = (on ? t('Pause') : t('Play')) + ' (Space)';
+    fastBtn.setAttribute('aria-pressed', String(historyPrefs.speed === HISTORY_FAST));
     if (on) {
       follow = true;
       lastFrame = performance.now();
@@ -5196,14 +5190,14 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
 
   /* ---------- restore: a moment back in the book ---------- */
 
-  // What a restore would bring back: the paragraphs picked, when they're
-  // in the text at this moment; else the chapter played, or in the whole
-  // book the picked paragraphs' chapter, else the caret's. None while it
-  // plays. { ch, paras }
-  function restoreTarget() {
+  // What a restore would bring back: with `paras` (the button beside
+  // them), the paragraphs picked, when they're in the text at this moment;
+  // else (the footer's) the chapter played, or in the whole book the picked
+  // paragraphs' chapter, else the caret's. None while it plays. { ch, paras }
+  function restoreTarget(paras = false) {
     if (!h || playing || !steps.length) return null;
     syncPart();
-    if (part && part.h === h && !part.away && part.b > part.a && chapters[part.ch] !== undefined) return { ch: part.ch, paras: true };
+    if (paras) return part && part.h === h && !part.away && part.b > part.a && chapters[part.ch] !== undefined ? { ch: part.ch, paras: true } : null;
     const ch = mode !== 'book' ? mode : part && !part.away ? part.ch : caretAt ? caretAt.ch : null;
     return ch && !Rec.isStream(ch) && chapters[ch] !== undefined ? { ch, paras: false } : null;
   }
@@ -5224,19 +5218,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     renderTagBtn();
     if (restoring) return;
     const target = restoreTarget();
-    const sig = target ? [h.key, pos, target.ch, target.paras ? part.a + '-' + part.b : '', mode].join(':') : '';
+    const sig = target ? [h.key, pos, target.ch, mode].join(':') : '';
     if (sig === restoreSig) return;
     restoreSig = sig;
     restoreBtn.hidden = !target;
     if (!target) return;
     const ch = target.ch;
-    if (target.paras) {
-      const c = chapters[ch];
-      restoreBtn.disabled = false;
-      restoreBtn.textContent = c.find(part.a) !== c.find(part.b - 1) ? t('Restore Paragraphs') : t('Restore This Paragraph');
-      restoreBtn.title = t('NEO finds them in the book as it is now and puts them back as they are here.') + ' ' + keptWhere() + ' ' + t('× beside the paragraph’s name restores the whole chapter instead.');
-      return;
-    }
     const inBook = meta.chapterOrder.includes(ch);
     const same = inBook && here && book && book.id === bookId && chapterHTML[ch] === chapters[ch].toString();
     restoreBtn.disabled = same;
@@ -5262,7 +5249,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   restoreBtn.addEventListener('click', async () => {
     const target = restoreTarget();
     if (!target) return;
-    if (target.paras) { restoreParagraphs(); return; }
     const ch = target.ch;
     const n = nAt(pos);
     const html = chapters[ch].toString();
@@ -5381,8 +5367,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const many = chapters[ch].find(a) !== chapters[ch].find(b - 1);
     const chapter = meta.chapterOrder.includes(ch) ? chapterName(ch, meta) : t('a deleted chapter');
     restoring = true;
-    restoreBtn.disabled = true;
-    restoreBtn.textContent = t('Finding them in the book as it is now…');
+    renderPart();
+    const slow = setTimeout(() => partSay(t('Finding them in the book as it is now…'), 60000), 300);
     let r;
     try {
       r = await trackToNow(ch, a, b, await chaptersNow());
@@ -5391,8 +5377,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       toast(t('That couldn’t be restored. The book is as it was.'));
     }
     restoring = false;
-    restoreSig = '';
-    renderRestore();
+    clearTimeout(slow);
+    if (badgeEl.textContent === t('Finding them in the book as it is now…')) { badgeEl.hidden = true; badgeUntil = 0; }
+    renderPart();
     if (!r || !bd.isConnected) return;
     if (r.gone) {
       const lost = r.elsewhere
@@ -5535,7 +5522,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         t('All of this book’s Writing History goes, and with it every earlier version you could restore from it, on every computer and phone that shares this library.'),
         t('The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.'),
         ...(tags.length ? [t('Its {n} tags go with it.', { n: tags.length })] : []),
-        ...(sealed ? [t('Its seals and timestamps go with it, so nothing will show when the book was written up to now.')] : []),
+        ...(sealed ? [t('Its timestamps go with it, so nothing will show when the book was written up to now.')] : []),
         bin ? t('The history, and its copy in the Backups folder, go to the Recycle Bin. You can get them back from there until it is emptied, but not from inside NEO.')
           : t('The history, and its copy in the Backups folder, go to the Trash. You can get them back from there until it is emptied, but not from inside NEO.'),
         library.recordWriting !== false ? t('NEO starts a new history from the book as it is now.') : t('Writing History is off, so nothing new is recorded until you turn it on.')
@@ -5559,31 +5546,20 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
 
   /* ---------- the controls ---------- */
 
-  playBtn.addEventListener('click', () => setPlaying(!playing));
+  // ▶ plays as it was written; ❚❚ pauses either
+  playBtn.addEventListener('click', () => {
+    if (!playing) historyPrefs.speed = 1;
+    setPlaying(!playing);
+  });
   backBtn.addEventListener('click', () => showDays(curDay()));
-  const speeds = $h('.hs-speeds');
-  speeds.setAttribute('aria-label', t('Speed'));
-  for (const sp of HISTORY_SPEEDS) {
-    const b = document.createElement('button');
-    b.textContent = sp + '×';
-    b.dataset.speed = sp;
-    b.setAttribute('aria-pressed', String(sp === historyPrefs.speed));
-    b.addEventListener('click', () => {
-      historyPrefs.speed = sp;
-      for (const x of speeds.children) x.setAttribute('aria-pressed', String(+x.dataset.speed === sp));
-    });
-    speeds.appendChild(b);
-  }
-  const skip = $h('.hs-skip input');
-  skip.checked = historyPrefs.skip;
-  skip.addEventListener('change', () => {
-    historyPrefs.skip = skip.checked;
-    if (!h) return;
-    const p = pos;
-    timeClock();
-    clock = p ? vt[p - 1] : 0;
-    drawTimeline();
-    drawHead();
+  // ▶▶: as fast as it was written, eight times over, and again for as
+  // written; from a pause it plays
+  fastBtn.title = t('Play fast') + ' (' + HISTORY_FAST + '×)';
+  fastBtn.setAttribute('aria-label', t('Play fast'));
+  fastBtn.addEventListener('click', () => {
+    historyPrefs.speed = historyPrefs.speed === HISTORY_FAST && playing ? 1 : HISTORY_FAST;
+    setPlaying(true);
+    fastBtn.setAttribute('aria-pressed', String(historyPrefs.speed === HISTORY_FAST));
   });
   const fromPointer = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -5835,6 +5811,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // before and the next time they changed, as each bout of changing them
   // left them (Rec.partNext, Rec.partPrev), across days. In the days, a
   // click opens the player at the day's end with the paragraph picked.
+  // a click off the text puts them down, as Esc does
+  scroller.addEventListener('click', (e) => { if (part && !e.target.closest('.rp-body, .hs-part')) clearPart(); });
   paper.addEventListener('click', (e) => {
     if (!h || (view !== 'player' && view !== 'days')) return;
     const body = e.target.closest('.rp-body');
@@ -5921,22 +5899,51 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     partNear = null;
   }
 
+  // The paragraphs picked, in the sheet's margins while it's paused: ‹ and
+  // restore them on the left, › on the right. Where they aren't in the text
+  // at this moment, the badge says so instead.
   function renderPart() {
-    partEl.classList.toggle('hs-part-on', !!part);
     const c = part && chapters[part.ch];
-    const name = !part ? t('Click a paragraph to step through its changes')
-      : part.away ? t('Not in the text at this moment')
-        : part.b <= part.a ? t('Taken out here')
-          : c && c.parts.length && c.find(part.a) !== c.find(part.b - 1) ? t('These paragraphs') : t('This paragraph');
-    const label = partEl.querySelector('.hs-part-name');
-    if (label.textContent !== name) label.textContent = name;
+    const st = part && part.h === h && !part.away && part.b > part.a && shown[part.ch];
+    const nodes = st && c && !st.whole && st.nodes.length === c.parts.length ? st.nodes.slice(c.find(part.a), c.find(part.b - 1) + 1).flat() : [];
+    const on = !!nodes.length && !playing && view === 'player';
+    partL.hidden = partR.hidden = !on;
+    const said = part && part.h === h && view === 'player' ? (part.away ? t('Not in the text at this moment') : part.b <= part.a ? t('Taken out here') : '') : '';
+    if (said !== partWas) {
+      if (said) { badgeEl.textContent = said; badgeEl.hidden = false; badgeUntil = 0; } else if (badgeEl.textContent === partWas) badgeEl.hidden = true;
+      partWas = said;
+    }
     // ‹ and ›: off where there's nothing that way (once looked for)
-    const near = partNear && partNear.key === partKey() ? partNear : null;
-    for (const [way, b] of [['prev', partEl.querySelector('.hs-part-prev')], ['next', partEl.querySelector('.hs-part-next')]]) {
+    const near = part && partNear && partNear.key === partKey() ? partNear : null;
+    for (const [way, b] of [['prev', partL.querySelector('.hs-part-prev')], ['next', partR.querySelector('.hs-part-next')]]) {
       const off = !!near && near[way] === null;
       if (b.disabled !== off) b.disabled = off;
     }
+    if (!on) return;
+    const many = c.find(part.a) !== c.find(part.b - 1);
+    const label = many ? t('Restore Paragraphs') : t('Restore This Paragraph');
+    partRestore.title = label + ': ' + t('NEO finds them in the book as it is now and puts them back as they are here.') + ' ' + keptWhere();
+    partRestore.setAttribute('aria-label', label);
+    partRestore.disabled = restoring;
+    // beside the paragraphs, kept in sight while they're taller than the sheet's window
+    const r = document.createRange();
+    r.setStartBefore(nodes[0]);
+    r.setEndAfter(nodes[nodes.length - 1]);
+    const box = r.getBoundingClientRect();
+    const body = nodes[0].parentElement && nodes[0].parentElement.closest('.rp-body');
+    const text = (body || paper).getBoundingClientRect();
+    const sr = scroller.getBoundingClientRect();
+    const top = box.top - sr.top + scroller.scrollTop;
+    const y = Math.max(top, Math.min(scroller.scrollTop + 10, top + box.height - partL.offsetHeight));
+    partL.style.top = partR.style.top = y + 'px';
+    partRestore.textContent = label;
+    const room = text.left - sr.left - 12;
+    partL.classList.toggle('hs-part-narrow', partL.offsetWidth > room);
+    if (partL.classList.contains('hs-part-narrow')) partRestore.textContent = '↺';
+    partL.style.left = Math.max(2, room - partL.offsetWidth) + 'px';
+    partR.style.left = Math.min(text.right - sr.left + 12, scroller.clientWidth - partR.offsetWidth - 2) + 'px';
   }
+  scroller.addEventListener('scroll', () => { if (part && !playing) renderPart(); }, { passive: true });
 
   // The part on the sheet, with the Highlight API: its paragraphs' nodes
   function paintPart() {
@@ -6081,14 +6088,13 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     seek(q);
   }
 
-  for (const [sel, label, key, go] of [['.hs-part-prev', t('The time before this changed'), '[', () => partGo(-1)],
-    ['.hs-part-next', t('The next time this changed'), ']', () => partGo(1)], ['.hs-part-x', t('Put it down'), 'Esc', clearPart]]) {
-    const b = partEl.querySelector(sel);
+  for (const [b, label, key, go] of [[partL.querySelector('.hs-part-prev'), t('Earlier version'), '[', () => partGo(-1)],
+    [partR.querySelector('.hs-part-next'), t('Later version'), ']', () => partGo(1)]]) {
     b.title = label + ' (' + key + ')';
     b.setAttribute('aria-label', label);
     b.addEventListener('click', () => go());
   }
-  renderPart();
+  partRestore.addEventListener('click', () => { if (!restoring && restoreTarget(true)) restoreParagraphs(); });
 
   /* ---------- tags: names on moments ---------- */
 
@@ -6097,7 +6103,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // and removed here by a new line in the session being recorded, so only
   // while this book is open and recording.
   const canTag = () => !!(rec.on && rec.bookId === bookId && book && book.id === bookId);
-  const tagWhy = () => (library.recordWriting === false ? t('Turn on Record Writing History, below, to tag moments.')
+  const tagWhy = () => (library.recordWriting === false ? (IS_POCKET ? t('Turn on ⋯ → Record Writing History to tag moments.') : t('Turn on File → Record Writing History to tag moments.'))
     : t('Open this book to tag its moments.'));
   // the tags written since the history was read, until it's read again
   let localTags = [];
@@ -20005,10 +20011,14 @@ window.neo.onMenu(async (msg) => {
   // full screen and focus mode together hide the bottom bar until hovered
   // (styles.css); the window says when it goes in and out, whatever is open
   if (msg.type === 'fullScreen') { document.body.classList.toggle('full-screen', !!msg.value); return; }
-  // Writing History open: only its own (Find, ⌘S to tag) and the news the
-  // main process sends of itself. The menu greys the rest out; a key that
-  // still reaches here does nothing behind the dialog.
-  if (historyShown && !['find', 'snapshot', 'update', 'uiLanguage'].includes(msg.type)) return;
+  // Writing History open: its own (Find, ⌘S to tag) and the news the main
+  // process sends of itself go on. Anything else picked from the menus
+  // closes it first and then happens; by its shortcut, it does nothing
+  // behind the dialog.
+  if (historyShown && !['find', 'snapshot', 'update', 'uiLanguage'].includes(msg.type)) {
+    if (msg.byKey || msg.type === 'history') return;
+    historyShown();
+  }
   if ($('#keyboard-shortcuts') && msg.type !== 'help') return;
   // a window the menu opens (⌘, for Goals, say) never stacks on one that's
   // already open: pressing it again used to pile up overlays

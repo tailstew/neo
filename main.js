@@ -1283,24 +1283,28 @@ ipcMain.on('rec:state', () => {
   try { buildMenu(); } catch (err) { logError('menu', err); }
 });
 
-// While Writing History is open the menus are its own: the window says when
-// it opens and closes, and buildMenu greys out the rest (lockMenu)
+// While Writing History is open, a menu item clicked closes it and then does
+// what it says; a shortcut does nothing behind it (the window drops a
+// message marked byKey). The window says when it opens and closes, so ⌘S
+// reads Tag This Moment… meanwhile.
 let historyOpen = false;
 ipcMain.on('ui:modal', (_e, on) => {
   if (historyOpen === !!on) return;
   historyOpen = !!on;
   try { buildMenu(); } catch (err) { logError('menu', err); }
 });
-// what stays on: editing the search field, Find (the history's search),
-// ⌘S (Tag This Moment), and the window's and the app's own
-const MODAL_ROLES = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'pasteAndMatchStyle', 'selectAll', 'quit', 'close', 'minimize', 'zoom', 'front', 'hide', 'hideOthers', 'unhide', 'services']);
-const MODAL_IDS = new Set(['find', 'snapshot']);
-function lockMenu(items) {
+// whether the menu item running now was reached by its shortcut, for
+// sendToWindow to say so
+let menuByKey = false;
+function markShortcuts(items) {
   for (const item of items) {
-    if (item.type === 'separator') continue;
-    if (Array.isArray(item.submenu)) { lockMenu(item.submenu); continue; }
-    if (item.role && item.role !== 'about' ? MODAL_ROLES.has(item.role) : MODAL_IDS.has(item.id)) continue;
-    item.enabled = false;
+    if (Array.isArray(item.submenu)) markShortcuts(item.submenu);
+    if (typeof item.click !== 'function') continue;
+    const click = item.click;
+    item.click = (mi, w, ev) => {
+      menuByKey = !!(ev && ev.triggeredByAccelerator);
+      try { return click(mi, w, ev); } finally { menuByKey = false; }
+    };
   }
 }
 
@@ -2728,7 +2732,7 @@ ipcMain.handle('spell:learn', async (_e, word) => {
 // ---------------------------------------------------------------------------
 function sendToWindow(msg) {
   const w = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-  if (w) w.webContents.send('menu', msg);
+  if (w) w.webContents.send('menu', menuByKey ? { ...msg, byKey: true } : msg);
 }
 
 // the Format menu's ticks: whether the caret is in a poetry paragraph, and
@@ -3180,7 +3184,7 @@ function buildMenu() {
       ]
     }
   ];
-  if (historyOpen) lockMenu(template);
+  markShortcuts(template);
   const menu = Menu.buildFromTemplate(template);
   editMenuState.edit = null; // the old menu bar is going: forget its Edit menu first
   Menu.setApplicationMenu(menu);

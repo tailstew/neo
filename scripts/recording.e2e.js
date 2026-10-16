@@ -925,7 +925,7 @@ test('the player seeks anywhere, and plays forward to the same text', async () =
   }
   // playing a stretch at full speed lands where seeking there would
   await js(`historyShown.player.seek(${Math.floor(n / 2)})`);
-  await js(`document.querySelector('.hs-speeds button[data-speed="32"]').click()`);
+  await js('historyShown.player.speed(32)');
   await js('historyShown.player.setPlaying(true)');
   await tick(1500);
   await js('historyShown.player.setPlaying(false)');
@@ -964,7 +964,7 @@ test('⇧← goes to the start of the session, then the one before; ⇧→ to th
   const at = () => js(`(() => { const p = historyShown.player; const h = p.h(); const v = p.steps(); const s = h.steps[v[Math.min(p.pos(), v.length - 1)]]; return h.sessions[s.session].id; })()`);
   const ids = await js('historyShown.player.h().sessions.map((s) => s.id)');
   assert.ok(ids.length >= 2, 'the day has sessions to skip between');
-  await js(`document.querySelector('.hs-speeds button[data-speed="1"]').click()`); // (a second into a session is its start)
+  await js('historyShown.player.speed(1)'); // (a second into a session is its start)
   const atStart = () => js(`(() => { const p = historyShown.player; const h = p.h(); const v = p.steps(); const i = p.pos(); return i === 0 || h.steps[v[i - 1]].k === 'session' || h.steps[v[i - 1]].session !== h.steps[v[i]].session; })()`);
   // (the day's first session starts before its first chapter is there)
   const shift = async (k) => { key(k, ['shift']); await tick(300); await playerReady({ drawn: false }); };
@@ -1453,10 +1453,10 @@ test('a paragraph restored to a moment: only it changes, the moment before it is
     return null;
   })()`);
   assert.ok(then, 'a paragraph that has changed since');
-  await waitFor('!document.querySelector(".hs-restore").hidden');
-  assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore This Paragraph');
+  await waitFor('!document.querySelector(".hs-part-restore").parentElement.hidden');
+  assert.equal(await js('document.querySelector(".hs-part-restore").getAttribute("aria-label")'), 'Restore This Paragraph');
   const darlingsBefore = await js('darlings.length');
-  await js('document.querySelector(".hs-restore").click()');
+  await js('document.querySelector(".hs-part-restore").click()');
   await waitFor(`!historyShown && chapterHTML[${JSON.stringify(chId)}] !== ${JSON.stringify(now)}`);
   await tick(300);
   const after = await html(0);
@@ -1499,14 +1499,14 @@ test('a paragraph whose chapter was deleted: History says so, and puts it in Dar
   })()`);
   await waitFor(`!!historyShown.player.paper.querySelector('.rp-chapter[data-ch="${gone}"] .rp-body p')`);
   await js(`historyShown.player.pickPart(${JSON.stringify(gone)}, historyShown.player.paper.querySelector('.rp-chapter[data-ch="${gone}"] .rp-body p'))`);
-  await waitFor('document.querySelector(".hs-restore").textContent === "Restore This Paragraph"');
+  await waitFor('!document.querySelector(".hs-part-restore").parentElement.hidden && document.querySelector(".hs-part-restore").getAttribute("aria-label") === "Restore This Paragraph"');
   // the clipboard, as the page writes it
   await js(`(() => {
     window.__clip = null;
     navigator.clipboard.write = async (items) => { window.__clip = { text: await (await items[0].getType('text/plain')).text(), html: await (await items[0].getType('text/html')).text() }; };
   })()`);
   const darlingsBefore = await js('darlings.length');
-  await js('document.querySelector(".hs-restore").click()');
+  await js('document.querySelector(".hs-part-restore").click()');
   // (the newest dialog: the first-run one is there too, hidden)
   await waitFor('!!document.body.lastElementChild.querySelector(".fr-choice")', 30000);
   assert.equal(await js('document.body.lastElementChild.querySelector(".modal h2").textContent'), 'The chapter this paragraph was in was deleted');
@@ -1713,8 +1713,8 @@ test('proof turned on seals the session being written; a named tag seals it agai
     // History says so
     await js('openHistory()');
     await daysReady();
-    await waitFor('/Waiting for the network/.test(document.querySelector(".hs-proof").textContent)');
-    assert.equal(await js('document.querySelector(".hs-level select").value'), 'timestamp');
+    await waitFor('/waiting for the network/.test(document.querySelector(".hs-proof").textContent)');
+    assert.equal(await js('historyLevel()'), 'timestamp');
     key('Escape');
     await tick(300);
 

@@ -75,7 +75,7 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
   <p class="rx-lede">${esc(T('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'))}</p>
-  ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to a sealed whole, so nothing on it fixes them in time.'))}</p>` : ''}
+  ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to the timestamped whole, so nothing on it fixes them in time.'))}</p>` : ''}
   <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>
 <main>
