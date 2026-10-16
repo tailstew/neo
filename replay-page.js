@@ -829,7 +829,8 @@
     }
 
     const nAt = (p) => (p <= 0 ? (steps.length ? steps[0] : 0) : steps[p - 1] + 1);
-    function seek(p) {
+    // follow: scroll the sheet to the caret, as playing does (a seek from the timeline)
+    function seek(p, follow = false) {
       pos = Math.max(0, Math.min(p, steps.length));
       n = nAt(pos);
       cur = h.doc(n);
@@ -839,7 +840,7 @@
         const st = h.steps[i];
         if (st.k === 'e' && st.page !== false && !Rec.isStream(st.ch)) { caret = { ch: st.ch, at: st.at + st.ins.length }; break; }
       }
-      draw();
+      draw(follow);
     }
 
     function advance(to) {
@@ -865,7 +866,7 @@
       return html.slice(0, at) + '<span class="rx-caret"></span>' + html.slice(at);
     }
 
-    function draw() {
+    function draw(follow = playing) {
       if (!h) return;
       const list = mode ? [mode] : order();
       const want = list.join('\n');
@@ -890,7 +891,7 @@
         body.innerHTML = shown || '';
         if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t on the page at this moment.') : ''));
       }
-      if (playing) {
+      if (follow) {
         const c = sheet.querySelector('.rx-caret');
         if (c) {
           const r = c.getBoundingClientRect();
@@ -1063,11 +1064,11 @@
       setPlaying(false);
       dragging = true;
       tl.setPointerCapture(ev.pointerId);
-      seek(posAt(clockAt(ev)));
+      seek(posAt(clockAt(ev)), true);
     });
     tl.addEventListener('pointermove', (ev) => {
       if (!h || !total) return;
-      if (dragging) { seek(posAt(clockAt(ev))); return; }
+      if (dragging) { seek(posAt(clockAt(ev)), true); return; }
       const text = describe(clockAt(ev));
       tip.hidden = !text;
       tip.textContent = text;
@@ -1080,7 +1081,7 @@
       if (!h || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
       e.preventDefault();
       setPlaying(false);
-      seek(posAt(clock + (e.key === 'ArrowRight' ? 1 : -1) * total / 50));
+      seek(posAt(clock + (e.key === 'ArrowRight' ? 1 : -1) * total / 50), true);
     });
 
     doc.addEventListener('keydown', (e) => {
