@@ -24,7 +24,7 @@ One helper sets the level, `setHistoryLevel('off' | 'record' | 'timestamp', { as
 - [x] **First run, step 3: "Your writing history"** (`#firstrun` in `index.html`, `showFirstRun` in `app.js:796`). It comes after the fonts step, before **Start writing**. The three levels are cards, like the pantser/plotter ones, with **Record only** selected:
   - **Off**: NEO keeps no history. Snapshots still work.
   - **Record only**: every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.
-  - **Record and timestamp**: as above. Also, every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show the writing existed by then. They show when it was written, not who wrote it.
+  - **Record and timestamp**: every keystroke is recorded as above, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove when it was written.
   - The choice made here *is* the consent (`asked: true`), so nothing asks again. Pocket shows two cards.
 - [x] **History footer** (`app.js:4119–4145`): the two checkboxes become the same three-level choice (a small segmented control or a select). At the timestamp level, the line saying when the book was last sealed stays under it; clicking it opens Timestamp services….
 - [x] Drop the `recordHintShown` toast (`app.js:6424–6428`); the question replaces it.
@@ -40,7 +40,7 @@ These are people who already use NEO and update to the first version with Writin
   - On Continue, set the level and `library.historyAsked = true`, and write library.json before the shelf can be used.
 - [x] **Wording for them:**
   - Title: "New: your writing history"
-  - Above the cards: "NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now; what you've already written is where the history begins."
+  - Above the cards: "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version. With timestamps, you also have proof of when your work was written. It starts when you turn it on: what you've already written is where the history begins." (The timestamps sentence only where timestamping exists, so not in Pocket.)
   - On the timestamp card: "Timestamps cover your writing from the day they're turned on."
 - [x] **Once per library, not per device.** `historyAsked` lives in library.json:
   - A second computer or Pocket sharing the library isn't asked again; it follows the answer.

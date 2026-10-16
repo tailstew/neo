@@ -3203,7 +3203,7 @@ function historyLevelCards(box, picked, onPick, { existing = false } = {}) {
     ['off', t('Off'), t('NEO keeps no history. Snapshots still work.')],
     ['record', t('Record only'), t('Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.')],
     ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp'),
-      t('Recorded as above, and every hour you write, a fingerprint (never your words) goes to two timestamp services. Their receipts show your writing existed by then: when it was written, not who wrote it.') +
+      t('Every keystroke is recorded as above, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove when it was written.') +
       (existing ? ' ' + t('Timestamps cover your writing from the day they’re turned on.') : '')]] : [])
   ];
   const pick = (value) => box.querySelectorAll('.fr-choice').forEach((b) => {
@@ -3241,7 +3241,9 @@ function askHistoryLevel() {
     <div style="text-align:right;margin-top:20px"><button class="btn-gold" type="button"></button></div>
   </div>`;
   bd.querySelector('h2').textContent = t('New: your writing history');
-  bd.querySelector('p').textContent = t('NEO can now record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. It starts from now: what you’ve already written is where the history begins.');
+  bd.querySelector('p').textContent = t('NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.') +
+    (window.neo.proofSet ? ' ' + t('With timestamps, you also have proof of when your work was written.') : '') +
+    ' ' + t('It starts when you turn it on: what you’ve already written is where the history begins.');
   historyLevelCards(bd.querySelector('.hl-cards'), picked, (v) => { picked = v; }, { existing: true });
   const go = bd.querySelector('.btn-gold');
   go.textContent = t('Continue');
