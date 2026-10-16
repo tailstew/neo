@@ -180,7 +180,8 @@ const PLAYER_FINGERPRINTS = {
   2: 'xbHUWHB2DFtMfqIHCwPosw',
   3: 'vacLbqay6MQQMDO7U1BK4w',
   4: 'critEwgcdtDFZt0cc4keLw',
-  5: '8HbjOIYIxuPvJhIfPZzmDw'
+  5: '8HbjOIYIxuPvJhIfPZzmDw',
+  6: 'k_7K1mTdtsqC_OpVKJA2jQ'
 };
 
 test('the player makes the same steps, keyframes and days, or PLAYER moved on', () => {

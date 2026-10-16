@@ -557,12 +557,16 @@
       b.addEventListener('focus', () => { if (view === 'days') showDay(i); });
       strip.append(b);
     });
-    // Each day's map, as NEO's tiles draw it: where the day changed the
-    // text, green where words came, red where they went, gold where both.
-    // The sessions' stats (Rec.playSession, each chapter's changes in bins
-    // along it) are worked out here, once, a session at a time after the
-    // page has opened, and each tile is drawn as its day is done.
+    // Each day's map, as NEO's tiles draw it (app.js, historyMap): where
+    // the day changed the text as a grid read like a page, green where words
+    // came, red where they went, gold where both; in the whole book each
+    // chapter a run of cells as long as its share of the book, a line where
+    // each begins. The sessions' stats (Rec.playSession, each chapter's
+    // changes in bins along it) and the chapters' lengths as each day ended
+    // are worked out here, once, a session at a time after the page has
+    // opened, and each tile is drawn as its day is done.
     const dayStats = book.days.map(() => null);
+    const dayLens = book.days.map(() => ({}));
     const INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
     function drawTile(i) {
       const cv = strip.children[i] && strip.children[i].firstChild;
@@ -574,43 +578,53 @@
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, W);
       const list = dayStats[i] || [];
+      const lens = dayLens[i];
       const whole = !mode;
       const after = book.orders[i + 1] || book.lastOrder || (data.chapters || []).map((c) => c.id);
-      const chs = whole ? after.filter((ch) => !Rec.isStream(ch)) : [mode];
-      for (const st of list) for (const ch of Object.keys(st.chapters || {})) if (whole && !Rec.isStream(ch) && !chs.includes(ch)) chs.push(ch);
-      const rows = whole ? 8 : 6;
-      const n = whole ? rows : rows * rows;
-      const grids = chs.map((ch) => {
-        const ins = new Float32Array(n);
-        const del = new Float32Array(n);
-        for (const st of list) {
-          const c = st.chapters && st.chapters[ch];
-          if (!c || !c.ins) continue;
+      const chs = whole ? after.filter((ch) => !Rec.isStream(ch) && (lens[ch] || !dayStats[i])) : [mode];
+      for (const st of list) for (const ch of Object.keys(st.chapters || {})) if (whole && !Rec.isStream(ch) && !chs.includes(ch) && lens[ch]) chs.push(ch);
+      const known = chs.map((ch) => lens[ch]).filter((x) => x > 0);
+      const usual = known.length ? known.reduce((x, y) => x + y, 0) / known.length : 1;
+      const parts = chs.map((ch) => ({ weight: lens[ch] > 0 ? lens[ch] : usual, bins: list.map((st) => st.chapters && st.chapters[ch]).filter((c) => c && c.ins) }));
+      if (!parts.length) return;
+      const side = Math.max(whole ? 8 : 6, Math.ceil(Math.sqrt(parts.length)));
+      const n = side * side;
+      const tw = parts.reduce((x, p) => x + p.weight, 0) || parts.length;
+      const cells = parts.map((p) => Math.max(1, Math.round((p.weight / tw) * n)));
+      let over = cells.reduce((x, y) => x + y, 0) - n;
+      while (over > 0) { const q = cells.indexOf(Math.max(...cells)); if (cells[q] <= 1) break; cells[q]--; over--; }
+      while (over < 0) { cells[cells.indexOf(Math.max(...cells))]++; over++; }
+      const ins = new Float32Array(n);
+      const del = new Float32Array(n);
+      const starts = [];
+      let at = 0;
+      parts.forEach((p, j) => {
+        const k = cells[j];
+        starts.push(at);
+        for (const c of p.bins) {
           const nb = c.ins.length;
-          for (let b = 0; b < nb; b++) {
-            if (!c.ins[b] && !c.del[b]) continue;
-            const a = Math.floor((b * n) / nb);
-            const z = Math.max(a + 1, Math.ceil(((b + 1) * n) / nb));
-            for (let q = a; q < z; q++) { ins[q] += c.ins[b]; del[q] += c.del[b]; }
+          for (let bi = 0; bi < nb; bi++) {
+            if (!c.ins[bi] && !c.del[bi]) continue;
+            const lo = at + Math.floor((bi * k) / nb);
+            const hi = Math.max(lo + 1, at + Math.ceil(((bi + 1) * k) / nb));
+            for (let q = lo; q < hi && q < n; q++) { ins[q] += c.ins[bi]; del[q] += c.del[bi]; }
           }
         }
-        return { ins, del };
+        at += k;
       });
       let max = 1;
-      for (const gr of grids) for (let q = 0; q < n; q++) max = Math.max(max, gr.ins[q] + gr.del[q]);
-      const cell = (x, y, w, hh, gr, q) => {
-        const v = gr.ins[q] + gr.del[q];
+      for (let q = 0; q < n; q++) max = Math.max(max, ins[q] + del[q]);
+      const cs = W / side;
+      const gap = cs >= 4 ? 1 : 0;
+      for (let q = 0; q < n; q++) {
+        const v = ins[q] + del[q];
         g.globalAlpha = v ? 0.45 + 0.55 * Math.sqrt(v / max) : 1;
-        g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : gr.ins[q] && gr.del[q] ? INK.edited : gr.ins[q] ? INK.added : INK.deleted;
-        g.fillRect(x, y, Math.max(0.5, w - (w >= 4 ? 1 : 0)), hh - 1);
-      };
-      if (whole) {
-        const cw = W / Math.max(1, grids.length);
-        grids.forEach((gr, c) => { for (let q = 0; q < rows; q++) cell(c * cw, (q * W) / rows, cw, W / rows, gr, q); });
-      } else {
-        const cs = W / rows;
-        for (let q = 0; q < n; q++) cell((q % rows) * cs, Math.floor(q / rows) * cs, cs, cs, grids[0], q);
+        g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : ins[q] && del[q] ? INK.edited : ins[q] ? INK.added : INK.deleted;
+        g.fillRect((q % side) * cs, Math.floor(q / side) * cs, Math.max(0.5, cs - gap), cs - gap);
       }
+      g.globalAlpha = 0.85;
+      g.fillStyle = getComputedStyle(cv).color;
+      for (const q of starts.slice(1)) if (q < n) g.fillRect((q % side) * cs - (q % side ? 1 : 0), Math.floor(q / side) * cs, 1.5, cs - gap);
       g.globalAlpha = 1;
     }
     const drawTiles = () => book.days.forEach((_, i) => drawTile(i));
@@ -624,6 +638,7 @@
           await tick();
         }
         dayStats[i] = out;
+        for (const [ch, c] of Object.entries(pg.doc)) if (c && !Rec.isStream(ch)) dayLens[i][ch] = c.length;
         drawTile(i);
       }
     })();

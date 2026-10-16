@@ -397,7 +397,7 @@ function brute(text, before) {
       if (d > 0) added += d; else removed -= d;
     }
     const words = id in ch ? [...b.values()].reduce((x, y) => x + y, 0) : goneWords[id] || 0;
-    const n = Math.max(8, Math.min(64, Math.ceil(words / 500)));
+    const n = Math.max(64, Math.min(256, Math.ceil(words / 100)));
     const ins = new Array(n).fill(0);
     const del = new Array(n).fill(0);
     for (const [share, i, d] of marks[id] || []) { const k = Math.min(n - 1, Math.floor(share * n)); ins[k] += i; del[k] += d; }
@@ -438,7 +438,7 @@ test('session stats count the words and bins a brute-force replay counts', () =>
 });
 
 test('a chapter deleted in a session keeps its bins, counted at the size it went at', () => {
-  const html = '<p>' + Array.from({ length: 4600 }, () => 'word').join(' ') + '</p>';
+  const html = '<p>' + Array.from({ length: 9000 }, () => 'word').join(' ') + '</p>';
   const lines = [
     [0, 'b', 'ch-a', html, R.digest(html), 'baseline'],
     [10, 'k', 'KeyA', 0], [0, 'e', 3, 0, 'x', 'iT'],
@@ -448,9 +448,9 @@ test('a chapter deleted in a session keeps its bins, counted at the size it went
   const st = R.playSession(text, {});
   const c = st.chapters['ch-a'];
   assert.equal(c.gone, 'delete');
-  assert.equal(c.ins.length, 10, 'about 4,600 words: ten bins');
+  assert.equal(c.ins.length, 90, '9,000 words: 90 bins');
   assert.equal(c.ins[0], 1);
-  assert.equal(c.removed, 4600);
+  assert.equal(c.removed, 9000);
   assert.equal(c.added, 0, 'xword is a word that went with the rest');
 });
 

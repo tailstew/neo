@@ -3992,6 +3992,55 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
   return html;
 }
 
+// A map of where text changed, on a square W wide: `parts` in order, each
+// { weight, bins: [{ ins, del }] } (a session's changes along a chapter),
+// laid out as a grid read like a page, `side` cells a row (more if there are
+// more parts than cells), each part a run of cells as long as its share of
+// the weights. A line in `edge` marks where each part after the first begins.
+function historyMap(g, W, parts, side, edge) {
+  if (!parts.length) return;
+  side = Math.max(side, Math.ceil(Math.sqrt(parts.length)));
+  const n = side * side;
+  const tw = parts.reduce((x, p) => x + p.weight, 0) || parts.length;
+  const cells = parts.map((p) => Math.max(1, Math.round((p.weight / tw) * n)));
+  let over = cells.reduce((x, y) => x + y, 0) - n;
+  while (over > 0) { const i = cells.indexOf(Math.max(...cells)); if (cells[i] <= 1) break; cells[i]--; over--; }
+  while (over < 0) { cells[cells.indexOf(Math.max(...cells))]++; over++; }
+  const ins = new Float32Array(n);
+  const del = new Float32Array(n);
+  const starts = [];
+  let at = 0;
+  parts.forEach((p, i) => {
+    const k = cells[i];
+    starts.push(at);
+    for (const c of p.bins) {
+      const nb = c.ins.length;
+      for (let b = 0; b < nb; b++) {
+        if (!c.ins[b] && !c.del[b]) continue;
+        const a = at + Math.floor((b * k) / nb);
+        const z = Math.max(a + 1, at + Math.ceil(((b + 1) * k) / nb));
+        for (let q = a; q < z && q < n; q++) { ins[q] += c.ins[b]; del[q] += c.del[b]; }
+      }
+    }
+    at += k;
+  });
+  let max = 1;
+  for (let q = 0; q < n; q++) max = Math.max(max, ins[q] + del[q]);
+  const cs = W / side;
+  const gap = cs >= 4 ? 1 : 0;
+  for (let q = 0; q < n; q++) {
+    const v = ins[q] + del[q];
+    g.globalAlpha = v ? 0.45 + 0.55 * Math.sqrt(v / max) : 1;
+    g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : ins[q] && del[q] ? HISTORY_INK.edited : ins[q] ? HISTORY_INK.added : HISTORY_INK.deleted;
+    g.fillRect((q % side) * cs, Math.floor(q / side) * cs, Math.max(0.5, cs - gap), cs - gap);
+  }
+  // where each chapter after the first begins
+  g.globalAlpha = 0.85;
+  g.fillStyle = edge;
+  for (const q of starts.slice(1)) if (q < n) g.fillRect((q % side) * cs - (q % side ? 1 : 0), Math.floor(q / side) * cs, 1.5, cs - gap);
+  g.globalAlpha = 1;
+}
+
 // a canvas sized to its box, for drawing in CSS pixels
 function historyCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
@@ -4593,9 +4642,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     return [historyWhen(historyDayMs(d.day), HISTORY_DATE), historySpent(d.stats.ms), on, historyWords(added, removed), also].filter(Boolean).join(' · ');
   }
 
-  // A day's map: where it changed the chapter, as a grid read like a page
-  // (or a column for each chapter of the book), green where words came,
-  // red where they went, gold where both
+  // A day's map: where it changed the text, as a grid read like a page,
+  // green where words came, red where they went, gold where both. In the
+  // whole book each chapter has a run of cells as long as its share of the
+  // book's words, in the book's order, and a line marks where each begins.
   const HISTORY_TILE = 46;
   function drawTile(cv, d) {
     const dpr = window.devicePixelRatio || 1;
@@ -4605,41 +4655,14 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const whole = mode === 'book';
     const chs = whole ? columns(d.to - 1) : [mode];
-    const rows = whole ? 8 : 6;
-    const n = whole ? rows : rows * rows;
-    const grids = chs.map((ch) => {
-      const ins = new Float32Array(n);
-      const del = new Float32Array(n);
-      for (const s of d.list) {
-        const c = s.stats.chapters[ch];
-        if (!c || !c.ins) continue;
-        const nb = c.ins.length;
-        for (let b = 0; b < nb; b++) {
-          if (!c.ins[b] && !c.del[b]) continue;
-          const a = Math.floor((b * n) / nb);
-          const z = Math.max(a + 1, Math.ceil(((b + 1) * n) / nb));
-          for (let k = a; k < z; k++) { ins[k] += c.ins[b]; del[k] += c.del[b]; }
-        }
-      }
-      return { ins, del };
-    });
-    let max = 1;
-    for (const gr of grids) for (let k = 0; k < n; k++) max = Math.max(max, gr.ins[k] + gr.del[k]);
-    const cell = (x, y, w, hh, gr, k) => {
-      const v = gr.ins[k] + gr.del[k];
-      g.globalAlpha = v ? 0.45 + 0.55 * Math.sqrt(v / max) : 1;
-      g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : gr.ins[k] && gr.del[k] ? HISTORY_INK.edited : gr.ins[k] ? HISTORY_INK.added : HISTORY_INK.deleted;
-      const gap = w >= 4 ? 1 : 0;
-      g.fillRect(x, y, Math.max(0.5, w - gap), hh - 1);
-    };
-    if (whole) {
-      const cw = W / Math.max(1, chs.length);
-      grids.forEach((gr, c) => { for (let k = 0; k < rows; k++) cell(c * cw, (k * W) / rows, cw, W / rows, gr, k); });
-    } else {
-      const cs = W / rows;
-      for (let k = 0; k < n; k++) cell((k % rows) * cs, Math.floor(k / rows) * cs, cs, cs, grids[0], k);
-    }
-    g.globalAlpha = 1;
+    const words = (S.frames[d.to - 1] || {}).words || {};
+    const known = chs.map((ch) => words[ch]).filter((w) => w > 0);
+    const usual = known.length ? known.reduce((x, y) => x + y, 0) / known.length : 1;
+    const parts = chs.map((ch) => ({
+      weight: words[ch] > 0 ? words[ch] : usual,
+      bins: d.list.map((x) => x.stats.chapters[ch]).filter((c) => c && c.ins)
+    }));
+    historyMap(g, W, parts, whole ? 8 : 6, getComputedStyle(cv).color);
   }
 
   // a day's tile: its date, and its map

@@ -89,7 +89,7 @@
   // History, playSession, DayBuilder). A change to what they come out as
   // takes the next number, so days cached by an earlier NEO are built again
   // instead of used.
-  const PLAYER = 5;
+  const PLAYER = 6;
 
   // What an `s` line's pIdx counts: the chapter body's elements that match
   // this, in document order (recPoint and historyPoint in app.js). Counting
@@ -1436,8 +1436,8 @@
   }
 
   // How many bins a chapter's marks are counted in, on the overview: one per
-  // 500 words, at least 8 and at most 64
-  const binsFor = (words) => Math.max(8, Math.min(64, Math.ceil(words / 500)));
+  // 100 words, at least 64 (a cell each in the day tiles' grid) and at most 256
+  const binsFor = (words) => Math.max(64, Math.min(256, Math.ceil(words / 100)));
   const ACTIVE_GAP = 60000; // keys or edits further apart than this aren't time spent writing
 
   // One session played onto doc (in place), and what it did, for the
