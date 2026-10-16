@@ -1115,27 +1115,29 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await tick(300);
 });
 
-test('while History is open the menus are its own: Find and ⌘S (to tag) stay, the rest is greyed out', async () => {
-  assert.equal(menuItem('Goals…').enabled, true);
+test('while History is open the menus stay live: an item clicked closes it and then does what it says, one reached by its shortcut does nothing, and ⌘S tags', async () => {
+  const before = await js('document.querySelectorAll(".modal-backdrop").length');
   await js('openHistory()');
   await daysReady();
   await tick(300);
-  assert.equal(menuItem('Goals…').enabled, false);
-  assert.equal(menuItem('Writing History…').enabled, false);
-  assert.equal(menuItem('Copy').enabled, true);
-  assert.ok(menuItem('Find & Replace') || menuItem('Find && Replace'));
-  assert.equal((menuItem('Find & Replace') || menuItem('Find && Replace')).enabled, true);
-  assert.equal(menuItem('Tag This Moment…').enabled, true, '⌘S tags the moment');
-  // a message that still reaches the window does nothing behind the dialog
-  const backdrops = await js('document.querySelectorAll(".modal-backdrop").length');
-  menuItem('Goals…').click();
+  assert.equal(menuItem('Goals…').enabled, true);
+  assert.equal(menuItem('Writing History…').enabled, true);
+  assert.equal(menuItem('Tag This Moment…').enabled, true, '⌘S reads Tag This Moment… while it is open');
+  const open = await js('document.querySelectorAll(".modal-backdrop").length');
+  // by its shortcut: nothing happens behind the dialog
+  menuItem('Goals…').click({ triggeredByAccelerator: true });
   await tick(300);
-  assert.equal(await js('document.querySelectorAll(".modal-backdrop").length'), backdrops, 'Goals didn’t open behind it');
+  assert.equal(await js('!!historyShown'), true);
+  assert.equal(await js('document.querySelectorAll(".modal-backdrop").length'), open, 'Goals didn’t open behind it');
+  // clicked: History closes, then Goals opens
+  menuItem('Goals…').click();
+  await tick(600);
+  assert.equal(await js('!!historyShown'), false);
+  assert.equal(await js('document.querySelectorAll(".modal-backdrop").length'), before + 1, 'Goals opened, alone');
   key('Escape');
   await tick(400);
-  assert.equal(await js('!!historyShown'), false);
-  assert.equal(menuItem('Goals…').enabled, true, 'the menus come back when it closes');
-  assert.equal(menuItem('Take Snapshot').enabled, true);
+  assert.equal(await js('document.querySelectorAll(".modal-backdrop").length'), before);
+  assert.equal(menuItem('Take Snapshot').enabled, true, '⌘S takes a snapshot again');
 });
 
 test('the days are cached in userData, and the cache plays the same', async () => {
@@ -1748,8 +1750,10 @@ test('the evidence report shows how the book was written; Export replay… write
   await waitFor('!!document.querySelector(".ev-body .ev-facts")', 30000);
   const facts = await js('document.querySelector(".ev-body").innerText');
   assert.match(facts, /keys pressed/);
-  assert.match(facts, /Judgement/i);
-  assert.match(facts, /not proof/);
+  assert.match(facts, /The gaps between keys/);
+  assert.match(facts, /Revised as typed/);
+  assert.match(facts, /whose ideas/);
+  assert.doesNotMatch(facts, /Judgement/i, 'figures only');
   // a chapter's own, and back
   if (await js('!!document.querySelector(".ev-chapters tr[data-ch]")')) {
     await js('document.querySelector(".ev-chapters tr[data-ch]").click()');
@@ -1792,6 +1796,10 @@ test('the evidence report shows how the book was written; Export replay… write
     assert.ok(checks.length >= 2, checks.join('\n'));
     assert.ok(checks.every((c) => !c.startsWith('bad')), checks.join('\n'));
     assert.equal(await page('document.querySelector(".rx-same").className'), 'rx-same ok');
+    // laid out as History: the footer's controls, and the evidence and the checks in pop-ups
+    assert.deepEqual(await page('[".rx-play", ".rx-fast", ".rx-evbtn", ".rx-ckbtn"].map((q) => !!document.querySelector("#rx-foot " + q))'), [true, true, true, true]);
+    assert.equal(await page('document.querySelector("#rx-report").closest("dialog") !== null && document.querySelector("#rx-checks").closest("dialog") !== null'), true);
+    assert.match(await page('document.querySelector(".rx-ckbtn").className'), /\bok\b/);
     // (the book's opening words: an earlier test dates a session the next
     // day, ahead of sessions written after it, so the days can't be played
     // through to now here; scripts/replay-page.test.js checks the last day's end)

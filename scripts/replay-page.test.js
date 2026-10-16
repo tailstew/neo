@@ -158,3 +158,20 @@ test('a token’s time is its TSTInfo’s genTime', () => {
   assert.equal(Page.genTime(new Uint8Array([1, 2, 3])), null);
   assert.equal(Page.canonical({ b: 1, a: [2, { d: undefined, c: 'x' }] }), P.canonical({ b: 1, a: [2, { d: undefined, c: 'x' }] }));
 });
+
+test('the page places each timestamp where NEO’s own player does, and finds the tags', async () => {
+  const r = await ask({ type: 'evidence', texts: true });
+  const data = dataOf(Export.build({ title: 'B', evidence: r.evidence, sessions: r.texts, seals: { [DEV]: Export.sealFiles(SEALS) } }));
+  const sessions = await Page.loadSessions(data);
+  const heads = new Map(sessions.map((s) => [s.id, Page.heads(s.text)]));
+  const page = Page.stampsOf(sessions, { [DEV]: await Page.checkSeals(data.seals[DEV], heads) });
+  const neo = await ask({ type: 'stamps', sessions: r.texts.map((s) => ({ id: s.id, device: s.device, open: s.open })) });
+  assert.deepEqual(page, neo);
+  assert.ok(Object.values(neo).every((list) => list.length && list.every((e) => e.n > 1 && e.by > 0)));
+  assert.equal(Page.stampsOf(sessions, {}), null);
+  // the tags, as the stats NEO keeps of each session list them
+  const stats = sessions.map((x) => ({ id: x.id, device: x.device, day: x.day, stats: R.playSession(x.text, {}) }));
+  const tags = Page.tagsIn(sessions);
+  assert.ok(tags.length >= 1);
+  assert.deepEqual(tags.map((t) => [t.id, t.label, t.at, t.day]), R.tagsOf(stats).map((t) => [t.id, t.label, t.at, t.day]));
+});

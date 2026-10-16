@@ -71,6 +71,25 @@ function writer(device, id, start, chapters = {}) {
       html[cur] = R.applyEdit(html[cur], at, 0, text);
       return api;
     },
+    // a change with no key, just after the caret was placed: a spelling
+    // suggestion picked (with spell, as NEO writes one now), or dictation
+    fix(at, del, ins, { spell = false } = {}) {
+      w.push([400, 's', 0, at - 3]);
+      if (spell) w.push([0, 'x', 'spell']);
+      w.push([1500, 'e', at, del, ins, 'iT', 0]);
+      html[cur] = R.applyEdit(html[cur], at, del, ins);
+      return api;
+    },
+    // Backspace n times from `at`
+    backAt(at, n, gap = 120) {
+      for (let i = 0; i < n; i++) {
+        w.push([gap, 'k', 'Backspace', 0]);
+        w.push([0, 'e', at - 1, 1, '', 'dB']);
+        html[cur] = R.applyEdit(html[cur], at - 1, 1, '');
+        at--;
+      }
+      return api;
+    },
     focus(what, dt = 0) { w.push([dt, 'f', what]); return api; },
     write() { for (const ch of Object.keys(html)) { w.push([0, 'w', R.digest(html[ch]), ch]); } return api; },
     done() {
@@ -209,20 +228,52 @@ test('a chapter not chosen is left out, and streams never count', () => {
   assert.deepEqual(Object.keys(some.words), ['b']);
 });
 
-test('the judgements: even typing reads as a script’s, uneven as a person’s', () => {
-  const words = 'the quick brown fox jumps over the lazy dog '.repeat(20);
-  const even = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P('') }).base('a').type(words, 100).done();
-  const r1 = R.evidenceRead(R.evidence([even]).book, 1000);
-  assert.equal(r1.judge.rhythm, 'even');
-  let x = 7;
-  const rand = () => { x = (x * 48271) % 2147483647; return x / 2147483647; };
-  const human = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P('') }).base('a')
-    .type(words, () => Math.round(Math.exp(Math.log(180) + 0.6 * (rand() * 2 - 1) * 1.7))).done();
-  const r2 = R.evidenceRead(R.evidence([human]).book, 1000);
-  assert.equal(r2.judge.rhythm, 'uneven');
-  // too little typed: no judgement at all
-  const few = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P('') }).base('a').type('abc', 100).done();
-  assert.deepEqual(R.evidenceRead(R.evidence([few]).book).judge, { rhythm: null, pauses: null, revision: null, order: null, pasted: null });
+test('spelling suggestions picked are counted as such, not as text with no key', () => {
+  const w = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P('I wnet hoem thee.') }).base('a');
+  w.fix(6, 3, 'ent', { spell: true });   // NEO writes `x spell` before it
+  w.fix(11, 3, 'ome');                   // a session from before it did: the caret placed, letters inside a word
+  w.fix(18, 1, '');                      // …or only taken out ("thee" to "the")
+  w.fix(18, 0, ' and spoke');            // words after the caret, with a space: dictation, still no key
+  const e = R.evidence([w.done()]);
+  const a = e.chapters.a;
+  assert.equal(w.html.a, P('I went home the and spoke.'));
+  assert.equal(a.spell, 3);
+  assert.equal(a.nokey, 1);
+  assert.equal(a.nokeyChars, 10);
+  const read = R.evidenceRead(a, e.chars.a);
+  assert.equal(read.spell, 3);
+  assert.equal(read.nokey, 1);
+});
+
+test('revising as typed and in earlier text, and deletions in a row', () => {
+  const long = 'x'.repeat(800);
+  const w = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P(long) }).base('a');
+  w.type('abcd').back(1).type('e').back(2).type('z'); // at the end: a run of 1, then a run of 2
+  w.backAt(13, 6);                           // back near the start: a run of 6, in earlier text
+  w.type('q', 150, 7);
+  const e = R.evidence([w.done()]);
+  const a = e.chapters.a;
+  assert.equal(a.deleted, 9);
+  assert.equal(a.delInside, 6);
+  assert.deepEqual(a.runs, [1, 1, 0, 1, 0]);
+  assert.equal(a.bursts, 1);
+  const read = R.evidenceRead(a, e.chars.a);
+  assert.equal(read.deletedAtEnd, 3);
+  assert.equal(read.typedAtEnd, 6);
+  assert.equal(read.inside, 1);
+  assert.equal(read.returns, 1);
+});
+
+test('the gaps between keys, in coarse bars', () => {
+  const w = writer('d-1', '2026-10-01T09-00-00Z-aaaa', '2026-10-01T09:00:00.000Z', { a: P('') }).base('a');
+  w.type('abcdef', 30);    // under 50 ms
+  w.type('ghij', 150);     // 100–200 ms
+  w.type('k', 5000);       // 3.2 s to a minute
+  w.type('l', 120000);     // time away: not rhythm at all
+  const r = R.evidenceRead(R.evidence([w.done()]).book);
+  assert.equal(r.rhythm.length, R.EV_GAPS.length + 1);
+  assert.deepEqual(r.rhythm, [5, 0, 4, 0, 0, 0, 0, 1]);
+  assert.equal(r.judge, undefined); // figures only: no judgements
 });
 
 test('a session cut down to some chapters still replays, on the same clock', () => {

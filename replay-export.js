@@ -71,6 +71,7 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 <style>${read('replay-page.css')}</style>
 </head>
 <body>
+<div class="rx-app">
 <header class="rx-top">
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
@@ -78,12 +79,13 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
   ${partial ? `<p class="rx-note">${esc(T('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to the timestamped whole, so nothing on it fixes them in time.'))}</p>` : ''}
   <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>
-<main>
-  <section id="rx-player" class="rx-player" hidden></section>
-  <section id="rx-checks" class="rx-checks" hidden></section>
-  <section id="rx-report" class="rx-report">${report}</section>
-</main>
-<footer class="rx-foot">${esc(T('Made with NEO {version} on {date}.', { version, date: made.slice(0, 10) }))}</footer>
+<nav id="rx-side" class="rx-side" hidden></nav>
+<main id="rx-player" class="rx-player" hidden></main>
+<footer id="rx-foot" class="rx-foot" hidden></footer>
+</div>
+<section id="rx-report" class="rx-report">${report}</section>
+<section id="rx-checks" class="rx-checks" hidden></section>
+<p id="rx-made" class="rx-made">${esc(T('Made with NEO {version} on {date}.', { version, date: made.slice(0, 10) }))}</p>
 <script type="application/json" id="rx-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
 <script nonce="${nonce}">${inline(read('recording.js'))}</script>
 <script nonce="${nonce}">${inline(read('replay-page.js'))}</script>

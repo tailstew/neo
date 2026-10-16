@@ -100,5 +100,13 @@ These are people who already use NEO and update to the first version with Writin
   - the File menu's level, the footer's and Pocket's stay in step
   - Record and Timestamp from the menu asks first, unless the writer already agreed
   - nothing autoplays
-  - the menus are greyed out in History
+  - a menu item clicked in History closes it and then does what it says; its shortcut does nothing behind it
   - Writing History… with no book open shows "Open a book first"
+
+## History's evidence, timestamps and the exported page (2026-10-16)
+
+- [x] The evidence report gives figures, not judgements: the gaps between keys and deletions in a row as bars, revising as typed and later, spelling suggestions picked.
+- [x] Spelling suggestions picked from NEO's menu are recorded as such (`x spell`), and older sessions' are recognised, so they no longer show under "without a key". What's left there is named in plain words.
+- [x] Timestamps in the report: how many, the first and last, the mean time between, the services; no list of sessions. "Invalid Date" fixed.
+- [x] History's footer says when the moment shown was first timestamped; a track under the timeline marks each timestamp.
+- [x] The exported page looks like History: chapters and tags on the left, day tiles or a day's timeline, a footer always on screen with ▶ and ▶▶, Evidence and the checks in pop-ups.

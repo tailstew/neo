@@ -484,6 +484,48 @@
     }
   }
 
+  /* ---------- timestamps, for the player ---------- */
+
+  // How far into each session ({ id, device, open }) the timestamps reach:
+  // { 'device/id': [{ n, by }] }, line n's seal first, so lines up to n were
+  // timestamped at `by` (its earliest trusted stamp, or for a seal not
+  // stamped itself the next one that was; null if none was). Null when no
+  // device has sealed. Each device's seals are checked once until another
+  // comes. Desktop only (proof.js).
+  BookDays.prototype.stamps = async function (sessions) {
+    if (!node) return null;
+    const fs = require('fs');
+    const P = require('./proof.js');
+    this.sealMemo = this.sealMemo || new Map();
+    const out = {};
+    let any = false;
+    for (const device of new Set(sessions.map((s) => s.device))) {
+      let files = [];
+      try { files = fs.readdirSync(this.io.join(this.dir(device), 'seals')).sort(); } catch { continue; }
+      const sig = files.length + ':' + files[files.length - 1];
+      let m = this.sealMemo.get(device);
+      if (!m || m.sig !== sig) {
+        m = { sig, seals: (await P.verifyDevice(this.dir(device))).seals };
+        this.sealMemo.set(device, m);
+      }
+      if (!m.seals.length) continue;
+      any = true;
+      for (const s of sessions.filter((x) => x.device === device)) {
+        const text = await this.text(s);
+        const lineOf = new Map();
+        for (const h of text.matchAll(/^\[0,"h",(\d+),"([A-Za-z0-9_-]+)"\]$/gm)) lineOf.set(h[2], +h[1]);
+        const list = [];
+        for (const seal of m.seals) {
+          const h = seal.heads && seal.heads[s.id];
+          if (!h || !lineOf.has(h)) continue;
+          list.push({ n: lineOf.get(h), by: seal.ok ? (seal.by !== null ? seal.by : seal.byLater || null) : null });
+        }
+        out[device + '/' + s.id] = list.sort((a, b) => a.n - b.n);
+      }
+    }
+    return any ? out : null;
+  };
+
   /* ---------- messages ---------- */
 
   const books = new Map(); // key -> BookDays
@@ -535,6 +577,7 @@
       while (d.building) await d.building.catch(() => {});
       return d.track(msg.day, msg.part, msg.from);
     }
+    if (msg.type === 'stamps') return d.stamps((Array.isArray(msg.sessions) ? msg.sessions : []).map((s) => ({ id: String(s.id), device: String(s.device), open: !!s.open })));
     if (msg.type === 'evidence') return d.evidence({ chapters: Array.isArray(msg.chapters) ? msg.chapters.map(String) : null, texts: !!msg.texts });
     if (msg.type === 'dayStart') {
       // a day can start once every day before it is built

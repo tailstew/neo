@@ -44,7 +44,8 @@
 // K, ch, o and h carry dt 0: they describe, they don't happen. An `e` line
 // with an input code came from the engine (typing, paste, dictation); a
 // trailing 0 says no key was down when it came. Without a code it belongs
-// to the last `x` cause. Mods are a bitmask: 1 Shift, 2 Ctrl, 4 Alt, 8 Meta,
+// to the last `x` cause. An `x spell` just before one with a code says NEO
+// had the engine make it: a spelling suggestion picked from its menu. Mods are a bitmask: 1 Shift, 2 Ctrl, 4 Alt, 8 Meta,
 // 16 auto-repeat, 32 not trusted (made by a script, not a keyboard).
 //
 // A hash is the first 128 bits of SHA-256, in base64url (22 characters).
@@ -2817,10 +2818,16 @@
   const EV_FIX = 1000;    // a delete this soon after a typed character is a quick fix
   const EV_SOON = 10000;  // a paste this soon after coming back to NEO…
   const EV_BIG = 200;     // …this long, is counted on its own
+  // The report's coarse view of the gaps between keys: these edges (ms),
+  // each the bin edge nearest a round figure, make EV_GAPS.length + 1 bars
+  const EV_GAPS = [50, 100, 200, 400, 800, 1600, 3200];
+  // …and of deletions in a row: runs of 1, 2, 3–5, 6–10 and 11 or more keys
+  const EV_RUNS = [1, 2, 3, 6, 11];
 
   function evScope() {
     return {
       keys: 0, typed: 0, deleted: 0, fixes: 0, bursts: 0, untrusted: 0, returns: 0, inside: 0, ms: 0,
+      delInside: 0, runs: new Array(EV_RUNS.length).fill(0), spell: 0,
       gaps: new Array(EV_SIZE).fill(0),
       pause: { inside: new Array(EV_SIZE).fill(0), word: new Array(EV_SIZE).fill(0), sentence: new Array(EV_SIZE).fill(0), para: new Array(EV_SIZE).fill(0) },
       pastes: 0, pasted: 0, soon: 0, soonPasted: 0, own: 0, ownPasted: 0,
@@ -2844,9 +2851,10 @@
 
   // A book's sessions (every device's, in sessionOrder: { id, device, text })
   // read for what they show of how the words came, for the evidence report:
-  // the rhythm of the keys, where the pauses fall, how much was revised,
-  // how often the writer went back into earlier text, what was pasted from
-  // outside NEO, what came with no key, and what was never recorded. For
+  // the rhythm of the keys, where the pauses fall, how much was revised as
+  // it was typed and how much later, in earlier text, spelling suggestions
+  // picked, what was pasted from outside NEO, what came with no key, and
+  // what was never recorded. For
   // the book and for each chapter (streams aren't chapters, and aren't
   // counted). Plays them as one page (Page), so text from another device
   // that was recorded there counts once, as that device's.
@@ -2892,6 +2900,7 @@
       let used = true;      // whether an edit has taken that key yet
       let typedT = null;    // the last typed character's moment
       let dels = 0;         // deleting keys in a row
+      let spellNext = false; // the next edit is a spelling suggestion picked (an `x spell`)
       let away = false;
       let backT = null;     // when the writer last came back to NEO
       const lastAt = {};    // ch -> where typing last left off
@@ -2913,8 +2922,24 @@
         if (counted(ch)) both(ch, (s) => { s.outside += n; });
       };
       const endRun = () => {
-        if (dels >= 3 && counted(cur)) both(cur, (s) => { s.bursts++; });
+        if (dels && counted(cur)) {
+          let b = EV_RUNS.length - 1;
+          while (b > 0 && dels < EV_RUNS[b]) b--;
+          both(cur, (s) => { s.runs[b]++; if (dels >= 3) s.bursts++; });
+        }
         dels = 0;
+      };
+      // A spelling suggestion picked from NEO's menu: an `x spell` says so.
+      // Sessions from before NEO wrote that line show one as typing with no
+      // key, just after the caret was placed, that changes letters inside a
+      // word and nothing else.
+      const spellPick = (c, at, del, ins) => {
+        let j = li - 1; // (past what only describes: a chunk's end, a write between)
+        while (j > 0 && Array.isArray(lines[j]) && /^(h|w|ch|K|o|T)$/.test(lines[j][1])) j--;
+        const prev = lines[j];
+        if (!c || !Array.isArray(prev) || prev[1] !== 's' || lines[li][5] !== 'iT' || (!ins && !del) || /[\s<>&]/.test(ins) || ins.length > 40) return false;
+        const L = /[\p{L}\p{M}'’]/u;
+        return L.test(c.before(at, 1).slice(-1)) || L.test(c.toString().slice(at + del, at + del + 1));
       };
       const on = {
         key(t) {
@@ -2941,8 +2966,11 @@
           const kind = line[1];
           const run = kind === 'r' || kind === 'rd';
           const input = kind === 'e' ? line[5] : null;
+          const spelled = spellNext;
+          spellNext = false;
           if (input && line[6] === 0) {
             if (input === 'iFP' || input === 'iFD') return; // a paste: counted from its `c` line
+            if (spelled || spellPick(doc[ch], at, del, ins)) { both(ch, (s) => { s.spell++; seen(ch, s); }); return; }
             const n = textOf(ins).length;
             both(ch, (s) => { s.nokey++; s.nokeyChars += n; s.nokeyKinds[inputName(input)] = (s.nokeyKinds[inputName(input)] || 0) + 1; seen(ch, s); });
             return;
@@ -2972,9 +3000,13 @@
           } else if (del) {
             const n = run ? 1 : Math.max(1, textOf(c.toString().slice(at, at + del)).length);
             const fix = first && typedT !== null && t - typedT <= EV_FIX && dels === 0;
+            const inside = c.length - at - del >= EV_INSIDE ? n : 0;
+            const back = lastAt[ch] !== undefined && at + del < lastAt[ch] - EV_RETURN;
             if (first) dels++;
             both(ch, (s) => {
               s.deleted += n;
+              s.delInside += inside;
+              if (back) s.returns++;
               if (fix) s.fixes++;
               seen(ch, s);
             });
@@ -3005,6 +3037,8 @@
           if (!Array.isArray(line)) return;
           const kind = line[1];
           if (kind === 'b' || kind === 'ch') { endRun(); cur = line[2]; }
+          if (kind === 'x') spellNext = line[2] === 'spell';
+          else if (kind === 'k' || kind === 'r' || kind === 'rd' || kind === 'n') spellNext = false;
           if (kind === 'n' || (kind === 'k' && !/^(Backspace|Delete)$/.test(line[2]))) endRun();
           lp.play(i);
           const w = walls[i];
@@ -3055,38 +3089,32 @@
   }
   const evCount = (hist) => hist.reduce((a, b) => a + b, 0);
 
-  // A scope's numbers as the report says them, and the judgements they
-  // support, each null where there's too little to judge. `chars`: the
-  // scope's text now, for the share pasted. The thresholds are rough by
-  // design: the report shows the figures, and says the judgement is one.
-  //   rhythm    'uneven' (a person's) | 'even' (a script's)
-  //   pauses    'boundaries' (longer before sentences and paragraphs) | 'flat'
-  //   revision  'much' | 'some' | 'little'
-  //   order     'back' (went back into earlier text) | 'straight'
-  //   pasted    'much' | 'some' | 'little'
+  // A scope's numbers as the report says them. `chars`: the scope's text
+  // now, for the share pasted. `rhythm` is the gaps between keys in coarse
+  // bars, split at EV_GAPS; `runs` deletions in a row, by EV_RUNS. Deletions
+  // and typing with EV_INSIDE or more of the chapter after them were in
+  // earlier text; the rest went where the text was being written.
   function evidenceRead(s, chars = 0) {
     const med = (h) => evQuantile(h, 0.5);
+    const rhythm = new Array(EV_GAPS.length + 1).fill(0);
+    s.gaps.forEach((v, b) => {
+      let k = 0;
+      while (k < EV_GAPS.length && b >= evBin(EV_GAPS[k])) k++;
+      rhythm[k] += v;
+    });
     const out = {
       keys: s.keys, typed: s.typed, deleted: s.deleted, fixes: s.fixes, bursts: s.bursts, untrusted: s.untrusted,
       days: s.days, sessions: s.sessions, ms: s.ms, first: s.first, last: s.last,
-      gap: med(s.gaps), gapLow: evQuantile(s.gaps, 0.25), gapHigh: evQuantile(s.gaps, 0.75),
+      gap: med(s.gaps), gapLow: evQuantile(s.gaps, 0.25), gapHigh: evQuantile(s.gaps, 0.75), rhythm,
       pause: {}, pauseN: {},
       revised: s.typed ? s.deleted / s.typed : null,
-      returns: s.returns, returnsPer: s.typed ? s.returns / (s.typed / 10000) : null, insideShare: s.typed ? s.inside / s.typed : null,
+      typedAtEnd: s.typed - s.inside, deletedAtEnd: s.deleted - s.delInside, runs: s.runs.slice(), spell: s.spell,
+      returns: s.returns, inside: s.inside, delInside: s.delInside, insideShare: s.typed ? s.inside / s.typed : null,
       pastes: s.pastes, pasted: s.pasted, pastedShare: chars ? Math.min(1, s.pasted / chars) : null, soon: s.soon, soonPasted: s.soonPasted,
       own: s.own, ownPasted: s.ownPasted, nokey: s.nokey, nokeyChars: s.nokeyChars, nokeyKinds: s.nokeyKinds,
-      before: s.before, outside: s.outside, judge: {}
+      before: s.before, outside: s.outside
     };
     for (const k of Object.keys(s.pause)) { out.pause[k] = med(s.pause[k]); out.pauseN[k] = evCount(s.pause[k]); }
-    const j = out.judge;
-    const enough = evCount(s.gaps) >= 500;
-    j.rhythm = enough && out.gapLow ? (out.gapHigh / out.gapLow >= 1.6 ? 'uneven' : out.gapHigh / out.gapLow < 1.3 ? 'even' : null) : null;
-    const bound = Math.max(out.pause.sentence || 0, out.pause.para || 0);
-    j.pauses = out.pauseN.inside >= 200 && (out.pauseN.sentence + out.pauseN.para) >= 20 && out.pause.inside
-      ? (bound >= 1.5 * out.pause.inside ? 'boundaries' : bound < 1.15 * out.pause.inside ? 'flat' : null) : null;
-    j.revision = s.typed >= 2000 ? (out.revised >= 0.1 ? 'much' : out.revised >= 0.03 ? 'some' : 'little') : null;
-    j.order = s.typed >= 5000 ? (out.returnsPer >= 2 || out.insideShare >= 0.1 ? 'back' : out.returnsPer < 0.5 && out.insideShare < 0.02 ? 'straight' : null) : null;
-    j.pasted = chars >= 2000 && out.pastedShare !== null ? (out.pastedShare >= 0.2 ? 'much' : out.pastedShare >= 0.05 ? 'some' : 'little') : null;
     return out;
   }
 
@@ -3147,6 +3175,6 @@
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
-    EV_BINS, evidence, evidenceRead, evQuantile, keepChapters
+    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, keepChapters
   };
 });

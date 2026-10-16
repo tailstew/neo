@@ -2969,6 +2969,15 @@ const rec = {
   },
 
   // keys or edits: the `idle` line waits for a minute without either
+  // What the engine's next change is, when NEO has it made as typing (a
+  // spelling suggestion picked: `spell`): an `x` line before it, so the
+  // evidence doesn't count it as text that came with no key
+  mark(cause) {
+    if (!this.on || !this.w) return;
+    this.tick();
+    this.event(['x', cause]);
+  },
+
   active() {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => this.context('idle'), REC_IDLE);
@@ -3784,16 +3793,13 @@ const REPLAY_PAGE_WORDS = [
   tk('This page couldn’t read its history: {why}'),
   tk('this browser is too old to read it'),
   tk('Nothing was recorded.'),
-  tk('Chapter'),
   tk('The whole book'),
   tk('Untitled chapter'),
   tk('The day before'),
-  tk('Day'),
   tk('1 character typed'),
   tk('{n} characters typed'),
   tk('The day after'),
   tk('Play'),
-  tk('Skip pauses'),
   tk('Timeline'),
   tk('Loading {day}…'),
   tk('Chapter {n}'),
@@ -3826,6 +3832,41 @@ const REPLAY_PAGE_WORDS = [
   tk('Check it without this page'),
   tk('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:'),
   tk('A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.'),
+  tk('Days'),
+  tk('Back to the days'),
+  tk('Play fast'),
+  tk('When the text you see here was first timestamped'),
+  tk('Evidence'),
+  tk('Chapters'),
+  tk('Snapshot'),
+  tk('Before restoring to {when}'),
+  tk('Tagged'),
+  tk('Tags'),
+  tk('Close'),
+  tk('Pasted from this book ({n} characters)'),
+  tk('Pasted from elsewhere ({n} characters)'),
+  tk('Written before NEO started recording'),
+  tk('Away from NEO'),
+  tk('Timestamped {when}'),
+  tk('Not timestamped'),
+  tk('Some checks failed'),
+  tk('Checked'),
+  tk('Chapter split'),
+  tk('Chapters joined'),
+  tk('New chapter'),
+  tk('Chapter deleted'),
+  tk('Sent to Darlings'),
+  tk('Back from Darlings'),
+  tk('Replace All'),
+  tk('Undone'),
+  tk('Snapshot restored'),
+  tk('Moved in the Outline'),
+  tk('From another device'),
+  tk('From another device, kept beside this one'),
+  tk('Changed while NEO wasn’t recording'),
+  tk('Restored'),
+  tk('A change the recorder didn’t see'),
+  tk('Kept whole again'),
   tk('Writing History'),
   tk('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'),
   tk('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to the timestamped whole, so nothing on it fixes them in time.'),
@@ -3834,46 +3875,79 @@ const REPLAY_PAGE_WORDS = [
 ];
 const replayPageStrings = () => Object.fromEntries(REPLAY_PAGE_WORDS.map((en) => [en, t(en)]));
 
-// The evidence of how a book, or a chapter, was written, as HTML: facts
-// first, then the judgements they support, labelled as judgements. From
-// Rec.evidence's figures (`ev`), the time cover from the seals (`cover`,
-// null when nothing was sealed), `scope` (null: the book; else a chapter
-// id), `title`, and `name(ch)` for the chapter table. The History dialog
-// shows it, and Export Writing History… puts it in the page.
+// The evidence of how a book, or a chapter, was written, as HTML: figures
+// only, with the gaps between keys and deletions in a row as bars, and no
+// judgements drawn from them. From Rec.evidence's figures (`ev`), the time
+// cover from the seals (`cover`, null when nothing was sealed), `scope`
+// (null: the book; else a chapter id), `title`, and `name(ch)` for the
+// chapter table. The History dialog shows it, and Export Writing History…
+// puts it in the page.
+const EV_NOKEY = {
+  insertText: 'program', insertHTML: 'program', insertParagraph: 'program', insertLineBreak: 'program',
+  insertReplacementText: 'autocorrect', insertCompositionText: 'ime',
+  deleteByCut: 'mouse', deleteByDrag: 'mouse', historyUndo: 'undo', historyRedo: 'undo',
+  formatBold: 'format', formatItalic: 'format', formatUnderline: 'format', formatStrikeThrough: 'format'
+};
+const EV_NOKEY_NAMES = {
+  program: tk('dictation or another program'), autocorrect: tk('the system’s spelling or autocorrect'), ime: tk('an input method'),
+  mouse: tk('cut or dragged with the mouse'), undo: tk('undo or redo from a menu'), format: tk('formatting from a menu'), other: tk('other changes from a program')
+};
 function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, order = [], partial = false } = {}) {
   const e = escHtml;
   const n = (x) => fmtNum(Math.round(x || 0));
-  const pct = (x) => (x === null || x === undefined ? '—' : (x > 0 && x < 0.01 ? '<1' : Math.round(x * 100)) + '%');
+  const pct = (x) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : (x > 0 && x < 0.01 ? '<1' : Math.round(x * 100)) + '%');
   const ms = (x) => (x === null || x === undefined ? '—' : t('{n} ms', { n: n(x) }));
   const date = (x) => historyWhen(x, HISTORY_DATE);
+  const moment = (x) => historyWhen(x, HISTORY_MOMENT);
   const sc = scope ? ev.chapters[scope] : ev.book;
   const chars = scope ? ev.chars[scope] || 0 : Object.values(ev.chars).reduce((a, b) => a + b, 0);
   if (!sc) return `<h2 class="ev-h">${e(title)}</h2><p>${e(t('Nothing in this chapter was written while NEO was recording.'))}</p>`;
   const r = Rec.evidenceRead(sc, chars);
   const rows = [];
-  const row = (head, text) => rows.push(`<tr><th>${e(head)}</th><td>${e(text)}</td></tr>`);
+  const row = (head, text, more = '') => rows.push(`<tr><th>${e(head)}</th><td>${e(text)}${more}</td></tr>`);
+  // a few bars, each its share of the whole: [[label, count]]
+  const bars = (caption, list) => {
+    const all = list.reduce((a, [, v]) => a + v, 0);
+    if (!all) return '';
+    const max = Math.max(...list.map(([, v]) => v));
+    return `<table class="ev-hist"><caption>${e(caption)}</caption>` + list.map(([label, v]) =>
+      `<tr><th>${e(label)}</th><td class="ev-hist-bar"><span style="width:${(100 * v / max).toFixed(1)}%"></span></td><td class="ev-hist-n">${e(pct(v / all))}</td></tr>`).join('') + '</table>';
+  };
+  const gapLabel = (x) => (x < 1000 ? t('{n} ms', { n: n(x) }) : t('{n} s', { n: (x / 1000).toLocaleString(NeoI18n.getLocale()) }));
+  const span = (x) => (x >= 2 * 86400000 ? t('{n} days', { n: n(x / 86400000) }) : historySpent(x));
   const one = r.days && date(r.first) === date(r.last);
   row(t('Time'), !r.days ? t('Nothing was written while NEO was recording.')
     : (one ? t('Written on {date}.', { date: date(r.first) }) : t('Written on {n} days between {first} and {last}.', { n: r.days, first: date(r.first), last: date(r.last) })) +
-      ' ' + t('{n} sessions, {hours} of writing, leaving out pauses of a minute or more.', { n: r.sessions, hours: historySpent(r.ms) }));
-  row(t('Keys'), t('{n} keys pressed, {typed} characters typed.', { n: r.keys, typed: n(r.typed) }));
-  if (r.gap !== null) row(t('Rhythm'), t('Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.', { low: ms(r.gapLow), high: ms(r.gapHigh), mid: ms(r.gap) }));
+      ' ' + t('{n} sessions, {hours} of writing, leaving out pauses of a minute or more.', { n: n(r.sessions), hours: historySpent(r.ms) }));
+  row(t('Keys'), t('{n} keys pressed, {typed} characters typed.', { n: n(r.keys), typed: n(r.typed) }));
+  if (r.gap !== null) {
+    const G = Rec.EV_GAPS;
+    const labels = [t('under {t}', { t: gapLabel(G[0]) }), ...G.slice(1).map((x, i) => gapLabel(G[i]) + '–' + gapLabel(x)), t('{t} to a minute', { t: gapLabel(G[G.length - 1]) })];
+    row(t('Rhythm'), t('Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.', { low: ms(r.gapLow), high: ms(r.gapHigh), mid: ms(r.gap) }),
+      bars(t('The gaps between keys'), r.rhythm.map((v, i) => [labels[i], v])));
+  }
   if (r.pauseN.inside) {
     row(t('Pauses'), t('The middle pause before a letter inside a word: {inside}. After a space: {word}. At the start of a sentence: {sentence}. At the start of a paragraph: {para}.', {
       inside: ms(r.pause.inside), word: ms(r.pause.word), sentence: ms(r.pause.sentence), para: ms(r.pause.para)
     }));
   }
-  row(t('Revision'), t('{deleted} characters deleted with keys, {share} of those typed.', { deleted: n(r.deleted), share: pct(r.revised) }) + ' ' +
-    t('Quick fixes (a deletion within a second of typing): {fixes}. Runs of three or more deletions: {bursts}.', { fixes: n(r.fixes), bursts: n(r.bursts) }));
-  row(t('Going back'), t('Times typing went back into earlier text: {n}. Characters typed with more of the chapter after them: {share}.', { n: n(r.returns), share: pct(r.insideShare) }));
+  const RUNS = [t('1 key'), t('2 keys'), t('3–5 keys'), t('6–10 keys'), t('11 or more')];
+  row(t('Revised as typed'), t('Deleted where the text was being written: {n} characters, {share} of those typed.', { n: n(r.deletedAtEnd), share: pct(r.typed ? r.deletedAtEnd / r.typed : null) }) + ' ' +
+    t('Quick fixes (a deletion within a second of typing): {fixes}.', { fixes: n(r.fixes) }) +
+    (r.spell ? ' ' + t('Spelling suggestions picked: {n}.', { n: n(r.spell) }) : ''),
+  bars(t('Deletions in a row'), r.runs.map((v, i) => [RUNS[i], v])));
+  row(t('Revised later'), t('Times the writer went back into earlier text: {n}.', { n: n(r.returns) }) + ' ' +
+    t('Typed in earlier text: {typed} characters, {share} of all typing. Deleted there: {deleted}.', { typed: n(r.inside), share: pct(r.insideShare), deleted: n(r.delInside) }));
   row(t('Pasted'), (r.pastes
     ? t('Pastes from outside NEO: {n}, {chars} characters, {share} of the text now.', { n: n(r.pastes), chars: n(r.pasted), share: pct(r.pastedShare) }) +
       (r.soon ? ' ' + t('Of those, within ten seconds of coming back to NEO from another app: {n}, {chars} characters.', { n: n(r.soon), chars: n(r.soonPasted) }) : '')
     : t('Nothing was pasted from outside NEO.')) +
     (r.own ? ' ' + t('Pastes of text copied inside NEO: {n}.', { n: n(r.own) }) : ''));
-  const kinds = Object.entries(r.nokeyKinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + n(v)).join(', ');
-  row(t('Without a key'), (r.nokey
-    ? t('Changes with no key pressed: {n}, {chars} characters ({kinds}). Dictation, the system’s autocorrect and other tools make these.', { n: n(r.nokey), chars: n(r.nokeyChars), kinds })
+  const kinds = {};
+  for (const [k, v] of Object.entries(r.nokeyKinds)) { const g = EV_NOKEY[k] || 'other'; kinds[g] = (kinds[g] || 0) + v; }
+  const kindList = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([g, v]) => t(EV_NOKEY_NAMES[g]) + ': ' + n(v)).join(', ');
+  row(t('Without typing'), (r.nokey
+    ? t('Changes made with no key pressed: {n}, adding {chars} characters ({kinds}).', { n: n(r.nokey), chars: n(r.nokeyChars), kinds: kindList })
     : t('Every change to the text was made with a key, a paste, or one of NEO’s own commands.')) +
     (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : ''));
   row(t('Not recorded'), t('Words there before NEO started recording: {before}. Words that came while NEO wasn’t recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
@@ -3883,39 +3957,26 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
   } else {
     const typedIn = new Map(ev.sessions.map((s) => [s.device + '/' + s.id, s]));
     const all = cover.flatMap((d) => d.cover.map((c) => ({ ...c, device: d.device })));
-    const gaps = all.filter((c) => c.gap && (typedIn.get(c.device + '/' + c.session) || {}).typed);
+    const late = all.filter((c) => c.gap && (typedIn.get(c.device + '/' + c.session) || {}).typed);
     const stamps = [...new Set(cover.flatMap((d) => d.stamps))];
-    let text = t('Timestamps: {seals}, from {first} to {last}, by {stamps}.', {
-      seals: n(cover.reduce((a, d) => a + d.seals, 0)), first: date(Math.min(...cover.map((d) => Date.parse(d.first)))),
-      last: date(Math.max(...cover.map((d) => Date.parse(d.last)))), stamps: stamps.join(', ') || '—'
-    }) + ' ' + (gaps.length
-      ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(gaps.length), all: n(all.length) })
+    const count = cover.reduce((a, d) => a + d.seals, 0);
+    const first = Math.min(...cover.map((d) => d.first));
+    const last = Math.max(...cover.map((d) => d.last));
+    let text = count > 1
+      ? t('{n} timestamps, the first {first} and the last {last}: one every {gap} on average between them.', { n: n(count), first: moment(first), last: moment(last), gap: span((last - first) / (count - 1)) })
+      : t('One timestamp, {when}.', { when: moment(first) });
+    if (stamps.length) text += ' ' + t('Timestamp services: {stamps}.', { stamps: stamps.join(', ') });
+    text += ' ' + (late.length
+      ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(late.length), all: n(all.length) })
       : t('Every session was timestamped within a day of ending.'));
     if (cover.some((d) => d.bad)) text += ' ' + t('Some timestamps don’t check: run verify-recording on the book to see why.');
     if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this page. The page holds only some chapters, so it can’t check them itself.');
-    let list = '';
-    if (gaps.length) {
-      list = '<ul>' + gaps.slice(0, 50).map((c) => {
-        const s = typedIn.get(c.device + '/' + c.session);
-        return `<li>${e(date(c.from) + ': ' + t('{n} characters typed', { n: n(s.typed) }) + '; ' + (c.gap === 'never' ? t('never timestamped') : t('timestamped later, on {date}: written by then, nothing earlier proven', { date: date(c.wholeBy) })))}</li>`;
-      }).join('') + (gaps.length > 50 ? `<li>${e(t('and {n} more', { n: n(gaps.length - 50) }))}</li>` : '') + '</ul>';
-    }
-    rows.push(`<tr><th>${e(t('Timestamps'))}</th><td>${e(text)}${list}</td></tr>`);
+    row(t('Timestamps'), text);
   }
-  const J = {
-    rhythm: { uneven: t('The gaps between keys vary as a person’s do.'), even: t('The gaps between keys are unusually even, as scripted typing tends to be.') },
-    pauses: { boundaries: t('Pauses are longer where sentences and paragraphs begin: thinking happens at boundaries.'), flat: t('Pauses aren’t longer where sentences and paragraphs begin, as in copying.') },
-    revision: { much: t('Much was revised as it was typed, as composing is.'), some: t('Some was revised as it was typed.'), little: t('Little was revised as it was typed, which is what copying looks like.') },
-    order: { back: t('The writer often went back into earlier text and changed it, the strongest sign of composing.'), straight: t('The text was typed almost straight through, top to bottom, as retyping is.') },
-    pasted: { much: t('A large share of the text was pasted from outside NEO.'), some: t('Some of the text was pasted from outside NEO.'), little: t('Very little was pasted from outside NEO.') }
-  };
-  const judged = Object.entries(r.judge).filter(([, v]) => v).map(([k, v]) => `<li>${e(J[k][v])}</li>`);
   let html = `<h2 class="ev-h">${e(title)}</h2>
-    <p class="ev-small">${e(t('From the Writing History NEO kept as it was written. Facts first; the judgements after them are labelled as judgements.'))}</p>
-    <h3>${e(t('Facts'))}</h3><table class="ev-facts">${rows.join('')}</table>
-    <h3>${e(t('Judgement'))}</h3>
-    <ul class="ev-judge">${judged.join('') || `<li>${e(t('Too little was written here for a judgement.'))}</li>`}</ul>
-    <p class="ev-small">${e(t('These are judgements, not proof. Writing History shows how the words were typed and when; it can’t show whose ideas they were.'))}</p>`;
+    <p class="ev-small">${e(t('Figures from the Writing History NEO kept as the words were written.'))}</p>
+    <table class="ev-facts">${rows.join('')}</table>
+    <p class="ev-small">${e(t('Writing History shows how the words were typed and when. It can’t show whose ideas they were.'))}</p>`;
   if (!scope) {
     const ids = [...order.filter((ch) => ev.chapters[ch] || ev.words[ch] !== undefined), ...Object.keys(ev.chapters).filter((ch) => !order.includes(ch))];
     if (ids.length > 1) {
@@ -3924,7 +3985,7 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
           const c = ev.chapters[ch];
           const cr = c ? Rec.evidenceRead(c, ev.chars[ch] || 0) : null;
           const label = ev.words[ch] === undefined ? t('{name} (deleted)', { name: name(ch) }) : name(ch);
-          return `<tr data-ch="${e(ch)}"><td>${e(label)}</td><td>${ev.words[ch] === undefined ? '—' : n(ev.words[ch])}</td><td>${cr ? n(cr.days) : '—'}</td><td>${cr ? n(cr.typed) : '—'}</td><td>${cr ? pct(cr.revised) : '—'}</td><td>${cr ? pct(cr.pastedShare) : '—'}</td></tr>`;
+          return `<tr data-ch="${e(ch)}"><td>${e(label)}</td><td>${ev.words[ch] === undefined ? '—' : n(ev.words[ch])}</td><td>${cr ? n(cr.days) : '—'}</td><td>${cr ? n(cr.typed) : '—'}</td><td>${cr ? e(pct(cr.revised)) : '—'}</td><td>${cr ? e(pct(cr.pastedShare)) : '—'}</td></tr>`;
         }).join('') + '</table>';
     }
   }
@@ -4168,6 +4229,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     </div>
     <div class="hs-foot">
       <span class="hs-when"></span>
+      <span class="hs-stamped" hidden></span>
       <button class="hs-tag" type="button" hidden></button>
       <button class="hs-restore" type="button" hidden></button>
       <button class="hs-proof" type="button" hidden></button>
@@ -4249,7 +4311,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         : t('Your writing up to {when} is waiting for the network to timestamp it.', { when });
   }
   renderProof();
-  const proofChanged = (changed) => { if (changed === bookId && bd.isConnected) renderProof(); };
+  const proofChanged = (changed) => {
+    if (changed !== bookId || !bd.isConnected) return;
+    renderProof();
+    stampLoads.clear();
+    loadStamps();
+  };
   proofListeners.add(proofChanged);
   document.body.appendChild(bd);
   bd.tabIndex = -1;
@@ -4297,6 +4364,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   let part = null;        // paragraphs picked on the sheet, to step through their changes: { ch, a, b (Rec's part), h, n (where it is once n steps of h played) }
   let partSeq = 0;        // each step through them, so a newer one makes an older one moot
   let partWas = '';       // what the badge says of them, when they aren't in the text
+  let stamps = null;      // how far the day's sessions were timestamped (rec:stamps): { key, map }, map null when nothing was
+  const stampLoads = new Map(); // day -> its stamps, loading or loaded
+  let stampMarks = [];    // the timestamps' track: { x (clock), by }
   let tags = [];          // the history's tags (Rec.tagsOf), oldest moment first
   let tagsByDay = new Map(); // day -> its tags
   const resize = new ResizeObserver(() => { if (bd.isConnected) drawAll(); });
@@ -4506,6 +4576,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     strip.hidden = v !== 'days';
     if (v === 'days') badgeEl.hidden = true;
     renderPart();
+    drawWhen();
   }
 
   function describeDay(d) {
@@ -4641,6 +4712,70 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const s = h && steps.length ? h.steps[steps[Math.max(0, Math.min(pos || 1, steps.length) - 1)]] : null;
     const when = s ? t('Your book {when}', { when: snapWhen(s.wall) }) : '';
     if (el.textContent !== when) el.textContent = when;
+    // …and when the text at that moment was timestamped
+    const st = $h('.hs-stamped');
+    const map = view === 'player' && s && stamps && stamps.key === h.key ? stamps.map : null;
+    st.hidden = !map;
+    if (!map) return;
+    const by = stampedBy(s);
+    const says = by ? t('Timestamped {when}', { when: snapWhen(by) }) : t('Not timestamped');
+    if (st.textContent !== says) st.textContent = says;
+    st.title = t('When the text you see here was first timestamped');
+  }
+
+  // When the lines of the history up to step s were first timestamped
+  // (ms), or null
+  function stampedBy(s) {
+    const x = h.sessions[s.session];
+    const list = x && stamps.map[x.device + '/' + x.id];
+    let by = null;
+    for (const e of list || []) if (e.n >= s.line && e.by !== null && (by === null || e.by < by)) by = e.by;
+    return by;
+  }
+
+  // the day's timestamps, from the history process (desktop only)
+  function loadStamps() {
+    if (!h || !window.neo.recStamps) return;
+    const key = h.key;
+    const d = S.days.find((x) => dayKey(x) === key);
+    if (!d) return;
+    if (!stampLoads.has(key)) {
+      stampLoads.set(key, window.neo.recStamps(bookId, d.list.map((x) => ({ id: x.id, device: x.device, open: !!x.open }))).catch(() => null));
+      if (stampLoads.size > 3) for (const k of stampLoads.keys()) { if (k !== key && stampLoads.size > 3) stampLoads.delete(k); }
+    }
+    stampLoads.get(key).then((map) => {
+      if (!bd.isConnected || !h || h.key !== key) return;
+      stamps = { key, map };
+      stampTrack();
+      drawTimeline();
+      drawWhen();
+    });
+  }
+
+  // where each timestamp falls on the clock: the last step of the view
+  // that its seal covered (one pass: a session's steps come in line order)
+  function stampTrack() {
+    stampMarks = [];
+    if (!stamps || stamps.key !== h.key || !stamps.map) return;
+    const lists = h.sessions.map((x) => stamps.map[x.device + '/' + x.id] || []);
+    const next = new Int32Array(lists.length);
+    const lastJ = new Int32Array(lists.length).fill(-1);
+    const seen = new Set();
+    const place = (si) => {
+      const e = lists[si][next[si]++];
+      const j = lastJ[si];
+      if (j < 0 || seen.has(j)) return;
+      seen.add(j);
+      stampMarks.push({ x: vt[j], by: e.by });
+    };
+    for (let j = 0; j < steps.length; j++) {
+      const st = h.steps[steps[j]];
+      const l = lists[st.session];
+      if (!l) continue;
+      while (next[st.session] < l.length && l[next[st.session]].n < st.line) place(st.session);
+      lastJ[st.session] = j;
+    }
+    lists.forEach((l, si) => { while (next[si] < l.length) place(si); });
   }
 
   /* ---------- the player: one day ---------- */
@@ -4688,6 +4823,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     }
     if (mine !== token) return;
     buildView();
+    if (fresh) loadStamps();
     renderList();
     renderDayline();
     markDay();
@@ -4762,6 +4898,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     }
     total = v;
     buildMarkers();
+    stampTrack();
   }
 
   // whether a step changed the page: one another device's copy took
@@ -5118,10 +5255,19 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     if (!total) return;
     const X = (c) => (c / total) * (W - 2) + 1;
     const top = 14;
+    // under the writing, a track with a dash where each timestamp was made
+    const track = stamps && stamps.key === h.key && stamps.map ? 7 : 0;
+    const base = H - track - (track ? 2 : 0);
+    if (track) {
+      g.fillStyle = 'rgba(128,128,128,0.22)';
+      g.fillRect(0, H - 4, W, 1);
+      g.fillStyle = '#6fb7a8';
+      for (const m of stampMarks) g.fillRect(Math.round(X(m.x)) - 1, H - track, 2, track);
+    }
     for (const m of markers) {
       if (m.kind !== 'away') continue;
       g.fillStyle = 'rgba(128,128,128,0.13)';
-      g.fillRect(X(m.x), top, Math.max(1, X(m.to) - X(m.x)), H - top);
+      g.fillRect(X(m.x), top, Math.max(1, X(m.to) - X(m.x)), base - top);
     }
     // what was written, and, faintly behind it, the caret moving around
     const bins = new Float32Array(Math.ceil(W));
@@ -5137,8 +5283,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       g.fillStyle = color;
       for (let x = 0; x < b.length; x++) {
         if (!b[x]) continue;
-        const bh = Math.max(1, Math.sqrt(b[x] / max) * (H - top - 2));
-        g.fillRect(x, H - bh, 1, bh);
+        const bh = Math.max(1, Math.sqrt(b[x] / max) * (base - top - 2));
+        g.fillRect(x, base - bh, 1, bh);
       }
     };
     bars(nav, 'rgba(201,168,106,0.18)');
@@ -5152,7 +5298,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       g.strokeStyle = COLORS[m.kind];
       g.fillStyle = COLORS[m.kind];
       if (m.kind === 'session') {
-        g.beginPath(); g.moveTo(x, top); g.lineTo(x, H); g.stroke();
+        g.beginPath(); g.moveTo(x, top); g.lineTo(x, base); g.stroke();
         if (x - lastLabel > 60) {
           g.fillStyle = '#8a857a';
           const label = [historyWhen(h.steps[m.step].wall, HISTORY_TIME), stepDevice(h.steps[m.step])].filter(Boolean).join(' · ');
@@ -5161,7 +5307,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         }
       } else if (m.kind === 'tag') {
         // a flag on a pole
-        g.beginPath(); g.moveTo(x, 1); g.lineTo(x, H); g.stroke();
+        g.beginPath(); g.moveTo(x, 1); g.lineTo(x, base); g.stroke();
         g.beginPath(); g.moveTo(x, 1); g.lineTo(x + 7, 4); g.lineTo(x, 7); g.closePath(); g.fill();
       } else {
         g.beginPath(); g.moveTo(x - 3, top - 1); g.lineTo(x + 3, top - 1); g.lineTo(x, top + 4); g.closePath(); g.fill();
@@ -5178,6 +5324,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     while (lo < hi) { const mid = (lo + hi) >> 1; if (vt[mid] <= c) lo = mid + 1; else hi = mid; }
     const s = steps.length ? h.steps[steps[Math.max(0, Math.min(lo, steps.length) - 1)]] : null;
     const lines = near.slice(0, 3).map((m) => m.label);
+    const stamp = stampMarks.find((m) => Math.abs(m.x - c) <= span);
+    if (stamp) lines.push(stamp.by ? t('Timestamped {when}', { when: snapWhen(stamp.by) }) : t('Not timestamped'));
     if (s) lines.push([historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · '));
     return lines.join(' · ');
   }
@@ -17193,6 +17341,7 @@ document.addEventListener('contextmenu', async (e) => {
         const r = document.createRange();
         r.setStart(node, at); r.setEnd(node, at + 1);
         sel.removeAllRanges(); sel.addRange(r);
+        rec.mark('spell');
         document.execCommand('insertText', false, s);
         if (chEl) spellScanEl(spellElFor(chEl.dataset.id), chEl.dataset.id);
       }
@@ -17228,6 +17377,7 @@ document.addEventListener('contextmenu', async (e) => {
       const r = document.createRange();
       r.setStart(node, a); r.setEnd(node, b);
       sel.removeAllRanges(); sel.addRange(r);
+      rec.mark('spell');
       document.execCommand('insertText', false, s);
       if (key) spellScanEl(spellElFor(key), key);
     },

@@ -1035,6 +1035,11 @@ const recChapters = (chapters) => (Array.isArray(chapters) ? chapters.slice(0, 5
 ipcMain.handle('rec:evidence', (_e, bookId, chapters) =>
   historyRequest({ type: 'evidence', chapters: recChapters(chapters), ...historyTarget(bookId) }));
 
+// How far each of a day's sessions was timestamped, for the player's
+// footer and its timestamps' track
+ipcMain.handle('rec:stamps', (_e, bookId, sessions) =>
+  historyRequest({ type: 'stamps', sessions: Array.isArray(sessions) ? sessions.slice(0, 1000) : [], ...historyTarget(bookId) }));
+
 // Export Writing History…: the history as one HTML page anyone can open
 // (replay-export.js). The window sends the report as it showed it and the
 // page's words in the writer's language; the sessions, the seals and the
