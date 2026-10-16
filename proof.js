@@ -677,23 +677,28 @@ class Sealer {
     return !!l && this.now() - Date.parse(l.at) > ms;
   }
 
-  // For the dialog: how many seals, the newest, and who stamped it
+  // For the window: how many seals, the newest, who stamped it, and since
+  // when the seals have waited for a stamp (null when the newest has one)
   status() {
     const l = this.last();
     if (!l) return { seals: 0 };
     const stem = pad(l.seq);
     const files = this.files();
     const stamps = files.filter((f) => f.startsWith(stem + '.') && TOKEN.test(f)).map((f) => TOKEN.exec(f)[2]);
-    // the newest seal any authority stamped
+    // the newest seal any authority stamped, and the first after it, which
+    // has waited for a stamp since it was made
     let stamped = null;
+    let waiting = null;
     for (const s of [...this.load().seals].reverse()) {
       if (files.some((f) => f.startsWith(pad(s.seq) + '.') && TOKEN.test(f))) { stamped = s.at; break; }
+      waiting = s.at;
     }
     return {
       seals: this.load().seals.length,
       at: l.at,
       stamps: stamps.map((id) => (this.tsas.find((t) => t.id === id) || { name: id }).name),
-      stampedAt: stamped
+      stampedAt: stamped,
+      waitingSince: waiting
     };
   }
 }

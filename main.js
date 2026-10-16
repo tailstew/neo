@@ -894,7 +894,7 @@ ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
   const dir = await RecFiles.prepare(recIO, recRoot(bookId), libName(device), recReadme(),
     { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
   await RecFiles.chunk(recIO, dir, recSession(session), first, text);
-  proofRun(bookId, 'hourly');
+  proofWrote(bookId, text);
   return true;
 });
 
@@ -906,7 +906,7 @@ ipcMain.handle('rec:rollup', async (_e, bookId, session) => {
 ipcMain.handle('rec:close', async (_e, bookId, session) => {
   const dir = recDir(bookId);
   if (fs.existsSync(path.join(dir, recSession(session)))) await RecFiles.closeSession(recIO, dir, session, false);
-  proofRun(bookId, 'now');
+  proofRun(bookId, 'words');
   await recMirrorMine(bookId);
   return true;
 });
@@ -1022,6 +1022,8 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
   }
   const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
   proofSealers.delete(bookId); // its seals went with the history
+  clearTimeout((proofWords.get(bookId) || {}).timer);
+  proofWords.delete(bookId);
   if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
   historyCleaned.delete(cache);
   fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
@@ -1083,17 +1085,34 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
 // ---------------------------------------------------------------------------
 // Proof of when I wrote (docs/neo-recording-plan.md, part 2; proof.js):
 // opt-in, off unless library.proveWriting. Seals of this device's recording
-// of a book, at most hourly while it's written, when a session closes and
-// when the writer names a tag, each signed with this computer's key and
+// of a book once the writing stops for a while (or has gone on for an
+// hour), when a session closes with words unsealed, and when the writer
+// names a tag, each signed with this computer's key and
 // stamped by two timestamp authorities. Only a seal's SHA-256 leaves the
 // computer, never a word. Nothing here holds up a save: the window isn't
 // waiting, and a stamp that fails is asked for again later.
 // ---------------------------------------------------------------------------
 const Proof = require('./proof.js');
 const PROOF_HOUR = 3600 * 1000;
+const PROOF_IDLE = 5 * 60 * 1000;
 let proofOn = false;
 let proofTimer = null;
 const proofSealers = new Map(); // bookId -> { sealer, queue }
+const proofWords = new Map();   // bookId -> { since, timer }: words written since its last seal
+
+// A chunk that wrote words (a chapter or stream written, taken out, or a
+// tag) wants a seal: once the writing has stopped for PROOF_IDLE, so the
+// seal, and its mark on History's timeline, comes at the end of the
+// stretch it covers, or once the first unsealed words are an hour old.
+// A chunk of caret moves and focus alone changes nothing worth sealing.
+function proofWrote(bookId, text) {
+  if (!proofOn || !/^\[\d+,"(?:w|d|tag)",/m.test(text)) return;
+  let w = proofWords.get(bookId);
+  if (!w) proofWords.set(bookId, w = { since: Date.now(), timer: null });
+  clearTimeout(w.timer);
+  if (Date.now() - w.since >= PROOF_HOUR) { proofRun(bookId, 'words'); return; }
+  w.timer = setTimeout(() => proofRun(bookId, 'words'), PROOF_IDLE);
+}
 
 // the window says what the writer chose (in library.json, which it reads)
 function proofSetFlags(f) {
@@ -1245,16 +1264,19 @@ ipcMain.handle('proof:serviceRemove', (_e, id) => {
   return proofServicesSave(now.filter((x) => x !== s));
 });
 
-// A book's seals, one call at a time: `hourly` seals what changed once the
-// last seal is an hour old, `now` whatever changed, `start` renews a seal
-// nearly a year old; then each asks for the stamps the newest seal lacks
-// (`retry` only that). Resolves to the seal made, or null.
+// A book's seals, one call at a time: `words` seals what changed if words
+// were written since the last seal (proofWrote), `now` whatever changed,
+// `start` renews a seal nearly a year old; then each asks for the stamps
+// the newest seal lacks (`retry` only that). Resolves to the seal made, or
+// null.
 function proofRun(bookId, how) {
   if (!proofOn) return Promise.resolve(null);
   let p;
   try { p = proofSealer(bookId); } catch (err) { logError('proof', err); return Promise.resolve(null); }
   const s = p.sealer;
-  if (how === 'hourly' && s.last() && Date.now() - Date.parse(s.last().at) < PROOF_HOUR) return Promise.resolve(null);
+  const w = proofWords.get(bookId);
+  if (how === 'words' && !w) return Promise.resolve(null);
+  if (w && (how === 'words' || how === 'now')) { clearTimeout(w.timer); proofWords.delete(bookId); }
   const job = p.queue.then(async () => {
     let made = null;
     if (how === 'start') { if (s.renewDue()) made = await s.seal({ force: true }); }
@@ -1270,12 +1292,15 @@ function proofRun(bookId, how) {
 ipcMain.handle('proof:set', (_e, flags) => { proofSetFlags(flags); return true; });
 // a tag the writer named, or proof just turned on: sealed at once
 ipcMain.handle('proof:seal', async (_e, bookId) => !!(await proofRun(libName(bookId), 'now')));
-// for the dialog: how many seals, the newest, who stamped it
-ipcMain.handle('proof:status', (_e, bookId) => {
+// for the dialog: how many seals, the newest, who stamped it; `settled`
+// waits for the seal and stamps under way (a book just opened asks again)
+ipcMain.handle('proof:status', async (_e, bookId, settled) => {
   const st = { on: proofOn, seals: 0 };
   try {
     if (!fs.existsSync(path.join(recDir(bookId), 'seals'))) return st;
-    return { ...st, ...proofSealer(libName(bookId)).sealer.status() };
+    const p = proofSealer(libName(bookId));
+    if (settled) await p.queue;
+    return { ...st, ...p.sealer.status() };
   } catch (err) {
     logError('proof', err);
     return st;
@@ -2919,9 +2944,12 @@ function buildMenu() {
           submenu: (() => {
             const lib = readJSON(LIBRARY_FILE, {});
             const level = lib.historyAsked !== true || lib.recordWriting === false ? 'off' : lib.proveWriting === true ? 'timestamp' : 'record';
-            return [['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
+            return [...[['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
               label, type: 'radio', checked: level === value, click: () => sendToWindow({ type: 'historyLevel', value })
-            }));
+            })),
+            // who stamps the seals (openTsaServices in app.js)
+            { type: 'separator' },
+            { label: t('Timestamp Services…'), click: () => sendToWindow({ type: 'tsaServices' }) }];
           })()
         },
         {

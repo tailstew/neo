@@ -585,9 +585,10 @@ function showWindowTitle() {
   if (strip) strip.textContent = title;
 }
 
-function toast(msg, ms = 4000) {
+function toast(msg, ms = 4000, { warn = false } = {}) {
   const h = $('#hint');
   h.textContent = msg;
+  h.classList.toggle('hint-warn', warn);
   h.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { h.hidden = true; }, ms);
@@ -3312,8 +3313,8 @@ async function proofWhoSays() {
 }
 
 // Timestamp services… (docs/neo-recording-plan.md, The writer's own
-// services): who stamps the seals, opened from the proof line in History's
-// footer. NEO's three and any the writer added, in the order they're
+// services): who stamps the seals, opened from File → Record Writing
+// History → Timestamp Services…. NEO's three and any the writer added, in the order they're
 // asked; the first two that answer stamp each seal. Every change is kept at
 // once, in library.proofTsas, so the writer's other computers ask the same
 // services; main.js hands back each change as keep, roots and all.
@@ -4236,6 +4237,33 @@ async function historyRestoreParagraphs({ ch, html, wall, ref, paras }) {
   toast((many ? t('Paragraphs restored from {when}.', { when: snapWhen(wall) }) : t('Paragraph restored from {when}.', { when: snapWhen(wall) })) + ' ' + historyKeptSaid(kept, wall, many), 9000);
 }
 
+// When a book was last timestamped, and by whom, from proof:status
+function proofSays(st) {
+  if (!st || !st.seals) return t('Not timestamped yet. The first timestamp comes with your next words.');
+  const when = snapWhen(Date.parse(st.at));
+  return st.stamps.length >= 2
+    ? t('Last timestamped {when}, by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
+    : st.stampedAt
+      ? t('Last timestamped {then}. Your writing up to {when} is waiting for the network to timestamp it.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
+      : t('Your writing up to {when} is waiting for the network to timestamp it.', { when });
+}
+
+// A book just opened, timestamping on, whose seals have waited more than a
+// week for a stamp: said once its own try at stamping them is over, unless
+// the writer has started typing meanwhile
+const PROOF_STALE = 7 * 24 * 3600 * 1000;
+async function proofWarnStale(bookId) {
+  if (historyLevel() !== 'timestamp' || !window.neo.proofStatus) return;
+  const opened = performance.now();
+  let st = null;
+  try { st = await window.neo.proofStatus(bookId, true); } catch { return; }
+  if (!st || !st.waitingSince || Date.now() - Date.parse(st.waitingSince) < PROOF_STALE) return;
+  if (!book || book.id !== bookId || $('#editor-view').hidden || rec.lastKeyAt > opened || historyShown) return;
+  toast(t('Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in File → Record Writing History → Timestamp Services….', {
+    when: snapWhen(Date.parse(st.waitingSince))
+  }), 12000, { warn: true });
+}
+
 // Opens the Writing History of a book (the open one unless another is
 // named). It opens on the days: the chapter the writer is in (or the
 // book) as it is now, with a tile for each day it was written on below.
@@ -4281,7 +4309,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <span class="hs-stamped" hidden></span>
       <button class="hs-tag" type="button" hidden></button>
       <button class="hs-restore" type="button" hidden></button>
-      <button class="hs-proof" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
       <button class="hs-export" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
@@ -4308,6 +4335,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const partL = $h('.hs-part:not(.hs-part-r)'); // beside the paragraphs picked: ‹ and restore them…
   const partR = $h('.hs-part-r');               // …and ›
   const partRestore = $h('.hs-part-restore');
+  const partPrev = $h('.hs-part-prev');
+  const partNext = $h('.hs-part-next');
   const restoreBtn = $h('.hs-restore');
   const tagBtn = $h('.hs-tag');
   const deleteBtn = $h('.hs-delete');
@@ -4334,35 +4363,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   backBtn.textContent = '← ' + t('Days');
   backBtn.title = t('Back to the days') + ' (Esc)';
 
-  // Timestamped: a line saying when the book was last timestamped, and by whom
-  const proofLine = $h('.hs-proof');
-  async function renderProof() {
-    proofLine.hidden = historyLevel() !== 'timestamp';
-    if (proofLine.hidden) return;
-    let st = null;
-    try { st = await window.neo.proofStatus(bookId); } catch { /* said below */ }
-    if (!bd.isConnected) return;
-    proofLine.textContent = proofSays(st);
+  // when the book was last timestamped, and by whom, said once as it opens
+  if (historyLevel() === 'timestamp' && window.neo.proofStatus) {
+    window.neo.proofStatus(bookId).then((st) => { if (bd.isConnected) toast(proofSays(st), 7000); }).catch(() => {});
   }
-  // the line that says who timestamped it last is the way to choose who does
-  proofLine.title = t('Timestamp services…');
-  proofLine.addEventListener('click', async () => {
-    await openTsaServices();
-    if (bd.isConnected) { bd.focus(); renderProof(); }
-  });
-  function proofSays(st) {
-    if (!st || !st.seals) return t('Not timestamped yet. The first timestamp comes with your next words.');
-    const when = snapWhen(Date.parse(st.at));
-    return st.stamps.length >= 2
-      ? t('Last timestamped {when}, by {a} and {b}.', { when, a: st.stamps[0], b: st.stamps[1] })
-      : st.stampedAt
-        ? t('Last timestamped {then}. Your writing up to {when} is waiting for the network to timestamp it.', { when, then: snapWhen(Date.parse(st.stampedAt)) })
-        : t('Your writing up to {when} is waiting for the network to timestamp it.', { when });
-  }
-  renderProof();
   const proofChanged = (changed) => {
     if (changed !== bookId || !bd.isConnected) return;
-    renderProof();
     stampLoads.clear();
     loadStamps();
   };
@@ -6086,7 +6092,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     }
     // ‹ and ›: off where there's nothing that way (once looked for)
     const near = part && partNear && partNear.key === partKey() ? partNear : null;
-    for (const [way, b] of [['prev', partL.querySelector('.hs-part-prev')], ['next', partR.querySelector('.hs-part-next')]]) {
+    for (const [way, b] of [['prev', partPrev], ['next', partNext]]) {
       const off = !!near && near[way] === null;
       if (b.disabled !== off) b.disabled = off;
     }
@@ -6107,10 +6113,14 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const top = box.top - sr.top + scroller.scrollTop;
     const y = Math.max(top, Math.min(scroller.scrollTop + 10, top + box.height - partL.offsetHeight));
     partL.style.top = partR.style.top = y + 'px';
-    partRestore.textContent = label;
+    // in words where the margins have room; else ‹ and ›, then ↺ too
     const room = text.left - sr.left - 12;
-    partL.classList.toggle('hs-part-narrow', partL.offsetWidth > room);
-    if (partL.classList.contains('hs-part-narrow')) partRestore.textContent = '↺';
+    const roomR = scroller.clientWidth - (text.right - sr.left + 12) - 2;
+    partRestore.textContent = label;
+    partPrev.textContent = '‹ ' + t('Earlier version');
+    partNext.textContent = t('Later version') + ' ›';
+    if (partL.offsetWidth > room || partR.offsetWidth > roomR) { partPrev.textContent = '‹'; partNext.textContent = '›'; }
+    if (partL.offsetWidth > room) partRestore.textContent = '↺';
     partL.style.left = Math.max(2, room - partL.offsetWidth) + 'px';
     partR.style.left = Math.min(text.right - sr.left + 12, scroller.clientWidth - partR.offsetWidth - 2) + 'px';
   }
@@ -6259,9 +6269,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     seek(q);
   }
 
-  for (const [b, label, key, go] of [[partL.querySelector('.hs-part-prev'), t('Earlier version'), '[', () => partGo(-1)],
-    [partR.querySelector('.hs-part-next'), t('Later version'), ']', () => partGo(1)]]) {
-    b.title = label + ' (' + key + ')';
+  for (const [b, label, says, key, go] of [
+    [partPrev, t('Earlier version'), t('Back to how this read before it last changed'), '[', () => partGo(-1)],
+    [partNext, t('Later version'), t('On to how this reads after it next changes'), ']', () => partGo(1)]]) {
+    b.title = label + ': ' + says + ' (' + key + ')';
     b.setAttribute('aria-label', label);
     b.addEventListener('click', () => go());
   }
@@ -6618,6 +6629,7 @@ async function openBook(bookId) {
   // everything is read, before any of it becomes the open book
   await rec.begin(bookId);
   if (gen !== openGeneration) return;
+  proofWarnStale(bookId);
   chapterHTML = {};
   for (const chId of Object.keys(html)) setChapterHTML(chId, html[chId], 'open');
   savedHTML = { ...chapterHTML };
@@ -20232,6 +20244,7 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'import') importBooks();
   if (msg.type === 'stats') openStats();
   if (msg.type === 'historyLevel') setHistoryLevel(msg.value);
+  if (msg.type === 'tsaServices') openTsaServices();
   // never greyed out: with no book open it says so, as Export does
   if (msg.type === 'history') { if (book && !$('#editor-view').hidden) openHistory(); else toast(t('Open a book first')); }
   if (msg.type === 'chapterStep') gotoChapter(msg.value);

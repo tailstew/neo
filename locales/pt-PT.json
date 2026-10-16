@@ -65,6 +65,7 @@
   "Enter — new chapter (or section, from a section line) · Tab — turn a fresh chapter line into a section · Shift+Tab — turn a section into a chapter · Backspace on an empty line removes it": "Enter: novo capítulo (ou secção, a partir de uma linha de secção) · Tab: transforma uma nova linha de capítulo em secção · Shift+Tab: transforma uma secção em capítulo · Backspace numa linha vazia remove-a",
   "Every book in your library is already on a shelf": "Todos os livros da sua biblioteca já estão numa estante",
   "File": "Ficheiro",
+  "Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in File → Record Writing History → Timestamp Services….": "O que escreveu desde {when} não tem carimbo de tempo: nenhum serviço de carimbo de tempo responde há mais de uma semana. A gravação continua. Verifique a sua ligação ou escolha outros serviços em Ficheiro → Gravar o histórico de escrita → Serviços de carimbo de tempo….",
   "Find": "Procurar",
   "Find & Replace": "Procurar e substituir",
   "For ebook stores — the TOC lists every story.": "Para lojas de e-books: o índice lista cada história.",

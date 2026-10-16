@@ -51,7 +51,7 @@ contextBridge.exposeInMainWorld('neo', {
   uiModal: (on) => ipcRenderer.send('ui:modal', !!on),
   proofSet: (flags) => ipcRenderer.invoke('proof:set', flags),
   proofSeal: (bookId) => ipcRenderer.invoke('proof:seal', bookId),
-  proofStatus: (bookId) => ipcRenderer.invoke('proof:status', bookId),
+  proofStatus: (bookId, settled) => ipcRenderer.invoke('proof:status', bookId, !!settled),
   proofServices: () => ipcRenderer.invoke('proof:services'),
   proofServicesSet: (order) => ipcRenderer.invoke('proof:servicesSet', order),
   proofServicesReset: () => ipcRenderer.invoke('proof:servicesReset'),

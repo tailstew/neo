@@ -568,10 +568,10 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-part { position: absolute; top: 0; z-index: 2; display: flex; align-items: center; gap: 6px; }
 .hs-part[hidden] { display: none; }
 .hs-part button {
-  background: #262626; border: 1px solid #3a3a3a; border-radius: 14px; color: #c9c3b8; font-size: 12px;
-  padding: 4px 11px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  background: #262626; border: 1px solid #3a3a3a; border-radius: 18px; color: #c9c3b8; font-size: 14px; line-height: 1.2;
+  padding: 8px 16px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-.hs-part-prev, .hs-part-next { min-width: 30px; padding: 4px 8px; font-size: 15px; line-height: 1; }
+.hs-part-prev, .hs-part-next { min-width: 40px; }
 .hs-part button:hover:not(:disabled), .hs-part button:focus-visible { border-color: var(--accent); color: var(--accent); }
 .hs-part button:disabled { opacity: 0.4; cursor: default; }
 ::highlight(neo-replay-part) { background: rgba(122, 167, 217, 0.2); }
@@ -606,11 +606,6 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-when:empty { display: none; }
 .hs-stamped { flex: none; font-size: 12px; color: #6fb7a8; white-space: nowrap; }
 .hs-stamped[hidden] { display: none; }
-/* when the book was last timestamped */
-.hs-proof { min-width: 0; margin-left: auto; font-size: 11px; color: #77736b; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* the proof line is the way to Timestamp services… */
-button.hs-proof { background: none; border: none; padding: 2px 0; font-family: inherit; text-align: left; cursor: pointer; }
-button.hs-proof:hover, button.hs-proof:focus-visible { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 /* Timestamp services…: who stamps the seals, in the order they're asked */
 .tsa-backdrop { z-index: 955; }
 .modal.tsa-modal { width: min(520px, calc(100vw - 48px)); }
@@ -639,27 +634,20 @@ body.light .tsa-list li { border-color: #e2ddd4; }
 body.light .tsa-about { color: #8a857a; }
 body.light .modal .tsa-said { color: #3f3b35; }
 body.light .modal .tsa-warn { color: #a8642a; }
-.hs-delete {
-  margin-left: auto; flex: none; background: transparent; border: none; color: #77736b; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
-}
-.hs-delete:hover, .hs-delete:focus-visible { color: #d9776b; }
-/* tag this moment, and restore it: in the footer, beside the moment's time */
-.hs-restore, .hs-tag {
+/* every button in the footer alike: tag this moment and restore it beside
+   the moment's time, then How It Was Written…, Export… and Delete… */
+.hs-foot button {
   flex: none; min-width: 0; max-width: 260px; background: #262626; border: 1px solid #3a3a3a; border-radius: 14px;
-  padding: 5px 13px; font-size: 12px; color: #c9c3b8; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 5px 13px; font-size: 12px; font-family: inherit; color: #c9c3b8; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.hs-restore:hover:not(:disabled), .hs-restore:focus-visible, .hs-tag:hover:not(.hs-off), .hs-tag:focus-visible { border-color: var(--accent); color: var(--accent); }
-.hs-restore:disabled, .hs-tag.hs-off { opacity: 0.5; cursor: default; }
+.hs-foot button:hover:not(:disabled):not(.hs-off), .hs-foot button:focus-visible { border-color: var(--accent); color: var(--accent); }
+.hs-foot button:disabled, .hs-foot button.hs-off { opacity: 0.5; cursor: default; }
+.hs-foot .hs-delete:hover, .hs-foot .hs-delete:focus-visible { border-color: #d9776b; color: #d9776b; }
 /* a day with tags: a flag in its tile's corner */
 .hs-tile { position: relative; }
 .hs-tile.hs-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; width: 0; height: 0; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
-/* the evidence report and Export replay… */
-.hs-evidence, .hs-export {
-  flex: none; background: transparent; border: none; color: #a9a294; font-size: 11px; cursor: pointer; padding: 2px 4px; white-space: nowrap;
-}
-.hs-evidence:hover, .hs-evidence:focus-visible, .hs-export:hover, .hs-export:focus-visible { color: var(--accent); }
-.hs-foot .hs-evidence { margin-left: auto; }
-.hs-foot .hs-evidence:not([hidden]) ~ .hs-delete, .hs-foot .hs-proof:not([hidden]) ~ .hs-evidence, .hs-foot .hs-proof:not([hidden]) ~ .hs-delete { margin-left: 0; }
+/* the history's own, at the right: the first of them shown takes the gap */
+.hs-foot .hs-evidence, .hs-foot .hs-evidence[hidden] + .hs-export, .hs-foot .hs-evidence[hidden] + .hs-export[hidden] + .hs-delete { margin-left: auto; }
 .ev-backdrop { z-index: 950; }
 .modal.ev-modal { width: min(760px, calc(100vw - 48px)); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
 .ev-bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid #2a2a2a; }
@@ -689,7 +677,6 @@ body.light .modal .tsa-warn { color: #a8642a; }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
   .hs-side { display: none; }
-  .hs-proof { display: none; }
 }
 @media (max-width: 560px) {
   .ps-paper { padding: 44px 26px 36px; }
@@ -1657,12 +1644,17 @@ body.bright .new-book { border-color: #8a8a8a; color: #8a8a8a; }
 body.bright #add-shelf-btn, body.bright #import-btn { color: #b4b4b4; border-color: #555; }
 
 /* --- Hint toast --- */
+/* above the dialogs too (History says when it was last timestamped), and
+   never in the way of a click */
 #hint {
   position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%);
   background: #2b2b2b; color: #bbb; font-size: 12px;
-  padding: 8px 18px; border-radius: 20px; z-index: 200;
+  padding: 8px 18px; border-radius: 20px; z-index: 990; pointer-events: none;
+  max-width: min(640px, calc(100vw - 48px)); text-align: center; line-height: 1.45;
   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
 }
+/* a warning: timestamps that have failed for a week */
+#hint.hint-warn { background: #3a2a1c; color: #f0c38f; border: 1px solid #6b4a2a; }
 
 /* 11px to grab, the thumb drawn 7px inside it (the border is see-through) */
 ::-webkit-scrollbar { width: 11px; height: 11px; }
@@ -1884,8 +1876,7 @@ body.light .hs-find-stop { border-color: #cfcac0; }
 body.light .hs-controls button { border-color: #cfcac0; }
 body.light .hs-head { background: #1c1a17; box-shadow: 0 0 0 1px rgba(255,255,255,0.5); }
 body.night .hs-head { background: #f4f1ea; }
-body.light .hs-restore, body.light .hs-tag { background: #fbfaf8; border-color: #dcd7ce; color: #3f3b35; }
-body.light .hs-delete { color: #8a857a; }
+body.light .hs-foot button { background: #fbfaf8; border-color: #dcd7ce; color: #3f3b35; }
 body.light .hs-badge, body.light .hs-tip { background: #fbfaf8; border-color: #dcd7ce; color: #2b2926; }
 
 /* dialogs */
@@ -1950,6 +1941,7 @@ body.light #searchbar input:focus { border-color: var(--accent); }
 body.light #searchbar button { border-color: #d6d1c7; color: #5a564e; }
 body.light #searchbar button:hover { color: var(--accent); border-color: var(--accent); }
 body.light #hint { background: #2b2926; color: #f0ede7; box-shadow: 0 3px 14px rgba(0,0,0,0.2); }
+body.light #hint.hint-warn { background: #fbf0e2; color: #7a4517; border-color: #e0b98a; }
 
 /* Goals, the shortcuts */
 body.light .stats-row input, body.light .stats-row select { background: #fff; border-color: #cfcac0; color: #1c1a17; }

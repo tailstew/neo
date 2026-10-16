@@ -1693,11 +1693,11 @@ test('proof turned on seals the session being written; a named tag seals it agai
     assert.ok(closedSessions().every((s) => first.heads[s]), 'and every session before it');
     assert.deepEqual(first.after, [{ beacon: 'drand-quicknet', round, randomness, signature: sig }]);
 
-    // within the hour, more writing waits for the next hour's seal
+    // more writing waits for the writing to stop (five minutes) before it's sealed
     await type(' Still.');
     await flush();
     await tick(500);
-    assert.ok(!fs.existsSync(path.join(sealsDir(), '000002.json')), 'not sealed again within the hour');
+    assert.ok(!fs.existsSync(path.join(sealsDir(), '000002.json')), 'not sealed again while the writing goes on');
     // a tag the writer names is sealed at once
     await js('rec.tag("Sent to my agent"); 0');
     for (let i = 0; i < 300 && !fs.existsSync(path.join(sealsDir(), '000002.json')); i++) await tick(100);
@@ -1712,10 +1712,10 @@ test('proof turned on seals the session being written; a named tag seals it agai
     assert.ok(sent.some((s) => /timestamp\.digicert\.com/.test(s.url)) && sent.some((s) => /timestamp\.sectigo\.com/.test(s.url)), 'both authorities asked');
     assert.deepEqual(fs.readdirSync(sealsDir()).sort(), ['000001.json', '000002.json'], 'nothing stamped while offline');
 
-    // History says so
+    // History says so, as it opens
     await js('openHistory()');
     await daysReady();
-    await waitFor('/waiting for the network/.test(document.querySelector(".hs-proof").textContent)');
+    await waitFor('/waiting for the network/.test(document.querySelector("#hint").textContent)');
     assert.equal(await js('historyLevel()'), 'timestamp');
     key('Escape');
     await tick(300);
