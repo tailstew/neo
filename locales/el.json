@@ -864,7 +864,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Κάθε ώρα που γράφετε, το NEO στέλνει ένα αποτύπωμα του ιστορικού γραφής σας (ποτέ τα λόγια σας) σε δύο ανεξάρτητες υπηρεσίες χρονοσήμανσης. Οι υπογεγραμμένες αποδείξεις τους δείχνουν ότι το κείμενό σας υπήρχε εκείνη τη στιγμή.",
   "Every seal": "Όλες οι σφραγίδες",
   "Every session was timestamped within a day of ending.": "Κάθε συνεδρία χρονοσημάνθηκε μέσα σε μία ημέρα από το τέλος της.",
-  "Evidence…": "Ενδείξεις…",
   "Export the Writing History of “{title}”": "Εξαγωγή του Ιστορικού γραφής του «{title}»",
   "Export Writing History…": "Εξαγωγή Ιστορικού γραφής…",
   "Files": "Αρχεία",
@@ -1013,7 +1012,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Σβήστηκαν εκεί όπου γραφόταν το κείμενο: {n} χαρακτήρες, {share} όσων πληκτρολογήθηκαν.",
   "Deletions in a row": "Διαδοχικά σβησίματα",
   "dictation or another program": "υπαγόρευση ή άλλο πρόγραμμα",
-  "Evidence": "Ενδείξεις",
   "Figures from the Writing History NEO kept as the words were written.": "Αριθμοί από το Ιστορικό γραφής που κράτησε το NEO καθώς γράφονταν οι λέξεις.",
   "formatting from a menu": "μορφοποίηση από μενού",
   "Not timestamped": "Χωρίς χρονοσήμανση",
@@ -1033,5 +1031,7 @@
   "undo or redo from a menu": "αναίρεση ή επανάληψη από μενού",
   "When the text you see here was first timestamped": "Πότε χρονοσημάνθηκε για πρώτη φορά το κείμενο που βλέπετε εδώ",
   "Without typing": "Χωρίς πληκτρολόγηση",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Το Ιστορικό γραφής δείχνει πώς και πότε πληκτρολογήθηκαν οι λέξεις. Δεν μπορεί να δείξει ποιανού ήταν οι ιδέες."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Το Ιστορικό γραφής δείχνει πώς και πότε πληκτρολογήθηκαν οι λέξεις. Δεν μπορεί να δείξει ποιανού ήταν οι ιδέες.",
+  "How It Was Written…": "Πώς γράφτηκε…",
+  "How it was written": "Πώς γράφτηκε"
 }

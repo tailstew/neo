@@ -601,7 +601,7 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
   font-size: 11px; color: #ddd; white-space: nowrap; pointer-events: none;
 }
 /* the moment shown, tagging and restoring it; then the history's own */
-.hs-foot { grid-area: foot; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-top: 1px solid #2a2a2a; }
+.hs-foot { grid-area: foot; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 18px; border-top: 1px solid #2a2a2a; }
 .hs-when { flex: none; font-size: 12px; color: #a9a294; white-space: nowrap; }
 .hs-when:empty { display: none; }
 .hs-stamped { flex: none; font-size: 12px; color: #6fb7a8; white-space: nowrap; }

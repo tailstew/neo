@@ -3836,7 +3836,7 @@ const REPLAY_PAGE_WORDS = [
   tk('Back to the days'),
   tk('Play fast'),
   tk('When the text you see here was first timestamped'),
-  tk('Evidence'),
+  tk('How it was written'),
   tk('Chapters'),
   tk('Snapshot'),
   tk('Before restoring to {when}'),
@@ -5571,7 +5571,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const evBtn = $h('.hs-evidence');
   const exBtn = $h('.hs-export');
   evBtn.hidden = !window.neo.recEvidence;
-  evBtn.textContent = t('Evidence…');
+  evBtn.textContent = t('How It Was Written…');
   evBtn.title = t('How this book was written, in figures: the rhythm of the keys, the revising, what was pasted, and when it was timestamped');
   exBtn.hidden = !window.neo.recExport;
   exBtn.textContent = t('Export Writing History…');

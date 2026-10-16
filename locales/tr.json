@@ -850,7 +850,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Yazdığınız her saat NEO, yazım geçmişinizin bir parmak izini (asla sözcüklerinizi değil) iki bağımsız zaman damgası hizmetine gönderir. İmzalı makbuzları, yazınızın o anda var olduğunu gösterir.",
   "Every seal": "Tüm mühürler",
   "Every session was timestamped within a day of ending.": "Her oturum bitişinden sonraki bir gün içinde zaman damgası aldı.",
-  "Evidence…": "Kanıtlar…",
   "Export the Writing History of “{title}”": "“{title}” kitabının Yazım Geçmişini dışa aktar",
   "Export Writing History…": "Yazım Geçmişini Dışa Aktar…",
   "Files": "Dosyalar",
@@ -990,7 +989,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Metnin yazıldığı yerde silinen: {n} karakter, yazılanların {share} kadarı.",
   "Deletions in a row": "Art arda silmeler",
   "dictation or another program": "dikte veya başka bir program",
-  "Evidence": "Kanıtlar",
   "Figures from the Writing History NEO kept as the words were written.": "NEO’nun sözcükler yazılırken tuttuğu Yazım Geçmişinden rakamlar.",
   "formatting from a menu": "menüden biçimlendirme",
   "Not timestamped": "Zaman damgası yok",
@@ -1010,5 +1008,7 @@
   "undo or redo from a menu": "menüden geri al veya yinele",
   "When the text you see here was first timestamped": "Burada gördüğünüz metnin ilk kez zaman damgası aldığı zaman",
   "Without typing": "Tuşa basmadan",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Yazım Geçmişi sözcüklerin nasıl ve ne zaman yazıldığını gösterir. Fikirlerin kime ait olduğunu gösteremez."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Yazım Geçmişi sözcüklerin nasıl ve ne zaman yazıldığını gösterir. Fikirlerin kime ait olduğunu gösteremez.",
+  "How It Was Written…": "Nasıl yazıldı…",
+  "How it was written": "Nasıl yazıldı"
 }

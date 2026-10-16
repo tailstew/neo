@@ -967,7 +967,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "În fiecare oră în care scrii, NEO trimite o amprentă a istoricului scrisului tău (niciodată cuvintele tale) la două servicii independente de marcaj temporal. Chitanțele lor semnate arată că textul tău exista atunci.",
   "Every seal": "Toate sigiliile",
   "Every session was timestamped within a day of ending.": "Fiecare sesiune a primit marcaj temporal în ziua de după încheiere.",
-  "Evidence…": "Indicii…",
   "Export the Writing History of “{title}”": "Exportă istoricul scrisului pentru „{title}”",
   "Export Writing History…": "Exportă istoricul scrisului…",
   "Files": "Fișiere",
@@ -1119,7 +1118,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Șters acolo unde se scria textul: {n} caractere, {share} din cele tastate.",
   "Deletions in a row": "Ștergeri la rând",
   "dictation or another program": "dictare sau alt program",
-  "Evidence": "Indicii",
   "Figures from the Writing History NEO kept as the words were written.": "Cifre din Istoricul scrisului pe care NEO l-a ținut în timp ce se scriau cuvintele.",
   "formatting from a menu": "formatare dintr-un meniu",
   "Not timestamped": "Fără marcaj temporal",
@@ -1139,5 +1137,7 @@
   "undo or redo from a menu": "anulare sau refacere dintr-un meniu",
   "When the text you see here was first timestamped": "Când a primit textul pe care îl vezi aici primul marcaj temporal",
   "Without typing": "Fără tastare",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Istoricul scrisului arată cum și când au fost tastate cuvintele. Nu poate arăta ale cui erau ideile."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Istoricul scrisului arată cum și când au fost tastate cuvintele. Nu poate arăta ale cui erau ideile.",
+  "How It Was Written…": "Cum a fost scris…",
+  "How it was written": "Cum a fost scris"
 }

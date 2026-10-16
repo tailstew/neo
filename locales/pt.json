@@ -926,7 +926,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "A cada hora em que você escreve, o NEO envia uma impressão digital do seu histórico de escrita (nunca suas palavras) para dois serviços de carimbo de tempo independentes. Os recibos assinados deles mostram que seu texto existia naquele momento.",
   "Every seal": "Todos os selos",
   "Every session was timestamped within a day of ending.": "Toda sessão recebeu carimbo de tempo até um dia depois de terminar.",
-  "Evidence…": "Indícios…",
   "Export the Writing History of “{title}”": "Exportar o histórico de escrita de “{title}”",
   "Export Writing History…": "Exportar o histórico de escrita…",
   "Files": "Arquivos",
@@ -1075,7 +1074,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Apagado onde o texto estava sendo escrito: {n} caracteres, {share} dos digitados.",
   "Deletions in a row": "Apagamentos seguidos",
   "dictation or another program": "ditado ou outro programa",
-  "Evidence": "Indícios",
   "Figures from the Writing History NEO kept as the words were written.": "Números do Histórico de escrita que o NEO guardou enquanto as palavras eram escritas.",
   "formatting from a menu": "formatação a partir de um menu",
   "Not timestamped": "Sem carimbo de tempo",
@@ -1095,5 +1093,7 @@
   "undo or redo from a menu": "desfazer ou refazer a partir de um menu",
   "When the text you see here was first timestamped": "Quando o texto que você vê aqui recebeu um carimbo de tempo pela primeira vez",
   "Without typing": "Sem digitar",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram digitadas. Não pode mostrar de quem eram as ideias."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram digitadas. Não pode mostrar de quem eram as ideias.",
+  "How It Was Written…": "Como foi escrito…",
+  "How it was written": "Como foi escrito"
 }

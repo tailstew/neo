@@ -698,7 +698,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Minden órában, amikor írsz, a NEO elküldi az írástörténeted ujjlenyomatát (soha nem a szavaidat) két független időbélyeg-szolgáltatásnak. Az aláírt nyugtáik mutatják, hogy az írásod akkor már létezett.",
   "Every seal": "Minden pecsét",
   "Every session was timestamped within a day of ending.": "Minden munkamenet a vége után egy napon belül időbélyeget kapott.",
-  "Evidence…": "Bizonyítékok…",
   "Export the Writing History of “{title}”": "A(z) „{title}” Írástörténetének exportálása",
   "Export Writing History…": "Írástörténet exportálása…",
   "Files": "Fájlok",
@@ -1008,7 +1007,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Törölve ott, ahol a szöveg épp íródott: {n} karakter, a begépeltek {share}-a.",
   "Deletions in a row": "Egymás utáni törlések",
   "dictation or another program": "diktálás vagy más program",
-  "Evidence": "Bizonyítékok",
   "Figures from the Writing History NEO kept as the words were written.": "Számok az Írástörténetből, amelyet a NEO a szavak írása közben vezetett.",
   "formatting from a menu": "formázás menüből",
   "Not timestamped": "Nincs időbélyege",
@@ -1028,5 +1026,7 @@
   "undo or redo from a menu": "visszavonás vagy újra menüből",
   "When the text you see here was first timestamped": "Mikor kapott először időbélyeget az itt látható szöveg",
   "Without typing": "Gépelés nélkül",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Az Írástörténet megmutatja, hogyan és mikor gépelték be a szavakat. Azt nem tudja megmutatni, kinek az ötletei voltak."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Az Írástörténet megmutatja, hogyan és mikor gépelték be a szavakat. Azt nem tudja megmutatni, kinek az ötletei voltak.",
+  "How It Was Written…": "Hogyan készült…",
+  "How it was written": "Hogyan készült"
 }

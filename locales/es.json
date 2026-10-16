@@ -927,7 +927,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Cada hora que escribes, NEO envía una huella de tu historial de escritura (nunca tus palabras) a dos servicios de sello de tiempo independientes. Sus recibos firmados muestran que tu texto existía en ese momento.",
   "Every seal": "Todos los sellos",
   "Every session was timestamped within a day of ending.": "Cada sesión recibió sello de tiempo en el día siguiente a su fin.",
-  "Evidence…": "Indicios…",
   "Export the Writing History of “{title}”": "Exportar el historial de escritura de «{title}»",
   "Export Writing History…": "Exportar el historial de escritura…",
   "Files": "Archivos",
@@ -1076,7 +1075,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Borrado donde se estaba escribiendo el texto: {n} caracteres, {share} de los escritos.",
   "Deletions in a row": "Borrados seguidos",
   "dictation or another program": "dictado u otro programa",
-  "Evidence": "Indicios",
   "Figures from the Writing History NEO kept as the words were written.": "Cifras del Historial de escritura que NEO guardó mientras se escribían las palabras.",
   "formatting from a menu": "formato desde un menú",
   "Not timestamped": "Sin sello de tiempo",
@@ -1096,5 +1094,7 @@
   "undo or redo from a menu": "deshacer o rehacer desde un menú",
   "When the text you see here was first timestamped": "Cuándo recibió por primera vez un sello de tiempo el texto que ves aquí",
   "Without typing": "Sin teclear",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "El Historial de escritura muestra cómo y cuándo se teclearon las palabras. No puede mostrar de quién eran las ideas."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "El Historial de escritura muestra cómo y cuándo se teclearon las palabras. No puede mostrar de quién eran las ideas.",
+  "How It Was Written…": "Cómo se escribió…",
+  "How it was written": "Cómo se escribió"
 }

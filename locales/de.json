@@ -926,7 +926,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "In jeder Stunde, in der du schreibst, sendet NEO einen Fingerabdruck deines Schreibverlaufs (nie deine Worte) an zwei unabhängige Zeitstempeldienste. Ihre signierten Quittungen zeigen, dass dein Text zu dem Zeitpunkt existierte.",
   "Every seal": "Alle Siegel",
   "Every session was timestamped within a day of ending.": "Jede Sitzung bekam innerhalb eines Tages nach ihrem Ende einen Zeitstempel.",
-  "Evidence…": "Belege…",
   "Export the Writing History of “{title}”": "Den Schreibverlauf von „{title}“ exportieren",
   "Export Writing History…": "Schreibverlauf exportieren…",
   "Files": "Dateien",
@@ -1075,7 +1074,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Gelöscht, wo der Text gerade entstand: {n} Zeichen, {share} der getippten.",
   "Deletions in a row": "Löschungen hintereinander",
   "dictation or another program": "Diktat oder ein anderes Programm",
-  "Evidence": "Belege",
   "Figures from the Writing History NEO kept as the words were written.": "Zahlen aus dem Schreibverlauf, den NEO beim Schreiben der Worte geführt hat.",
   "formatting from a menu": "Formatierung aus einem Menü",
   "Not timestamped": "Ohne Zeitstempel",
@@ -1095,5 +1093,7 @@
   "undo or redo from a menu": "Rückgängig oder Wiederholen aus einem Menü",
   "When the text you see here was first timestamped": "Wann der Text, den du hier siehst, zum ersten Mal einen Zeitstempel bekam",
   "Without typing": "Ohne Tippen",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Der Schreibverlauf zeigt, wie und wann die Worte getippt wurden. Er kann nicht zeigen, wessen Ideen sie waren."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Der Schreibverlauf zeigt, wie und wann die Worte getippt wurden. Er kann nicht zeigen, wessen Ideen sie waren.",
+  "How It Was Written…": "Wie es geschrieben wurde…",
+  "How it was written": "Wie es geschrieben wurde"
 }

@@ -107,8 +107,7 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-tile:hover { color: var(--ink); }
 .rx-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
 .rx-tile.rx-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
-.rx-tilebar { display: flex; align-items: flex-end; width: 34px; height: 30px; }
-.rx-tilebar span { display: block; width: 100%; min-height: 2px; background: var(--accent); opacity: 0.6; border-radius: 2px; }
+.rx-tile canvas { display: block; width: 46px; height: 46px; }
 .rx-tiledate { white-space: nowrap; }
 
 /* the footer: always on screen */

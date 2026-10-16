@@ -982,7 +982,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "W każdej godzinie pisania NEO wysyła odcisk twojej historii pisania (nigdy twoich słów) do dwóch niezależnych usług znaczników czasu. Ich podpisane potwierdzenia pokazują, że twój tekst istniał w tamtej chwili.",
   "Every seal": "Wszystkie pieczęcie",
   "Every session was timestamped within a day of ending.": "Każda sesja dostała znacznik czasu w ciągu dnia od zakończenia.",
-  "Evidence…": "Poszlaki…",
   "Export the Writing History of “{title}”": "Eksportuj historię pisania „{title}”",
   "Export Writing History…": "Eksportuj historię pisania…",
   "Files": "Pliki",
@@ -1137,7 +1136,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Usunięte tam, gdzie powstawał tekst: {n} znaków, {share} wpisanych.",
   "Deletions in a row": "Usunięcia pod rząd",
   "dictation or another program": "dyktowanie lub inny program",
-  "Evidence": "Poszlaki",
   "Figures from the Writing History NEO kept as the words were written.": "Liczby z Historii pisania, którą NEO prowadził, gdy powstawały słowa.",
   "formatting from a menu": "formatowanie z menu",
   "Not timestamped": "Bez znacznika czasu",
@@ -1157,5 +1155,7 @@
   "undo or redo from a menu": "cofnij lub ponów z menu",
   "When the text you see here was first timestamped": "Kiedy tekst, który tu widzisz, pierwszy raz dostał znacznik czasu",
   "Without typing": "Bez pisania na klawiaturze",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Historia pisania pokazuje, jak i kiedy wpisano słowa. Nie może pokazać, czyje były pomysły."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Historia pisania pokazuje, jak i kiedy wpisano słowa. Nie może pokazać, czyje były pomysły.",
+  "How It Was Written…": "Jak to powstało…",
+  "How it was written": "Jak to powstało"
 }

@@ -926,7 +926,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Ogni ora in cui scrivi, NEO invia un’impronta della tua cronologia di scrittura (mai le tue parole) a due servizi di marca temporale indipendenti. Le loro ricevute firmate mostrano che il tuo testo esisteva a quel momento.",
   "Every seal": "Tutti i sigilli",
   "Every session was timestamped within a day of ending.": "Ogni sessione ha ricevuto una marca temporale entro un giorno dalla fine.",
-  "Evidence…": "Indizi…",
   "Export the Writing History of “{title}”": "Esporta la cronologia di scrittura di «{title}»",
   "Export Writing History…": "Esporta la cronologia di scrittura…",
   "Files": "File",
@@ -1075,7 +1074,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Cancellato dove si stava scrivendo il testo: {n} caratteri, {share} di quelli digitati.",
   "Deletions in a row": "Cancellazioni di fila",
   "dictation or another program": "dettatura o un altro programma",
-  "Evidence": "Indizi",
   "Figures from the Writing History NEO kept as the words were written.": "Cifre dalla Cronologia di scrittura che NEO ha tenuto mentre le parole venivano scritte.",
   "formatting from a menu": "formattazione da un menu",
   "Not timestamped": "Senza marca temporale",
@@ -1095,5 +1093,7 @@
   "undo or redo from a menu": "annulla o ripeti da un menu",
   "When the text you see here was first timestamped": "Quando il testo che vedi qui ha ricevuto per la prima volta una marca temporale",
   "Without typing": "Senza digitare",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "La Cronologia di scrittura mostra come e quando sono state digitate le parole. Non può mostrare di chi fossero le idee."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "La Cronologia di scrittura mostra come e quando sono state digitate le parole. Non può mostrare di chi fossero le idee.",
+  "How It Was Written…": "Come è stato scritto…",
+  "How it was written": "Come è stato scritto"
 }

@@ -1000,7 +1000,6 @@
   "Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.": "Каждый час, когда вы пишете, NEO отправляет отпечаток вашей истории письма (никогда не ваши слова) двум независимым службам меток времени. Их подписанные квитанции показывают, что ваш текст существовал к тому времени.",
   "Every seal": "Все печати",
   "Every session was timestamped within a day of ending.": "Каждый сеанс получил метку времени в течение суток после окончания.",
-  "Evidence…": "Свидетельства…",
   "Export the Writing History of “{title}”": "Экспортировать историю письма «{title}»",
   "Export Writing History…": "Экспортировать историю письма…",
   "Files": "Файлы",
@@ -1155,7 +1154,6 @@
   "Deleted where the text was being written: {n} characters, {share} of those typed.": "Удалено там, где писался текст: {n} знаков, {share} набранного.",
   "Deletions in a row": "Удаления подряд",
   "dictation or another program": "диктовка или другая программа",
-  "Evidence": "Свидетельства",
   "Figures from the Writing History NEO kept as the words were written.": "Цифры из Истории письма, которую NEO вёл, пока писались слова.",
   "formatting from a menu": "форматирование из меню",
   "Not timestamped": "Без метки времени",
@@ -1175,5 +1173,7 @@
   "undo or redo from a menu": "отмена или повтор из меню",
   "When the text you see here was first timestamped": "Когда текст, который вы видите здесь, впервые получил метку времени",
   "Without typing": "Без набора",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "История письма показывает, как и когда набирались слова. Она не может показать, чьи это были идеи."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "История письма показывает, как и когда набирались слова. Она не может показать, чьи это были идеи.",
+  "How It Was Written…": "Как это написано…",
+  "How it was written": "Как это написано"
 }

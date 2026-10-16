@@ -261,6 +261,7 @@
         }
         return before;
       });
+      this.lastOrder = order; // …and the last day's
     }
 
     static snapshot(pg) {
@@ -447,7 +448,7 @@
     const stamped = el('span', 'rx-stamped');
     stamped.hidden = true;
     stamped.title = T('When the text you see here was first timestamped');
-    const evBtn = el('button', 'rx-evbtn', T('Evidence'));
+    const evBtn = el('button', 'rx-evbtn', T('How it was written'));
     const ckBtn = el('button', 'rx-ckbtn', T('Checking…'));
     foot.append(backBtn, playBtn, fastBtn, when, stamped, el('span', 'rx-gap'), evBtn, ckBtn);
 
@@ -461,7 +462,7 @@
       const b = el('button', 'rx-chbtn', label);
       b.dataset.ch = id;
       b.setAttribute('role', 'option');
-      b.addEventListener('click', () => { mode = id; markMode(); if (!h) return; rebuild(); if (view === 'days') seek(steps.length); });
+      b.addEventListener('click', () => { mode = id; markMode(); drawTiles(); if (!h) return; rebuild(); if (view === 'days') seek(steps.length); });
       chList.append(b);
     };
     chButton('', T('The whole book'));
@@ -531,7 +532,7 @@
       return d;
     };
     const report = doc.getElementById('rx-report');
-    const evPop = pop(report, T('Evidence'));
+    const evPop = pop(report, T('How it was written'));
     evBtn.addEventListener('click', () => { setPlaying(false); evPop.showModal(); report.scrollTop = 0; });
     const ckPop = pop(doc.getElementById('rx-checks'), T('What this page checks'));
     ckBtn.addEventListener('click', () => { setPlaying(false); ckPop.showModal(); });
@@ -546,21 +547,86 @@
     // the days, as tiles
     const tagDays = new Set(tags.map((tg) => tg.day));
     const dayTyped = book.days.map((d) => d.list.reduce((a, s) => a + (typed.get(s.device + '/' + s.id) || 0), 0));
-    const most = Math.max(1, ...dayTyped);
     book.days.forEach((d, i) => {
       const b = el('button', 'rx-tile' + (tagDays.has(d.day) ? ' rx-tagged' : ''));
       b.setAttribute('role', 'option');
       b.dataset.k = String(i);
-      const bar = el('span', 'rx-tilebar');
-      const fill = el('span');
-      fill.style.height = (100 * Math.sqrt(dayTyped[i] / most)).toFixed(0) + '%';
-      bar.append(fill);
-      b.append(bar, el('span', 'rx-tiledate', fmtShort(d.day)));
+      b.append(el('canvas'), el('span', 'rx-tiledate', fmtShort(d.day)));
       b.title = fmtDay(d.day) + (typed.size ? ' · ' + (dayTyped[i] === 1 ? T('1 character typed') : T('{n} characters typed', { n: fmtNum(dayTyped[i]) })) : '');
       b.addEventListener('click', () => openPlayer(i));
       b.addEventListener('focus', () => { if (view === 'days') showDay(i); });
       strip.append(b);
     });
+    // Each day's map, as NEO's tiles draw it: where the day changed the
+    // text, green where words came, red where they went, gold where both.
+    // The sessions' stats (Rec.playSession, each chapter's changes in bins
+    // along it) are worked out here, once, a session at a time after the
+    // page has opened, and each tile is drawn as its day is done.
+    const dayStats = book.days.map(() => null);
+    const INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
+    function drawTile(i) {
+      const cv = strip.children[i] && strip.children[i].firstChild;
+      if (!cv) return;
+      const W = 46;
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = cv.height = Math.round(W * dpr);
+      const g = cv.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, W, W);
+      const list = dayStats[i] || [];
+      const whole = !mode;
+      const after = book.orders[i + 1] || book.lastOrder || (data.chapters || []).map((c) => c.id);
+      const chs = whole ? after.filter((ch) => !Rec.isStream(ch)) : [mode];
+      for (const st of list) for (const ch of Object.keys(st.chapters || {})) if (whole && !Rec.isStream(ch) && !chs.includes(ch)) chs.push(ch);
+      const rows = whole ? 8 : 6;
+      const n = whole ? rows : rows * rows;
+      const grids = chs.map((ch) => {
+        const ins = new Float32Array(n);
+        const del = new Float32Array(n);
+        for (const st of list) {
+          const c = st.chapters && st.chapters[ch];
+          if (!c || !c.ins) continue;
+          const nb = c.ins.length;
+          for (let b = 0; b < nb; b++) {
+            if (!c.ins[b] && !c.del[b]) continue;
+            const a = Math.floor((b * n) / nb);
+            const z = Math.max(a + 1, Math.ceil(((b + 1) * n) / nb));
+            for (let q = a; q < z; q++) { ins[q] += c.ins[b]; del[q] += c.del[b]; }
+          }
+        }
+        return { ins, del };
+      });
+      let max = 1;
+      for (const gr of grids) for (let q = 0; q < n; q++) max = Math.max(max, gr.ins[q] + gr.del[q]);
+      const cell = (x, y, w, hh, gr, q) => {
+        const v = gr.ins[q] + gr.del[q];
+        g.globalAlpha = v ? 0.45 + 0.55 * Math.sqrt(v / max) : 1;
+        g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : gr.ins[q] && gr.del[q] ? INK.edited : gr.ins[q] ? INK.added : INK.deleted;
+        g.fillRect(x, y, Math.max(0.5, w - (w >= 4 ? 1 : 0)), hh - 1);
+      };
+      if (whole) {
+        const cw = W / Math.max(1, grids.length);
+        grids.forEach((gr, c) => { for (let q = 0; q < rows; q++) cell(c * cw, (q * W) / rows, cw, W / rows, gr, q); });
+      } else {
+        const cs = W / rows;
+        for (let q = 0; q < n; q++) cell((q % rows) * cs, Math.floor(q / rows) * cs, cs, cs, grids[0], q);
+      }
+      g.globalAlpha = 1;
+    }
+    const drawTiles = () => book.days.forEach((_, i) => drawTile(i));
+    drawTiles();
+    (async () => {
+      const pg = new Rec.Page();
+      for (let i = 0; i < book.days.length; i++) {
+        const out = [];
+        for (const s of book.days[i].list) {
+          try { out.push(Rec.playSession(s.text, null, { page: pg, device: s.device })); } catch { /* a session that won't play: no map */ }
+          await tick();
+        }
+        dayStats[i] = out;
+        drawTile(i);
+      }
+    })();
 
     const loadDay = (i) => {
       if (!loads.has(i)) {
