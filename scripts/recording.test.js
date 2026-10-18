@@ -709,3 +709,21 @@ test('a restore’s tag is the moment before the restore: the text it replaced',
   assert.equal(h.state(R.momentStep(h, tg.made.restore)).c1, old, 'its restore: the moment restored to');
   assert.equal(h.end.c1, old);
 });
+
+test('leadSteps: a player starts on the words that were there before it recorded', () => {
+  const steps = [
+    { k: 'session' },
+    { k: 'x', cause: 'catch-up' },
+    { k: 'e', cause: 'catch-up' },
+    { k: 'b', cause: 'baseline' },
+    { k: 's', by: 'n' },
+    { k: 'e', cause: 'input' },
+    { k: 'b', cause: 'baseline' }
+  ];
+  const view = steps.map((_, i) => i);
+  assert.equal(R.leadSteps(steps, view, new Float64Array([0, 0, 0, 0, 0, 0, 40])), 5);
+  // nothing before the clock moves is passed over…
+  assert.equal(R.leadSteps(steps, view, new Float64Array([0, 0, 10, 10, 10, 10, 40])), 2);
+  // …and a chapter made new isn't text from before
+  assert.equal(R.leadSteps([{ k: 'session' }, { k: 'x', cause: 'new' }, { k: 'b', cause: 'new' }], [0, 1, 2], new Float64Array(3)), 1);
+});

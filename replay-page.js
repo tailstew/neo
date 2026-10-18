@@ -384,11 +384,10 @@
   /* ---------- the player ---------- */
 
   // as NEO's own player: ▶▶ is this many times as fast, and a pause longer
-  // than SKIP plays SKIP_TO long
+  // than SKIP plays SKIP long (▶▶ skips it)
   const FAST = 8;
   const SKIP = 3000;
-  const SKIP_TO = 500;
-  // what made a change, as the timeline's markers say it (app.js, HISTORY_CAUSES)
+    // what made a change, as the timeline's markers say it (app.js, HISTORY_CAUSES)
   const CAUSES = {
     split: 'Chapter split', merge: 'Chapters joined', new: 'New chapter', delete: 'Chapter deleted',
     'darling-out': 'Sent to Darlings', 'darling-in': 'Back from Darlings', 'darling-delete': 'Sent to Darlings',
@@ -425,6 +424,8 @@
     let h = null;      // its History
     let steps = [];    // the steps this view plays (indexes into h.steps)
     let vt = new Float64Array(0); // each one's moment on the player's clock
+    let pauses = new Uint8Array(0); // 1 where the pause before a step was longer than SKIP
+    let lead = 0;      // steps that only say what was there before (Rec.leadSteps): played at once
     let total = 0;
     let pos = 0;       // view steps played
     let n = 0;         // steps of h played
@@ -715,7 +716,7 @@
     }
 
     // the steps the view plays, and the player's clock over them: the
-    // recording's own, with pauses over SKIP played SKIP_TO long, and none
+    // recording's own, with pauses over SKIP played SKIP long (skipped at ▶▶, in frame), and none
     // before a session's first change or after its last
     function rebuild(keep = true) {
       if (!h) return;
@@ -723,6 +724,7 @@
       steps = [];
       h.steps.forEach((s, i) => { if ((!mode && !Rec.isStream(s.ch)) || s.ch === mode || s.k === 'session' || s.k === 'f') steps.push(i); });
       vt = new Float64Array(steps.length);
+      pauses = new Uint8Array(steps.length);
       const acts = (s) => s.k === 'e' || s.k === 'x' || s.k === 'd' || s.k === 'o' || s.k === 'c' || (s.k === 's' && s.by !== 'n');
       const first = new Int32Array(steps.length);
       const lastA = new Int32Array(steps.length);
@@ -742,11 +744,12 @@
         let gap = j ? s.t - h.steps[steps[j - 1]].t : 0;
         if (s.k === 'session' && j) gap = s.session ? Math.max(0, s.t - h.sessions[s.session - 1].t1) : 0;
         else if (j <= first[j] || j > lastA[j]) gap = 0;
-        if (gap > SKIP) gap = SKIP_TO;
+        if (gap > SKIP) { pauses[j] = 1; gap = SKIP; }
         v += gap;
         vt[j] = v;
       }
       total = v;
+      lead = Rec.leadSteps(h.steps, steps, vt);
       buildMarkers();
       stampTrack();
       sheet.dataset.list = '';
@@ -837,7 +840,7 @@
     const nAt = (p) => (p <= 0 ? (steps.length ? steps[0] : 0) : steps[p - 1] + 1);
     // follow: scroll the sheet to the caret, as playing does (a seek from the timeline)
     function seek(p, follow = false) {
-      pos = Math.max(0, Math.min(p, steps.length));
+      pos = Math.max(Math.min(lead, steps.length), Math.min(p, steps.length));
       n = nAt(pos);
       cur = h.doc(n);
       clock = pos ? vt[pos - 1] : 0;
@@ -1028,6 +1031,7 @@
         return;
       }
       clock += dt * speed;
+      if (speed === FAST && pauses[pos] && clock < vt[pos]) clock = vt[pos]; // ▶▶ skips a long pause
       const to = posAt(clock);
       if (to > pos) {
         pos = to;

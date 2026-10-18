@@ -3175,6 +3175,21 @@
     return out;
   }
 
+  // How many of a player's steps (`view`, indexes into `steps`, with `vt`
+  // their moments on its clock) only say what the text was before the
+  // recording saw any of it written: the chapters set whole or caught up
+  // (QUIET), sessions starting, the caret placed, before the clock moves.
+  // A player starts after them, so its first moment shows the words that
+  // were already there rather than an empty page.
+  function leadSteps(steps, view, vt) {
+    let j = 0;
+    for (; j < view.length && !(vt[j] > 0); j++) {
+      const s = steps[view[j]];
+      if (s.k === 'b' || s.k === 'e' || s.k === 'd' || s.k === 'x') { if (!QUIET.has(s.cause)) break; } else if (s.k === 'c') break;
+    }
+    return j;
+  }
+
   return {
     FORMAT, READS, PLAYER, CARET_BLOCK, INPUT_TYPES, MOD, inputCode, inputName,
     STREAMS, isStream, streamTexts,
@@ -3187,7 +3202,7 @@
     replay, replayCheck, ANCHOR_CHARS, ANCHOR_TIMES, anchorDue, baseLines,
     QUIET, Page, sessionOrder,
     sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
-    textOffset, compileSession, History,
+    textOffset, compileSession, History, leadSteps,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,

@@ -3559,8 +3559,7 @@ async function recRestart(bookId) {
 /* ================================================================== */
 
 const HISTORY_FAST = 8;       // ▶▶ plays this many times as fast as it was written
-const HISTORY_SKIP = 3000;    // a pause longer than this…
-const HISTORY_SKIP_TO = 500;  // …plays this long, and a badge says how long it was
+const HISTORY_SKIP = 3000;    // a pause longer than this plays this long (▶▶ skips it), and a badge says how long it was
 const HISTORY_INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
 const historyPrefs = { speed: 1, skip: true }; // the speed is kept while NEO runs
 const historyCanOpen = () => !!(Rec && window.neo.recList && window.neo.recRead && window.neo.recDays && window.neo.recDayStart);
@@ -4416,6 +4415,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   let shown = {};         // ch -> what its sheet was last drawn from
   let markers = [];       // { x (clock), kind, label, step }
   let badgeUntil = 0;
+  let pauseSaid = -1;     // the view index whose pause the badge last told
+  let lead = 0;           // view steps that only say what was there before (Rec.leadSteps): played at once
   let loaded = { state: 'loading' }; // then ready, empty or failed, with ms and error
   let token = 0;          // a newer load makes an older one's result moot
   let find = null;        // a search: { phrase ({ text, word, cs }), sid, findings, within: { done, total }, finished, stopped, error }
@@ -4899,7 +4900,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   }
 
   // the player's clock: the recording's own, with long pauses cut short
-  // when Skip Pauses is on. The wait before a session's first change and
+  // (and skipped at ▶▶, in frame). The wait before a session's first change and
   // after its last (NEO open, nothing written yet, or left open after) isn't
   // played at all: sessions follow each other with the History's own gap.
   function timeClock() {
@@ -4924,11 +4925,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       let gap = j ? s.t - h.steps[steps[j - 1]].t : 0;
       if (s.k === 'session' && j) gap = s.session ? Math.max(0, s.t - h.sessions[s.session - 1].t1) : 0;
       else if (j <= first[j] || j > last[j]) gap = 0;
-      if (historyPrefs.skip && gap > HISTORY_SKIP) { pauses[j] = gap; gap = HISTORY_SKIP_TO; }
+      if (historyPrefs.skip && gap > HISTORY_SKIP) { pauses[j] = gap; gap = HISTORY_SKIP; }
       v += gap;
       vt[j] = v;
     }
     total = v;
+    lead = Rec.leadSteps(h.steps, steps, vt);
     buildMarkers();
     stampTrack();
   }
@@ -4989,8 +4991,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const nAt = (p) => (p <= 0 ? (steps.length ? steps[0] : 0) : steps[p - 1] + 1); // steps of h played
   function seek(p, { keepFollow = false } = {}) {
     if (!h) return;
-    p = Math.max(0, Math.min(p, steps.length));
+    p = Math.max(Math.min(lead, steps.length), Math.min(p, steps.length));
     pos = p;
+    pauseSaid = -1;
     clock = p ? vt[p - 1] : 0;
     chapters = h.doc(nAt(p));
     for (const ch of Object.keys(chapters)) if (Rec.isStream(ch)) delete chapters[ch]; // (not played: see buildView)
@@ -5017,7 +5020,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   function playStep(j, now) {
     const i = steps[j];
     const s = h.steps[i];
-    if (pauses[j] && playing) { badgeEl.textContent = historyPause(pauses[j]); badgeEl.hidden = false; badgeUntil = now + 1200; }
     if (h.bad.has(i)) return;
     if (s.k === 'e') {
       if (chapters[s.ch] === undefined && s.sync === undefined) return;
@@ -5043,7 +5045,21 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const dt = Math.min(250, now - lastFrame); // a hidden window doesn't fast-forward
     lastFrame = now;
     clock += dt * historyPrefs.speed;
-    while (pos < steps.length && vt[pos] <= clock) playStep(pos++, now);
+    for (;;) {
+      while (pos < steps.length && vt[pos] <= clock) playStep(pos++, now);
+      if (pos >= steps.length || !pauses[pos]) break;
+      // in a long pause: the badge says how long it really was, for as long
+      // as it plays (3 s at most), and ▶▶ skips it
+      const fast = historyPrefs.speed === HISTORY_FAST;
+      if (pauseSaid !== pos) {
+        pauseSaid = pos;
+        badgeEl.textContent = historyPause(pauses[pos]);
+        badgeEl.hidden = false;
+        badgeUntil = now + (fast ? 1200 : (vt[pos] - clock) / historyPrefs.speed + 600);
+      }
+      if (!fast) break;
+      clock = vt[pos];
+    }
     const di = curDay();
     const next = di >= 0 ? dayAfter(di, 1) : -1;
     if (next >= 0 && pos > steps.length * 0.7) loadDay(next); // ready by the time it's wanted
