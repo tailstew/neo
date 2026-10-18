@@ -3889,9 +3889,15 @@ const EV_NOKEY = {
   deleteByCut: 'mouse', deleteByDrag: 'mouse', historyUndo: 'undo', historyRedo: 'undo',
   formatBold: 'format', formatItalic: 'format', formatUnderline: 'format', formatStrikeThrough: 'format'
 };
+// each kind of change made with no key, said in full
 const EV_NOKEY_NAMES = {
-  program: tk('dictation or another program'), autocorrect: tk('the system’s spelling or autocorrect'), ime: tk('an input method'),
-  mouse: tk('cut or dragged with the mouse'), undo: tk('undo or redo from a menu'), format: tk('formatting from a menu'), other: tk('other changes from a program')
+  program: tk('Text put in by dictation, an emoji picker or another program: {n}.'),
+  autocorrect: tk('Words replaced by the system’s autocorrect or spelling: {n}.'),
+  ime: tk('Text composed with an input method (accents, Chinese, Japanese…): {n}.'),
+  mouse: tk('Text cut or dragged with the mouse: {n}.'),
+  undo: tk('Undo or redo from the Edit menu: {n}.'),
+  format: tk('Formatting from a menu: {n}.'),
+  other: tk('Other changes made by the system or a program: {n}.')
 };
 function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, order = [], partial = false } = {}) {
   const e = escHtml;
@@ -3948,11 +3954,12 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
   if (r.own) row(t('Moved'), t('Text moved within the book: {chars} characters.', { chars: n(r.ownPasted) }));
   const kinds = {};
   for (const [k, v] of Object.entries(r.nokeyKinds)) { const g = EV_NOKEY[k] || 'other'; kinds[g] = (kinds[g] || 0) + v; }
-  const kindList = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([g, v]) => t(EV_NOKEY_NAMES[g]) + ': ' + n(v)).join(', ');
-  row(t('Without typing'), (r.nokey
-    ? t('Changes made with no key pressed: {n}, adding {chars} characters ({kinds}).', { n: n(r.nokey), chars: n(r.nokeyChars), kinds: kindList })
-    : t('Every change to the text was made with a key, a paste, or one of NEO’s own commands.')) +
-    (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : ''));
+  const kindList = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([g, v]) => t(EV_NOKEY_NAMES[g], { n: n(v) })).join(' ');
+  row(t('Not typed'), (r.nokey
+    ? t('Changes made with no key pressed: {n}, adding {chars} characters.', { n: n(r.nokey), chars: n(r.nokeyChars) }) + ' ' + kindList
+    : t('Every change to the text was typed, pasted, or made by one of NEO’s own commands.')) +
+    (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : '') + ' ' +
+    t('Not counted here: spelling suggestions picked from NEO’s menu (under Revised as typed), pastes and moves (above), and NEO’s own commands, such as Replace All, joining chapters or moving cards in the Outline.'));
   row(t('Not recorded'), t('Words there before NEO started recording: {before}. Words that came while NEO wasn’t recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
   // the time cover: how much of the writing is fixed in time
   // (a device that seals nothing itself, Pocket, is in it with no seals:
