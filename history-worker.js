@@ -455,29 +455,37 @@
     }
 
     // Each device's seals and the time cover of its sessions, or null when
-    // no device has sealed. `list`: the sessions whole (a cut-down list is
-    // read again, since a seal covers whole sessions).
+    // no device has sealed. A device that seals nothing (Pocket) is there
+    // with no seals, covered by the seals of the devices that sealed its
+    // sessions for it. `list`: the sessions whole (a cut-down list is read
+    // again, since a seal covers whole sessions).
     async cover(evidence, list) {
       const fs = require('fs');
       const P = require('./proof.js');
       const devices = fs.existsSync(this.root) ? fs.readdirSync(this.root).filter((d) => Files.DEVICE.test(d)) : [];
       if (!devices.some((d) => fs.existsSync(this.io.join(this.dir(d), 'seals')))) return null;
       if (!list) list = await this.allTexts();
+      const hashes = new Map(devices.map((d) => [d, new Map(list.filter((s) => s.device === d).map((s) => [s.id, P.chainHashes(s.text)]))]));
+      const checked = {};
+      for (const device of devices) {
+        const v = await P.verifyDevice(this.dir(device), { sessions: hashes.get(device), others: hashes });
+        if (v.seals.length) checked[device] = v;
+      }
       const out = [];
       for (const device of devices) {
         const mine = list.filter((s) => s.device === device);
-        const hashes = new Map(mine.map((s) => [s.id, P.chainHashes(s.text)]));
-        const v = await P.verifyDevice(this.dir(device), { sessions: hashes });
-        if (!v.seals.length) continue;
+        const v = checked[device];
+        if (!v && !mine.length) continue;
         const spans = new Map(evidence.sessions.filter((s) => s.device === device).map((s) => [s.id, s]));
         const sessions = mine.map((s) => ({ id: s.id, open: s.open, last: R.verifyChain(s.text).last, from: (spans.get(s.id) || {}).from || null, to: (spans.get(s.id) || {}).to || null }));
+        const seals = v ? v.seals : [];
         out.push({
-          device, key: v.publicKey, seals: v.seals.length,
-          stamped: v.seals.filter((s) => s.by !== null).length,
-          first: v.seals[0].at, last: v.seals[v.seals.length - 1].at,
-          bad: v.seals.filter((s) => !s.ok).length,
-          stamps: [...new Set(v.seals.flatMap((s) => s.stamps.filter((x) => x.ok && x.trusted).map((x) => (P.TSAS.find((a) => a.id === x.tsa) || { name: x.tsa }).name)))],
-          cover: P.timeCover(sessions, v.seals)
+          device, key: v ? v.publicKey : null, seals: seals.length,
+          stamped: seals.filter((s) => s.by !== null).length,
+          first: seals.length ? seals[0].at : null, last: seals.length ? seals[seals.length - 1].at : null,
+          bad: seals.filter((s) => !s.ok).length,
+          stamps: [...new Set(seals.flatMap((s) => s.stamps.filter((x) => x.ok && x.trusted).map((x) => (P.TSAS.find((a) => a.id === x.tsa) || { name: x.tsa }).name)))],
+          cover: P.timeCover(sessions, R.sealsOver(device, checked))
         });
       }
       return out;
@@ -490,16 +498,17 @@
   // { 'device/id': [{ n, by }] }, line n's seal first, so lines up to n were
   // timestamped at `by` (its earliest trusted stamp, or for a seal not
   // stamped itself the next one that was; null if none was). Null when no
-  // device has sealed. Each device's seals are checked once until another
-  // comes. Desktop only (proof.js).
+  // device has sealed. A session's seals are its device's, and those of
+  // another device that sealed it (R.sealsOver). Each device's seals are
+  // checked once until another comes. Desktop only (proof.js).
   BookDays.prototype.stamps = async function (sessions) {
     if (!node) return null;
     const fs = require('fs');
     const P = require('./proof.js');
     this.sealMemo = this.sealMemo || new Map();
-    const out = {};
-    let any = false;
-    for (const device of new Set(sessions.map((s) => s.device))) {
+    const checked = {};
+    const devices = fs.existsSync(this.root) ? fs.readdirSync(this.root).filter((d) => Files.DEVICE.test(d)) : [];
+    for (const device of devices) {
       let files = [];
       try { files = fs.readdirSync(this.io.join(this.dir(device), 'seals')).sort(); } catch { continue; }
       const sig = files.length + ':' + files[files.length - 1];
@@ -508,22 +517,25 @@
         m = { sig, seals: (await P.verifyDevice(this.dir(device))).seals };
         this.sealMemo.set(device, m);
       }
-      if (!m.seals.length) continue;
-      any = true;
-      for (const s of sessions.filter((x) => x.device === device)) {
-        const text = await this.text(s);
-        const lineOf = new Map();
-        for (const h of text.matchAll(/^\[0,"h",(\d+),"([A-Za-z0-9_-]+)"\]$/gm)) lineOf.set(h[2], +h[1]);
-        const list = [];
-        for (const seal of m.seals) {
-          const h = seal.heads && seal.heads[s.id];
-          if (!h || !lineOf.has(h)) continue;
-          list.push({ n: lineOf.get(h), by: seal.ok ? (seal.by !== null ? seal.by : seal.byLater || null) : null });
-        }
-        out[device + '/' + s.id] = list.sort((a, b) => a.n - b.n);
-      }
+      if (m.seals.length) checked[device] = m;
     }
-    return any ? out : null;
+    if (!Object.keys(checked).length) return null;
+    const out = {};
+    for (const s of sessions) {
+      const seals = R.sealsOver(s.device, checked);
+      if (!seals.length && !checked[s.device]) continue;
+      const text = await this.text(s);
+      const lineOf = new Map();
+      for (const h of text.matchAll(/^\[0,"h",(\d+),"([A-Za-z0-9_-]+)"\]$/gm)) lineOf.set(h[2], +h[1]);
+      const list = [];
+      for (const seal of seals) {
+        const h = seal.heads[s.id];
+        if (!h || !lineOf.has(h)) continue;
+        list.push({ n: lineOf.get(h), by: seal.ok ? (seal.by !== null ? seal.by : seal.byLater || null) : null });
+      }
+      out[s.device + '/' + s.id] = list.sort((a, b) => a.n - b.n);
+    }
+    return out;
   };
 
   /* ---------- messages ---------- */

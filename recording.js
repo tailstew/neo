@@ -3159,6 +3159,22 @@
     return out.join('\n') + '\n';
   }
 
+  // The seals over one device's sessions, from every device's seals checked
+  // ({ device: { seals } }, proof.js's verifyDevice or the exported page's):
+  // its own, by their `heads`, and another device's that sealed its sessions
+  // for it (Pocket seals nothing), by their `others`. Each is the seal as
+  // checked, with `heads` this device's and `sealedBy` whose seal it is.
+  function sealsOver(device, checked) {
+    const out = [];
+    for (const [by, r] of Object.entries(checked || {})) {
+      for (const s of (r && r.seals) || []) {
+        const heads = by === device ? s.heads : s.others && s.others[device];
+        if (heads && Object.keys(heads).length) out.push({ ...s, heads, sealedBy: by });
+      }
+    }
+    return out;
+  }
+
   return {
     FORMAT, READS, PLAYER, CARET_BLOCK, INPUT_TYPES, MOD, inputCode, inputName,
     STREAMS, isStream, streamTexts,
@@ -3175,6 +3191,6 @@
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
-    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, keepChapters
+    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, keepChapters, sealsOver
   };
 });

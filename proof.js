@@ -10,11 +10,16 @@
 //   { neoSeal: 1, seq, at, book, device, publicKey,
 //     after: [{ beacon: 'drand-quicknet', round, randomness, signature }],  (when it answered)
 //     heads: { <session>: <its last h line's hash> },     (those changed since the last seal)
+//     others: { <device>: { <session>: <its last h> } },  (when there are any)
 //     tokens: { <file in seals/>: <sha256 hex> },         (stamps written since the last seal)
 //     prev: <sha256 hex of the previous seal's bytes>, sig }
 //
 // `heads` takes the session still being written too, so a long session is
-// fixed in time hour by hour. `after` is a value nobody knew before it was
+// fixed in time hour by hour. `others` is the sessions of devices that
+// don't seal their own (Pocket; a computer that records without
+// timestamping), as they reached this one by sync, each `h` no seal of any
+// device names yet: fixed in time by when they arrived, not when they were
+// written. A NEO from before `others` checks the seal whole and ignores it. `after` is a value nobody knew before it was
 // published, so the seal was made after it; its stamps say it existed by
 // then. `tokens` puts each earlier stamp under the next seal's stamps, so a
 // stamp whose authority's certificate expires stays covered by a newer one
@@ -517,11 +522,13 @@ class Sealer {
   constructor({ dir, book, device, key, now = () => new Date(), fetch = globalThis.fetch, write, log = () => {},
     tsas = TSAS, anchors = null, cacheFile = null, check = checkToken }) {
     Object.assign(this, { dir, book, device, key, now, fetch, log, tsas, cacheFile, check });
+    this.root = path.dirname(dir);
     this.anchors = anchors;
     this.put = (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); write(file, data); };
     this.io = Files.nodeIO({ fs, path, zlib, write: this.put, log });
     this.state = null;
     this.closedHeads = null;
+    this.named = null;
   }
 
   get sealsDir() { return path.join(this.dir, 'seals'); }
@@ -548,50 +555,130 @@ class Sealer {
 
   last() { const s = this.load().seals; return s.length ? s[s.length - 1] : null; }
 
-  // Each session's last `h`, the open ones' too
-  async heads() {
+  // The closed sessions' heads remembered, by device: { <device>: {
+  // <session>: h } } (an older NEO kept this device's alone)
+  knownHeads(device) {
     if (!this.closedHeads) {
-      this.closedHeads = {};
-      if (this.cacheFile) try { this.closedHeads = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8')) || {}; } catch { /* none yet */ }
+      let c = {};
+      if (this.cacheFile) try { c = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8')) || {}; } catch { /* none yet */ }
+      this.closedHeads = c.devices ? c : { devices: { [this.device]: c } };
     }
-    const out = new Map();
+    const d = this.closedHeads.devices;
+    return d[device] || (d[device] = {});
+  }
+
+  keepHeads() {
+    if (!this.cacheFile) return;
+    try { this.put(this.cacheFile, JSON.stringify(this.closedHeads)); } catch (err) { this.log('proof cache', err); }
+  }
+
+  // Each session's last `h` in one device's folder, the open ones' too,
+  // into `out`; `known` remembers the closed ones' (only from a chain that
+  // verifies whole: another device's file may still be arriving). Returns
+  // whether it learnt one.
+  async headsIn(dir, known, out) {
     let names = [];
-    try { names = fs.readdirSync(this.dir); } catch { return out; }
+    try { names = fs.readdirSync(dir); } catch { return false; }
     let learnt = false;
     const closed = new Set();
     for (const n of names) {
       const s = Files.closedName(n);
       if (!s) continue;
       closed.add(s);
-      if (!this.closedHeads[s]) {
+      let h = known[s];
+      if (!h) {
         try {
-          const h = R.verifyChain(this.io.readGz(path.join(this.dir, n))).last;
-          if (h) { this.closedHeads[s] = h; learnt = true; }
+          const v = R.verifyChain(this.io.readGz(path.join(dir, n)));
+          h = v.last;
+          if (h && v.ok) { known[s] = h; learnt = true; }
         } catch (err) { this.log('proof', err); }
       }
-      if (this.closedHeads[s]) out.set(s, this.closedHeads[s]);
+      if (h) out.set(s, h);
     }
     for (const n of names) {
       if (!Files.SESSION.test(n) || closed.has(n)) continue;
       try {
-        const text = R.joinParts(await Files.readParts(this.io, path.join(this.dir, n))).text;
+        const text = R.joinParts(await Files.readParts(this.io, path.join(dir, n))).text;
         const h = text && R.verifyChain(text).last;
         if (h) out.set(n, h);
       } catch (err) { if (err.code !== 'ENOENT') this.log('proof', err); }
     }
-    if (learnt && this.cacheFile) {
-      try { this.put(this.cacheFile, JSON.stringify(this.closedHeads)); } catch (err) { this.log('proof cache', err); }
-    }
+    return learnt;
+  }
+
+  // This device's sessions' heads
+  async heads() {
+    const out = new Map();
+    if (await this.headsIn(this.dir, this.knownHeads(this.device), out)) this.keepHeads();
     return out;
   }
 
-  // A seal of whatever changed since the last one; null when nothing did,
-  // unless `force` (a yearly renewal, which seals the stamps alone)
-  async seal({ force = false } = {}) {
+  devices() {
+    try { return fs.readdirSync(this.root).filter((d) => Files.DEVICE.test(d)).sort(); } catch { return []; }
+  }
+
+  // What every device's seals name: `heads`, device -> Set of 'session h'
+  // (by its own seals' heads and anyone's others), and `sealing`, the
+  // devices with seals of their own. A seal is written once, so each is read
+  // once; one that doesn't read yet (still arriving) is read next time.
+  sealsNamed() {
+    const n = this.named || (this.named = { read: new Set(), heads: new Map(), sealing: new Set() });
+    const add = (device, heads) => {
+      let set = n.heads.get(device);
+      if (!set) n.heads.set(device, set = new Set());
+      for (const [s, h] of Object.entries(heads || {})) set.add(s + ' ' + h);
+    };
+    for (const d of this.devices()) {
+      let files = [];
+      try { files = fs.readdirSync(path.join(this.root, d, 'seals')); } catch { continue; }
+      for (const f of files) {
+        if (!SEAL.test(f) || n.read.has(d + '/' + f)) continue;
+        let body;
+        try { body = JSON.parse(fs.readFileSync(path.join(this.root, d, 'seals', f))); } catch { continue; }
+        if (!body || typeof body !== 'object') continue;
+        n.read.add(d + '/' + f);
+        n.sealing.add(d);
+        add(d, body.heads);
+        for (const [dev, heads] of Object.entries(body.others || {})) add(dev, heads);
+      }
+    }
+    return n;
+  }
+
+  // The heads of other devices' sessions that no seal names yet:
+  // { <device>: { <session>: h } }. Only of devices that seal nothing
+  // themselves (Pocket; a computer recording without timestamps): one that
+  // seals its own does so once its writing stops, and sealing it here too
+  // would only ask the authorities twice.
+  async others() {
+    const named = this.sealsNamed();
+    const out = {};
+    let learnt = false;
+    for (const d of this.devices()) {
+      if (d === this.device || named.sealing.has(d)) continue;
+      const heads = new Map();
+      if (await this.headsIn(path.join(this.root, d), this.knownHeads(d), heads)) learnt = true;
+      const done = named.heads.get(d) || new Set();
+      const changed = {};
+      for (const [s, h] of heads) if (!done.has(s + ' ' + h)) changed[s] = h;
+      if (Object.keys(changed).length) out[d] = changed;
+    }
+    if (learnt) this.keepHeads();
+    return out;
+  }
+
+  // A seal of whatever changed since the last one, here and on the devices
+  // that seal nothing themselves; null when nothing did, unless `force` (a
+  // yearly renewal, which seals the stamps alone). `ifOthers`: only if
+  // another device's sessions want sealing (a book looked at while nothing
+  // is written here).
+  async seal({ force = false, ifOthers = false } = {}) {
     const st = this.load();
     const changed = {};
     for (const [s, h] of await this.heads()) if (st.sealed.get(s) !== h) changed[s] = h;
-    if (!Object.keys(changed).length && !force) return null;
+    const others = await this.others();
+    const anyOthers = Object.keys(others).length > 0;
+    if (!force && !anyOthers && (ifOthers || !Object.keys(changed).length)) return null;
     const tokens = {};
     for (const f of this.files()) {
       if (TOKEN.test(f) && !st.covered.has(f)) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
@@ -609,6 +696,7 @@ class Sealer {
       publicKey: this.key.publicKey,
       after: after.length ? after : undefined,
       heads: changed,
+      others: anyOthers ? others : undefined,
       tokens: Object.keys(tokens).length ? tokens : undefined,
       prev: prev ? prev.hash : null
     };
@@ -708,9 +796,10 @@ class Sealer {
 // One device's seals checked: each one's signature, its place in the chain,
 // its stamps, its `after`, and the stamps it says it covers. `sessions`
 // maps a session to the `h` hashes its chain holds (chainHashes), to check
-// the heads; `online` asks drand too.
-// { device, publicKey, seals: [{ seq, at, ok, by, after, stamps, problems }], problems }
-async function verifyDevice(dir, { sessions = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
+// the heads; `others` maps each other device to its sessions' the same way,
+// to check the heads the seal holds for them; `online` asks drand too.
+// { device, publicKey, seals: [{ seq, at, ok, by, after, heads, others, stamps, problems }], problems }
+async function verifyDevice(dir, { sessions = null, others = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
   const sealsDir = path.join(dir, 'seals');
   let files = [];
   try { files = fs.readdirSync(sealsDir).sort(); } catch { /* none */ }
@@ -737,6 +826,7 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
     try { bytes = fs.readFileSync(path.join(sealsDir, f)); body = JSON.parse(bytes); } catch { bad('it can’t be read'); prevHash = null; continue; }
     s.at = Date.parse(body.at);
     s.heads = body.heads || {};
+    s.others = body.others || {};
     if (body.neoSeal !== 1) bad('it is in a format this NEO doesn’t know');
     if (body.seq !== s.seq) bad('its number isn’t its file’s');
     if (body.seq !== out.seals.length) bad('seals before it are missing');
@@ -754,6 +844,16 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
         const known = sessions.get(session);
         if (!known) bad('session ' + session + ' isn’t in the recording');
         else if (!known.has(h)) bad('session ' + session + ' doesn’t hold what it seals');
+      }
+    }
+    if (others) {
+      for (const [device, heads] of Object.entries(body.others || {})) {
+        const held = others.get(device);
+        for (const [session, h] of Object.entries(heads || {})) {
+          const known = held && held.get(session);
+          if (!known) bad('session ' + session + ' of ' + device + ' isn’t in the recording');
+          else if (!known.has(h)) bad('session ' + session + ' of ' + device + ' doesn’t hold what it seals');
+        }
       }
     }
     for (const [t, hash] of Object.entries(body.tokens || {})) {
@@ -808,7 +908,8 @@ async function verifyDevice(dir, { sessions = null, online = false, fetch: fetch
 
 // The time cover of one device's sessions: when each was first timestamped
 // in part (a seal over the session while it was open) and when as a whole
-// (a seal naming its last `h`), from the seals verifyDevice checked.
+// (a seal naming its last `h`), from the seals verifyDevice checked, in any
+// order (R.sealsOver: its own, and other devices' that sealed it).
 // Sessions are { id, open, last (its last h), from, to }. A closed session
 // with no whole stamp, or one stamped more than a day after it ended, is a
 // gap: [{ session, from, to, firstStamped, wholeBy, gap: 'never' | 'late' }]
@@ -819,8 +920,8 @@ function timeCover(sessions, seals) {
     const when = s.by !== null ? s.by : s.byLater || null;
     for (const [id, h] of Object.entries(s.heads || {})) {
       const was = bySession.get(id) || { first: null, whole: null };
-      if (was.first === null && when) was.first = when;
-      if (was.whole === null && s.ok && when && h === (sessions.find((x) => x.id === id) || {}).last) was.whole = when;
+      if (when && (was.first === null || when < was.first)) was.first = when;
+      if (s.ok && when && (was.whole === null || when < was.whole) && h === (sessions.find((x) => x.id === id) || {}).last) was.whole = when;
       bySession.set(id, was);
     }
   }

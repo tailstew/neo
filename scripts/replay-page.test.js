@@ -175,3 +175,54 @@ test('the page places each timestamp where NEO’s own player does, and finds th
   assert.ok(tags.length >= 1);
   assert.deepEqual(tags.map((t) => [t.id, t.label, t.at, t.day]), R.tagsOf(stats).map((t) => [t.id, t.label, t.at, t.day]));
 });
+
+test('a phone’s sessions sealed by a computer: NEO, the page and verify-recording all count them covered', async () => {
+  const { verifyBook } = require('./verify-recording.js');
+  const PHONE = 'd-00000000000000aa';
+  const LAPTOP = 'd-00000000000000bb';
+  const book = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-phone-'));
+  const root = path.join(book, 'recording');
+  fs.cpSync(path.join(FIX, 'recording'), root, { recursive: true });
+  // the phone wrote what the fixture's computer wrote, and seals nothing
+  fs.mkdirSync(path.join(root, PHONE));
+  for (const f of fs.readdirSync(path.join(root, DEV))) if (f.endsWith('.jsonl.gz')) fs.copyFileSync(path.join(root, DEV, f), path.join(root, PHONE, f));
+  // a laptop with nothing of its own seals the phone's (and not the fixture
+  // computer's, which seals its own); no stamps, so nothing is fixed by them
+  const round = { round: 33000000, signature: 'ab'.repeat(48) };
+  round.randomness = crypto.createHash('sha256').update(Buffer.from(round.signature, 'hex')).digest('hex');
+  const sealer = new P.Sealer({
+    dir: path.join(root, LAPTOP), book: 'book-x', device: LAPTOP, key: P.keyOf(P.newKey()), now: () => new Date('2026-11-01T10:00:00Z'),
+    fetch: async () => ({ ok: true, status: 200, json: async () => round }), tsas: [],
+    write: (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data); }
+  });
+  const seal = await sealer.seal({ ifOthers: true });
+  assert.deepEqual(Object.keys(seal.others), [PHONE]);
+  assert.deepEqual(seal.heads, {});
+
+  const opts = { key: 'phone-' + Math.random(), root, cache: fs.mkdtempSync(path.join(os.tmpdir(), 'neo-replay-')) };
+  const r = await handle({ ...opts, type: 'evidence', texts: true }, () => {});
+  const phone = r.cover.find((d) => d.device === PHONE);
+  assert.equal(phone.seals, 0);
+  assert.equal(phone.cover.length, 3);
+  assert.equal(r.cover.find((d) => d.device === LAPTOP).bad, 0);
+  // the page's checks agree, and its timestamps' track is NEO's
+  const seals = { [DEV]: Export.sealFiles(path.join(root, DEV, 'seals')), [LAPTOP]: Export.sealFiles(path.join(root, LAPTOP, 'seals')) };
+  const data = dataOf(Export.build({ title: 'B', evidence: r.evidence, sessions: r.texts, seals }));
+  const sessions = await Page.loadSessions(data);
+  const res = await Page.runChecks({ sessions, partial: false, seals: data.seals, evidence: data.evidence });
+  for (const d of [DEV, LAPTOP]) assert.ok(res.seals[d].seals.every((s) => s.ok), d + ': ' + res.seals[d].seals.flatMap((s) => s.problems).join('; '));
+  const neo = await handle({ ...opts, type: 'stamps', sessions: r.texts.map((s) => ({ id: s.id, device: s.device, open: s.open })) }, () => {});
+  assert.deepEqual(Page.stampsOf(sessions, res.seals), neo);
+  assert.ok(Object.keys(neo).filter((k) => k.startsWith(PHONE + '/')).every((k) => neo[k].length === 1));
+  // verify-recording: the phone sealed by the laptop
+  const v = await verifyBook(book);
+  assert.equal(v.ok, true, JSON.stringify(v.devices.map((d) => d.problems)));
+  assert.deepEqual(v.devices.find((d) => d.device === PHONE).sealedBy, [LAPTOP]);
+  // a phone session changed after it was sealed: the laptop's seal fails
+  const zlib = require('node:zlib');
+  const first = fs.readdirSync(path.join(root, PHONE)).sort()[0];
+  const text = zlib.gunzipSync(fs.readFileSync(path.join(root, PHONE, first))).toString();
+  fs.writeFileSync(path.join(root, PHONE, first), zlib.gzipSync(text.replace(/"h",(\d+),"./, '"h",$1,"~')));
+  const bad = await verifyBook(book, { mirror: path.join(book, 'no-mirror') });
+  assert.ok(bad.devices.find((d) => d.device === LAPTOP).problems.some((p) => p.includes('of ' + PHONE)));
+});

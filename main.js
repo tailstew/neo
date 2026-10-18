@@ -889,10 +889,12 @@ ipcMain.handle('rec:start', async (_e, bookId, proof) => {
   return { device, app: app.getVersion(), ...r };
 });
 
+// This computer's folder in a book's recording/, made the first time
+const recPrepare = (bookId) => RecFiles.prepare(recIO, recRoot(bookId), libName(recDevice()), recReadme(),
+  { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
+
 ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
-  const device = recDevice();
-  const dir = await RecFiles.prepare(recIO, recRoot(bookId), libName(device), recReadme(),
-    { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
+  const dir = await recPrepare(bookId);
   await RecFiles.chunk(recIO, dir, recSession(session), first, text);
   proofWrote(bookId, text);
   return true;
@@ -1119,13 +1121,31 @@ function proofSetFlags(f) {
   if (!f || typeof f !== 'object') return;
   proofOn = !!f.on;
   if ('tsas' in f) proofServicesUse(Array.isArray(f.tsas) ? f.tsas : null);
-  // stamps that failed (offline) are asked for again every half hour
+  // stamps that failed (offline) are asked for again every half hour, and
+  // another device's sessions that reached a book since are sealed
   if (proofOn && !proofTimer) {
     proofTimer = setInterval(() => {
       if (!proofOn) return;
-      for (const bookId of proofSealers.keys()) proofRun(bookId, 'retry');
+      for (const bookId of new Set([...proofSealers.keys(), ...proofOthers()])) proofRun(bookId, 'retry');
     }, 30 * 60 * 1000);
   }
+}
+
+// The books whose recording holds another device's folder: what Pocket
+// writes reaches this computer by sync, and is sealed here, open or not
+// (Pocket seals nothing itself)
+function proofOthers() {
+  const out = [];
+  let names = [];
+  try { names = fs.readdirSync(LIBRARY_DIR); } catch { return out; }
+  const me = recDevice();
+  for (const name of names) {
+    if (!name.startsWith('book-')) continue;
+    try {
+      if (fs.readdirSync(path.join(LIBRARY_DIR, name, 'recording')).some((d) => RecFiles.DEVICE.test(d) && d !== me)) out.push(name);
+    } catch { /* no recording */ }
+  }
+  return out;
 }
 
 // This computer's signing key, Ed25519, made the first time it seals and
@@ -1266,8 +1286,9 @@ ipcMain.handle('proof:serviceRemove', (_e, id) => {
 
 // A book's seals, one call at a time: `words` seals what changed if words
 // were written since the last seal (proofWrote), `now` whatever changed,
-// `start` renews a seal nearly a year old; then each asks for the stamps
-// the newest seal lacks (`retry` only that). Resolves to the seal made, or
+// `start` renews a seal nearly a year old; `start` and `retry` seal
+// another device's sessions no seal names yet (Sealer.others); then each
+// asks for the stamps the newest seal lacks. Resolves to the seal made, or
 // null.
 function proofRun(bookId, how) {
   if (!proofOn) return Promise.resolve(null);
@@ -1279,10 +1300,14 @@ function proofRun(bookId, how) {
   if (w && (how === 'words' || how === 'now')) { clearTimeout(w.timer); proofWords.delete(bookId); }
   const job = p.queue.then(async () => {
     let made = null;
-    if (how === 'start') { if (s.renewDue()) made = await s.seal({ force: true }); }
-    else if (how !== 'retry') made = await s.seal();
-    await s.stamp();
-    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
+    if (how === 'start' || how === 'retry') made = await s.seal({ force: how === 'start' && s.renewDue(), ifOthers: true });
+    else made = await s.seal();
+    // (a book never written on here gets this computer's folder now)
+    if (made) await recPrepare(bookId);
+    const stamped = await s.stamp();
+    if (how !== 'retry' || made || stamped.length) {
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
+    }
     return made;
   }).catch((err) => { logError('proof', err); return null; });
   p.queue = job;

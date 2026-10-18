@@ -318,7 +318,155 @@ test('the heads of closed sessions are remembered outside the library', async ()
   const cacheFile = path.join(tmp(), 'cache', 'heads.json');
   await sealer(dir, network(), { cacheFile }).seal();
   const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-  assert.deepEqual(Object.keys(cached).sort(), ['2026-10-06T09-14-03Z-k3f9', '2026-10-07T20-01-44Z-q7m2']);
+  assert.deepEqual(Object.keys(cached.devices[DEV]).sort(), ['2026-10-06T09-14-03Z-k3f9', '2026-10-07T20-01-44Z-q7m2']);
+  // an older NEO's cache, this device's heads alone, is read as this device's
+  fs.writeFileSync(cacheFile, JSON.stringify(cached.devices[DEV]));
+  const s = sealer(dir, network(), { cacheFile });
+  assert.deepEqual(s.knownHeads(DEV), cached.devices[DEV]);
+});
+
+/* ---------- another device's sessions ---------- */
+
+const PHONE = 'd-00000000000000aa';
+const LAPTOP = 'd-00000000000000bb';
+
+// a book's recording/ with this computer's folder (deviceFolder's) and a
+// phone's, which seals nothing: one closed session and one open
+function withPhone() {
+  const f = deviceFolder();
+  const phone = path.join(path.dirname(f.dir), PHONE);
+  const src = path.join(__dirname, 'fixtures', 'recording-v1');
+  const [a, , c] = fs.readdirSync(src).sort();
+  put(path.join(phone, a + '.gz'), zlib.gzipSync(fs.readFileSync(path.join(src, a))));
+  const raw = R.splitLines(fs.readFileSync(path.join(src, c), 'utf8')).lines;
+  const firstH = raw.findIndex((l) => l.includes('"h"'));
+  const open = path.join(phone, c.slice(0, -6));
+  put(path.join(open, 'c-000001.jsonl'), raw.slice(0, firstH + 1).map((l) => l + '\n').join(''));
+  return { ...f, phone, phoneOpen: open, phoneRest: raw.slice(firstH + 1), closedPhone: a.slice(0, -6) };
+}
+const nextChunk = (open, rest) => {
+  const n = R.splitLines(fs.readFileSync(path.join(open, 'c-000001.jsonl'), 'utf8')).lines.length;
+  put(path.join(open, `c-${String(n + 1).padStart(6, '0')}.jsonl`), rest.map((l) => l + '\n').join(''));
+};
+
+test('a seal holds a phone’s sessions as `others`, each head once, and signs them', async () => {
+  const { dir, phone, phoneOpen, phoneRest, closedPhone } = withPhone();
+  const s = sealer(dir, network());
+  const first = await s.seal();
+  assert.deepEqual(Object.keys(first.others), [PHONE]);
+  assert.deepEqual(Object.keys(first.others[PHONE]).sort(), [closedPhone, path.basename(phoneOpen)].sort());
+  assert.equal(first.others[PHONE][closedPhone], R.verifyChain(zlib.gunzipSync(fs.readFileSync(path.join(phone, closedPhone + '.jsonl.gz'))).toString()).last);
+  const { sig, ...signed } = JSON.parse(fs.readFileSync(path.join(dir, 'seals', '000001.json')));
+  assert.equal(P.verifySignature(first.publicKey, signed, sig), true);
+  // nothing new anywhere: no seal, and none for the phone alone either
+  assert.equal(await s.seal(), null);
+  assert.equal(await s.seal({ ifOthers: true }), null);
+  // the phone writes on, and its chunk arrives: sealed though nothing was written here
+  nextChunk(phoneOpen, phoneRest);
+  const second = await s.seal({ ifOthers: true });
+  assert.deepEqual(second.heads, {});
+  assert.deepEqual(Object.keys(second.others[PHONE]), [path.basename(phoneOpen)]);
+  // another NEO on this computer, started again, reads the seals and agrees
+  assert.equal(await sealer(dir, network()).seal({ ifOthers: true }), null);
+});
+
+test('writing here alone is no reason to seal with ifOthers; a phone head another computer sealed isn’t sealed again', async () => {
+  const { dir, open, rest, phoneOpen, phoneRest } = withPhone();
+  // a laptop sealed the phone's sessions first
+  const laptop = path.join(path.dirname(dir), LAPTOP);
+  fs.mkdirSync(laptop);
+  const l = sealer(laptop, network());
+  l.device = LAPTOP;
+  const theirs = await l.seal();
+  // (this computer's too: it hadn't sealed yet)
+  assert.deepEqual(Object.keys(theirs.others), [PHONE, DEV]);
+  // here: this computer's own sessions, and nothing of the phone's or the laptop's (it seals its own)
+  const s = sealer(dir, network());
+  const mine = await s.seal();
+  assert.equal(mine.others, undefined);
+  assert.equal(Object.keys(mine.heads).length, 3);
+  // written here: ifOthers still makes no seal
+  nextChunk(open, rest);
+  assert.equal(await s.seal({ ifOthers: true }), null);
+  // the phone again: then here, with this computer's words too
+  nextChunk(phoneOpen, phoneRest);
+  const next = await s.seal({ ifOthers: true });
+  assert.deepEqual(Object.keys(next.others[PHONE]), [path.basename(phoneOpen)]);
+  assert.deepEqual(Object.keys(next.heads), [path.basename(open)]);
+});
+
+test('a phone session still arriving isn’t remembered as closed, and an unreadable seal is read again', async () => {
+  const { dir, phone, closedPhone } = withPhone();
+  const file = path.join(phone, closedPhone + '.jsonl.gz');
+  const whole = fs.readFileSync(file);
+  const text = zlib.gunzipSync(whole).toString();
+  const lines = R.splitLines(text).lines;
+  // half of it: its chain doesn't verify whole
+  fs.writeFileSync(file, zlib.gzipSync(lines.slice(0, Math.floor(lines.length / 2)).map((x) => x + '\n').join('')));
+  const s = sealer(dir, network());
+  await s.seal();
+  assert.equal(s.knownHeads(PHONE)[closedPhone], undefined);
+  fs.writeFileSync(file, whole);
+  const next = await s.seal({ ifOthers: true });
+  assert.equal(next.others[PHONE][closedPhone], R.verifyChain(text).last);
+  assert.equal(s.knownHeads(PHONE)[closedPhone], R.verifyChain(text).last);
+
+  // a laptop's seal half synced: not read, so not taken for a sealing device, till it reads
+  const laptopSeals = path.join(path.dirname(dir), LAPTOP, 'seals');
+  put(path.join(laptopSeals, '000001.json'), '{"neoSeal":1,"he');
+  assert.ok(!s.sealsNamed().sealing.has(LAPTOP));
+  fs.writeFileSync(path.join(laptopSeals, '000001.json'), JSON.stringify({ neoSeal: 1, seq: 1, heads: {} }));
+  assert.ok(s.sealsNamed().sealing.has(LAPTOP));
+});
+
+test('a seal’s `others` are checked against the phone’s sessions, and cover them in time', async () => {
+  const { dir, phone, closedPhone, phoneOpen } = withPhone();
+  const s = sealer(dir, network({ tsa: { one: 'up' } }));
+  await s.seal();
+  const hashesIn = (d) => {
+    const m = hashesOf(d);
+    for (const n of fs.readdirSync(d)) {
+      if (!/^\d{4}-.*Z-[a-z0-9]+$/.test(n)) continue;
+      m.set(n, P.chainHashes(R.joinParts([{ name: 'c-000001.jsonl', text: fs.readFileSync(path.join(d, n, 'c-000001.jsonl'), 'utf8') }]).text));
+    }
+    return m;
+  };
+  const others = new Map([[DEV, hashesIn(dir)], [PHONE, hashesIn(phone)]]);
+  let v = await P.verifyDevice(dir, { sessions: others.get(DEV), others });
+  assert.equal(v.seals[0].ok, true, v.seals[0].problems.join('; '));
+  assert.deepEqual(Object.keys(v.seals[0].others), [PHONE]);
+  // the phone's copy isn't what was sealed
+  const wrong = new Map([...others, [PHONE, new Map([...others.get(PHONE)].map(([id, hs]) => [id, id === closedPhone ? new Set(['x']) : hs]))]]);
+  v = await P.verifyDevice(dir, { sessions: others.get(DEV), others: wrong });
+  assert.deepEqual(v.seals[0].problems, [`session ${closedPhone} of ${PHONE} doesn’t hold what it seals`]);
+  // missing altogether
+  v = await P.verifyDevice(dir, { sessions: others.get(DEV), others: new Map([[DEV, others.get(DEV)]]) });
+  assert.equal(v.seals[0].ok, false);
+
+  // the time cover of the phone's sessions comes from this computer's seal
+  v = await P.verifyDevice(dir, { sessions: others.get(DEV), others });
+  v.seals[0].by = Date.parse('2026-11-01T10:00:05Z');
+  const over = R.sealsOver(PHONE, { [DEV]: v });
+  assert.equal(over.length, 1);
+  assert.equal(over[0].sealedBy, DEV);
+  const last = R.verifyChain(zlib.gunzipSync(fs.readFileSync(path.join(phone, closedPhone + '.jsonl.gz'))).toString()).last;
+  const cover = P.timeCover([{ id: closedPhone, open: false, last, from: 0, to: Date.parse('2026-11-01T09:00:00Z') }, { id: path.basename(phoneOpen), open: true, last: 'later', from: 0, to: null }], over);
+  assert.equal(cover[0].wholeBy, v.seals[0].by);
+  assert.equal(cover[0].gap, undefined);
+  assert.equal(cover[1].firstStamped, v.seals[0].by);
+  assert.equal(R.sealsOver(DEV, { [DEV]: v })[0].heads, v.seals[0].heads);
+});
+
+test('the time cover takes the earliest seal, whatever order the seals come in', () => {
+  const sessions = [{ id: 's', open: false, last: 'h2', from: 0, to: 1000 }];
+  const seals = [
+    { ok: true, by: 5000, heads: { s: 'h2' } },
+    { ok: true, by: 2000, heads: { s: 'h2' } },
+    { ok: true, by: 1500, heads: { s: 'h1' } }
+  ];
+  const [c] = P.timeCover(sessions, seals);
+  assert.equal(c.wholeBy, 2000);
+  assert.equal(c.firstStamped, 1500);
 });
 
 /* ---------- drand ---------- */

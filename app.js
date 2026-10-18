@@ -3953,16 +3953,19 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
     (r.untrusted ? ' ' + t('Keys sent by a program, not a keyboard: {n}.', { n: n(r.untrusted) }) : ''));
   row(t('Not recorded'), t('Words there before NEO started recording: {before}. Words that came while NEO wasn’t recording: {outside}. Neither is counted above.', { before: n(r.before), outside: n(r.outside) }));
   // the time cover: how much of the writing is fixed in time
-  if (!cover || !cover.length) {
+  // (a device that seals nothing itself, Pocket, is in it with no seals:
+  // only its sessions count, covered by another device's seals)
+  const sealing = (cover || []).filter((d) => d.seals);
+  if (!sealing.length) {
     row(t('Timestamps'), t('None: timestamping wasn’t turned on, so nothing fixes this history in time.'));
   } else {
     const typedIn = new Map(ev.sessions.map((s) => [s.device + '/' + s.id, s]));
     const all = cover.flatMap((d) => d.cover.map((c) => ({ ...c, device: d.device })));
     const late = all.filter((c) => c.gap && (typedIn.get(c.device + '/' + c.session) || {}).typed);
-    const stamps = [...new Set(cover.flatMap((d) => d.stamps))];
-    const count = cover.reduce((a, d) => a + d.seals, 0);
-    const first = Math.min(...cover.map((d) => d.first));
-    const last = Math.max(...cover.map((d) => d.last));
+    const stamps = [...new Set(sealing.flatMap((d) => d.stamps))];
+    const count = sealing.reduce((a, d) => a + d.seals, 0);
+    const first = Math.min(...sealing.map((d) => d.first));
+    const last = Math.max(...sealing.map((d) => d.last));
     let text = count > 1
       ? t('{n} timestamps, the first {first} and the last {last}: one every {gap} on average between them.', { n: n(count), first: moment(first), last: moment(last), gap: span((last - first) / (count - 1)) })
       : t('One timestamp, {when}.', { when: moment(first) });

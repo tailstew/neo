@@ -158,10 +158,11 @@
 
   // One device's seals ([{ name, b64 }]): each signature (Ed25519, with
   // WebCrypto), its place in the chain, the sessions it seals (`sessions`,
-  // id -> its h hashes), the stamps it covers, its drand round, and its
-  // timestamp tokens: that each stamps this seal's SHA-256, and when. A
-  // token's own signature isn't checked here: openssl does that (below).
-  async function checkSeals(files, sessions) {
+  // id -> its h hashes, and `others`, each other device -> its sessions the
+  // same way), the stamps it covers, its drand round, and its timestamp
+  // tokens: that each stamps this seal's SHA-256, and when. A token's own
+  // signature isn't checked here: openssl does that (below).
+  async function checkSeals(files, sessions, others = new Map()) {
     const byName = new Map(files.map((f) => [f.name, fromB64(f.b64)]));
     const out = { key: null, seals: [], ed25519: true };
     let prev = null;
@@ -178,6 +179,7 @@
       try { body = JSON.parse(new TextDecoder().decode(bytes)); } catch { bad(T('it can’t be read')); prev = null; continue; }
       s.at = Date.parse(body.at);
       s.heads = body.heads || {};
+      s.others = body.others || {};
       if (body.seq !== seq || seq !== out.seals.length) bad(T('seals before it are missing'));
       const { sig, ...signed } = body;
       if (out.key === null) out.key = body.publicKey;
@@ -192,10 +194,13 @@
       if ((body.prev || null) !== (out.seals.length > 1 ? prev : null)) bad(T('it doesn’t name the seal before it'));
       const digest = await sha256(bytes);
       prev = hex(digest);
-      for (const [id, h] of Object.entries(body.heads || {})) {
-        const held = sessions.get(id);
-        if (!held) bad(T('a session it seals isn’t on this page'));
-        else if (!held.has(h)) bad(T('a session it seals isn’t what it sealed'));
+      const sealed = [[sessions, body.heads], ...Object.entries(body.others || {}).map(([d, hs]) => [others.get(d) || new Map(), hs])];
+      for (const [mine, hs] of sealed) {
+        for (const [id, h] of Object.entries(hs || {})) {
+          const held = mine.get(id);
+          if (!held) bad(T('a session it seals isn’t on this page'));
+          else if (!held.has(h)) bad(T('a session it seals isn’t what it sealed'));
+        }
       }
       for (const [name, want] of Object.entries(body.tokens || {})) {
         const t = byName.get(name);
@@ -353,20 +358,21 @@
   }
 
   // The lines each session's timestamps reach (as NEO's own player has
-  // them): { 'device/id': [{ n, by }] }, from the seals checked here; null
-  // when nothing was sealed
+  // them): { 'device/id': [{ n, by }] }, from the seals checked here, its
+  // device's and another's that sealed it (Rec.sealsOver); null when nothing
+  // was sealed
   function stampsOf(sessions, sealsChecked) {
     const devices = Object.keys(sealsChecked || {});
     if (!devices.length) return null;
     const out = {};
     for (const s of sessions) {
-      const r = sealsChecked[s.device];
-      if (!r) continue;
+      const seals = Rec.sealsOver(s.device, sealsChecked);
+      if (!seals.length && !sealsChecked[s.device]) continue;
       const lineOf = new Map();
       for (const m of s.text.matchAll(/^\[0,"h",(\d+),"([A-Za-z0-9_-]+)"\]$/gm)) lineOf.set(m[2], +m[1]);
       const list = [];
-      for (const seal of r.seals) {
-        const h = seal.heads && seal.heads[s.id];
+      for (const seal of seals) {
+        const h = seal.heads[s.id];
         if (!h || !lineOf.has(h)) continue;
         list.push({ n: lineOf.get(h), by: seal.ok ? (seal.by !== null ? seal.by : seal.byLater || null) : null });
       }
@@ -1131,9 +1137,14 @@
     const replays = await checkReplay(sessions, step);
     const out = { chains, replays, seals: {}, evidence: null };
     if (!partial) {
+      const byDevice = new Map();
+      for (const s of sessions) {
+        if (!byDevice.has(s.device)) byDevice.set(s.device, new Map());
+        byDevice.get(s.device).set(s.id, heads(s.text));
+      }
       for (const [d, files] of Object.entries(seals || {})) {
         if (!files.length) continue;
-        out.seals[d] = await checkSeals(files, new Map(sessions.filter((s) => s.device === d).map((s) => [s.id, heads(s.text)])));
+        out.seals[d] = await checkSeals(files, byDevice.get(d) || new Map(), byDevice);
       }
     }
     done = sessions.length * 2;

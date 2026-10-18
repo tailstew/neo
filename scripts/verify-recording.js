@@ -8,7 +8,7 @@
 // For each device: every session's hash chain, and the sessions chained to
 // each other; that replaying them hashes to every chapter write they record
 // (replayCheck); each seal's signature, its place in the seals' chain, the
-// sessions it seals, its stamps (RFC 3161 tokens checked against the roots
+// sessions it seals (another device's too, for one that seals nothing), its stamps (RFC 3161 tokens checked against the roots
 // in proof-roots.pem, and the roots of services the writer added that are
 // in Mozilla's list) and its `after`; then the time cover: when each
 // session was sealed, and every one that went more than a day unsealed.
@@ -42,12 +42,16 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
   }
   const io = Files.nodeIO({ fs, path, zlib, write: () => { throw new Error('read only'); }, log: () => {} });
   const report = { book: path.basename(bookDir), ok: true, devices: [] };
+  // each device's sessions' h hashes, for the seals of every device: a
+  // computer's seal can hold another device's sessions (others)
+  const allHashes = new Map();
   for (const dev of await Files.list(io, root, null, mirror)) {
     const dir = path.join(root, dev.device);
     const d = { device: dev.device, name: dev.name, sessions: [], replay: null, seals: null, cover: [], problems: [] };
     report.devices.push(d);
     const texts = [];
     const hashes = new Map();
+    allHashes.set(dev.device, hashes);
     let prevLast;
     for (const s of dev.sessions) {
       const r = await Files.read(io, dir, s.id, mirror && path.join(mirror, dev.device));
@@ -69,14 +73,24 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
     d.replay = { writes: rc.writes, bad: rc.bad.length, problems: rc.problems.length };
     if (rc.bad.length) d.problems.push(`${rc.bad.length} of ${rc.writes} chapter writes don’t replay to what was written`);
     if (rc.problems.length) d.problems.push(`${rc.problems.length} places the replay couldn’t follow (${[...new Set(rc.problems.map((p) => p.reason))].join(', ')})`);
+  }
 
-    // seals
-    const sealsDir = path.join(dir, 'seals');
-    if (fs.existsSync(sealsDir)) {
-      d.seals = await P.verifyDevice(dir, { sessions: hashes, online });
-      for (const s of d.seals.seals) if (!s.ok) d.problems.push(`seal ${s.seq}: ${s.problems.join('; ')}`);
-      // time cover: the first seal over each session's last line
-      d.cover = P.timeCover(d.sessions, d.seals.seals).map((c) => (c.gap
+  // seals
+  const checked = {};
+  for (const d of report.devices) {
+    const dir = path.join(root, d.device);
+    if (!fs.existsSync(path.join(dir, 'seals'))) continue;
+    d.seals = await P.verifyDevice(dir, { sessions: allHashes.get(d.device), others: allHashes, online });
+    for (const s of d.seals.seals) if (!s.ok) d.problems.push(`seal ${s.seq}: ${s.problems.join('; ')}`);
+    checked[d.device] = d.seals;
+  }
+  // time cover: the first seal over each session's last line, its device's
+  // or another's that sealed it
+  for (const d of report.devices) {
+    const seals = R.sealsOver(d.device, checked);
+    if (seals.length || d.seals) {
+      d.sealedBy = [...new Set(seals.map((s) => s.sealedBy).filter((x) => x !== d.device))];
+      d.cover = P.timeCover(d.sessions, seals).map((c) => (c.gap
         ? { ...c, gap: c.gap === 'never' ? 'never timestamped' : 'timestamped later, on ' + iso(c.wholeBy).slice(0, 10) } : c));
     }
     if (d.problems.length) report.ok = false;
@@ -98,11 +112,14 @@ function print(r) {
         const who = s.stamps.filter((x) => x.ok).map((x) => `${x.tsa} ${iso(x.genTime)}${x.trusted ? '' : x.added ? ' (root added by the writer, in no public list)' : ' (untrusted)'}`).join(', ');
         out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}`);
       }
+    } else if (!d.sealedBy || !d.sealedBy.length) {
+      out.push('  No seals: proof was never turned on here, so nothing fixes this recording in time.');
+    }
+    if (d.sealedBy && d.sealedBy.length) out.push(`  Sealed by ${d.sealedBy.join(', ')} as its sessions arrived there`);
+    if (d.seals || (d.sealedBy && d.sealedBy.length)) {
       const gaps = d.cover.filter((c) => c.gap);
       out.push(gaps.length ? `  Time cover: ${gaps.length} session(s) not timestamped within a day:` : '  Time cover: every closed session timestamped within a day of its end');
       for (const c of gaps) out.push(`   ${c.session} (${iso(c.from)} to ${iso(c.to)}): ${c.gap}`);
-    } else {
-      out.push('  No seals: proof was never turned on here, so nothing fixes this recording in time.');
     }
     for (const p of d.problems) out.push('  ! ' + p);
   }

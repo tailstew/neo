@@ -132,7 +132,10 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Windows: `%APPDATA%\NEO\secrets.json` holds `proofKey` encrypted (not a readable `-----BEGIN PRIVATE KEY-----`).
 - [ ] Turn the network off for over a week of writing (or move the clock), then open the book: once NEO has tried the services again, a warning toast (amber) says your writing since … hasn't been timestamped and points to Timestamp Services…. Start typing right after opening and it doesn't appear. Online again, it doesn't come back.
 - [ ] **(2 computers)** Proof on (it's a library setting, so on for both): each computer seals its own folder with its own key, and verify-recording checks both.
-- [ ] **(phone)** The phone doesn't offer proof and writes no seals; its sessions are checked as unsealed.
+- [ ] **(phone)** The phone doesn't offer proof and writes no seals of its own.
+- [ ] **(phone)** With proof on on the desktop, write on the phone and let it sync, with the book not open on the desktop: within half an hour a new seal is in the desktop's `recording/<id>/seals/`, with the phone's sessions under `"others"`; the book gets the desktop's folder if it had none. Opening the book on the desktop seals them at once. Nothing new on the phone, and nothing new arrives: no seal.
+- [ ] **(phone)** How It Was Written… on that book: the Timestamps row counts the phone's sessions, and says they were timestamped within a day. In History, a day written on the phone shows "Timestamped …" and the dashes on the track. The exported page's checks pass, and `node scripts/verify-recording.js` says the phone's device was "Sealed by" the desktop.
+- [ ] **(2 computers + phone)** Both computers have proof on: only one seals a given phone head (look for it under `"others"` in one seal), and neither puts the other computer's sessions under `"others"`.
 
 ### Timestamp services…
 
