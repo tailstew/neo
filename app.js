@@ -3939,11 +3939,13 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
   bars(t('Deletions in a row'), r.runs.map((v, i) => [RUNS[i], v])));
   row(t('Revised later'), t('Times the writer went back into earlier text: {n}.', { n: n(r.returns) }) + ' ' +
     t('Typed in earlier text: {typed} characters, {share} of all typing. Deleted there: {deleted}.', { typed: n(r.inside), share: pct(r.insideShare), deleted: n(r.delInside) }));
-  row(t('Pasted'), (r.pastes
-    ? t('Pastes from outside NEO: {n}, {chars} characters, {share} of the text now.', { n: n(r.pastes), chars: n(r.pasted), share: pct(r.pastedShare) }) +
-      (r.soon ? ' ' + t('Of those, within ten seconds of coming back to NEO from another app: {n}, {chars} characters.', { n: n(r.soon), chars: n(r.soonPasted) }) : '')
-    : t('Nothing was pasted from outside NEO.')) +
-    (r.own ? ' ' + t('Pastes of text copied inside NEO: {n}.', { n: n(r.own) }) : ''));
+  // characters, not how many pastes: "1, 43 characters" reads as 1,043
+  row(t('Pasted'), r.pastes
+    ? t('Pasted from outside NEO: {chars} characters, {share} of the text now.', { chars: n(r.pasted), share: pct(r.pastedShare) }) +
+      (r.soon ? ' ' + t('Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.', { chars: n(r.soonPasted) }) : '')
+    : t('Nothing was pasted from outside NEO.'));
+  // a paste of text copied inside NEO moves it, and says so
+  if (r.own) row(t('Moved'), t('Text moved within the book: {chars} characters.', { chars: n(r.ownPasted) }));
   const kinds = {};
   for (const [k, v] of Object.entries(r.nokeyKinds)) { const g = EV_NOKEY[k] || 'other'; kinds[g] = (kinds[g] || 0) + v; }
   const kindList = Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([g, v]) => t(EV_NOKEY_NAMES[g]) + ': ' + n(v)).join(', ');
