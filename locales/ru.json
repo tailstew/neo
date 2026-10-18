@@ -767,7 +767,7 @@
   "Nothing recorded yet. Write in this book and its history shows here.": "Пока ничего не записано. Пишите в этой книге, и её история появится здесь.",
   "Nothing written yet at this moment.": "В этот момент ещё ничего не написано.",
   "Pasted from elsewhere ({n} characters)": "Вставлено извне (символов: {n})",
-  "Pasted from this book ({n} characters)": "Вставлено из этой книги (символов: {n})",
+  "Moved text ({n} characters)": "Перемещённый текст (символов: {n})",
   "Pause": "Пауза",
   "paused {n} h": "пауза {n} ч",
   "paused {n} min": "пауза {n} мин",

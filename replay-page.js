@@ -386,7 +386,7 @@
   // as NEO's own player: ▶▶ is this many times as fast, and a pause longer
   // than SKIP plays SKIP long (▶▶ skips it)
   const FAST = 8;
-  const SKIP = 3000;
+  const SKIP = 1500;
     // what made a change, as the timeline's markers say it (app.js, HISTORY_CAUSES)
   const CAUSES = {
     split: 'Chapter split', merge: 'Chapters joined', new: 'New chapter', delete: 'Chapter deleted',
@@ -756,8 +756,8 @@
         v += gap;
         vt[j] = v;
       }
-      total = v;
-      lead = Rec.leadSteps(h.steps, steps, vt);
+      lead = Rec.playFrom(h, steps, vt, mode || null);
+      total = steps.length ? vt[steps.length - 1] : v;
       buildMarkers();
       stampTrack();
       sheet.dataset.list = '';
@@ -785,7 +785,7 @@
         const x = vt[j];
         if (s.k === 'session') markers.push({ x, kind: 'session', step: i, label: [fmtTime(s.wall), devName(s)].filter(Boolean).join(' · ') });
         else if (s.k === 'c' && s.what === 'paste') {
-          markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', label: s.internal ? T('Pasted from this book ({n} characters)', { n: s.len }) : T('Pasted from elsewhere ({n} characters)', { n: s.len }) });
+          markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', label: s.internal ? T('Moved text ({n} characters)', { n: s.len }) : T('Pasted from elsewhere ({n} characters)', { n: s.len }) });
         } else if (s.k === 'x' && CAUSES[s.cause] && !(Rec.QUIET.has(s.cause) && !reached(j))) {
           const kind = SYNC.includes(s.cause) ? 'sync' : s.cause === 'catch-up' || s.cause === 'unobserved' ? 'catch' : s.cause === 'restore' ? 'restore' : 'move';
           markers.push({ x, kind, label: T(CAUSES[s.cause]) });

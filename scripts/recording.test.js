@@ -727,3 +727,21 @@ test('leadSteps: a player starts on the words that were there before it recorded
   // …and a chapter made new isn't text from before
   assert.equal(R.leadSteps([{ k: 'session' }, { k: 'x', cause: 'new' }, { k: 'b', cause: 'new' }], [0, 1, 2], new Float64Array(3)), 1);
 });
+
+test('playFrom: the clock starts where the chapter shown is first there', () => {
+  const steps = [
+    { k: 'session' },
+    { k: 'e', ch: 'a', cause: 'input' },
+    { k: 'x', ch: 'b', cause: 'new' },
+    { k: 'b', ch: 'b', html: '', cause: 'new' },
+    { k: 'e', ch: 'b', cause: 'input' }
+  ];
+  const h = { steps, bad: new Set(), doc: (n) => (n >= 4 ? { a: 1, b: 1 } : { a: 1 }) };
+  // the whole book: chapter a is there from the first step
+  let vt = new Float64Array([0, 0, 500, 500, 900]);
+  assert.equal(R.playFrom(h, [0, 1, 2, 3, 4], vt), 1);
+  // chapter b alone: from once it was made, which is 0 on the clock
+  vt = new Float64Array([0, 500, 500, 900]);
+  assert.equal(R.playFrom(h, [0, 2, 3, 4], vt, 'b'), 3);
+  assert.deepEqual([...vt], [0, 0, 0, 400]);
+});

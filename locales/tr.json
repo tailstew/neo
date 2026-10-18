@@ -656,7 +656,7 @@
   "Nothing recorded yet. Write in this book and its history shows here.": "Henüz hiçbir şey kaydedilmedi. Bu kitaba yazın, geçmişi burada görünür.",
   "Nothing written yet at this moment.": "Bu anda henüz bir şey yazılmamış.",
   "Pasted from elsewhere ({n} characters)": "Başka bir yerden yapıştırıldı ({n} karakter)",
-  "Pasted from this book ({n} characters)": "Bu kitaptan yapıştırıldı ({n} karakter)",
+  "Moved text ({n} characters)": "Taşınan metin ({n} karakter)",
   "Pause": "Duraklat",
   "paused {n} h": "{n} sa duraklama",
   "paused {n} min": "{n} dk duraklama",

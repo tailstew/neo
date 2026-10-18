@@ -711,7 +711,7 @@
   "Nothing recorded yet. Write in this book and its history shows here.": "Noch nichts aufgezeichnet. Schreib in diesem Buch, und sein Verlauf erscheint hier.",
   "Nothing written yet at this moment.": "Zu diesem Zeitpunkt ist noch nichts geschrieben.",
   "Pasted from elsewhere ({n} characters)": "Von anderswo eingefügt ({n} Zeichen)",
-  "Pasted from this book ({n} characters)": "Aus diesem Buch eingefügt ({n} Zeichen)",
+  "Moved text ({n} characters)": "Text verschoben ({n} Zeichen)",
   "Pause": "Pause",
   "paused {n} h": "{n} Std. Pause",
   "paused {n} min": "{n} Min. Pause",

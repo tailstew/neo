@@ -713,7 +713,7 @@
   "Nothing recorded yet. Write in this book and its history shows here.": "Rien n’est encore enregistré. Écrivez dans ce livre et son historique apparaîtra ici.",
   "Nothing written yet at this moment.": "Rien n’est encore écrit à ce moment-là.",
   "Pasted from elsewhere ({n} characters)": "Collé d’ailleurs ({n} caractères)",
-  "Pasted from this book ({n} characters)": "Collé depuis ce livre ({n} caractères)",
+  "Moved text ({n} characters)": "Texte déplacé ({n} caractères)",
   "Pause": "Pause",
   "paused {n} h": "pause de {n} h",
   "paused {n} min": "pause de {n} min",

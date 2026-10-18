@@ -3559,7 +3559,7 @@ async function recRestart(bookId) {
 /* ================================================================== */
 
 const HISTORY_FAST = 8;       // ▶▶ plays this many times as fast as it was written
-const HISTORY_SKIP = 3000;    // a pause longer than this plays this long (▶▶ skips it), and a badge says how long it was
+const HISTORY_SKIP = 1500;    // a pause longer than this plays this long (▶▶ skips it), and a badge says how long it was
 const HISTORY_INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
 const historyPrefs = { speed: 1, skip: true }; // the speed is kept while NEO runs
 const historyCanOpen = () => !!(Rec && window.neo.recList && window.neo.recRead && window.neo.recDays && window.neo.recDayStart);
@@ -3844,7 +3844,7 @@ const REPLAY_PAGE_WORDS = [
   tk('Tagged'),
   tk('Tags'),
   tk('Close'),
-  tk('Pasted from this book ({n} characters)'),
+  tk('Moved text ({n} characters)'),
   tk('Pasted from elsewhere ({n} characters)'),
   tk('Written before NEO started recording'),
   tk('Away from NEO'),
@@ -4930,8 +4930,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       v += gap;
       vt[j] = v;
     }
-    total = v;
-    lead = Rec.leadSteps(h.steps, steps, vt);
+    lead = Rec.playFrom(h, steps, vt, mode === 'book' ? null : mode);
+    total = steps.length ? vt[steps.length - 1] : v;
     buildMarkers();
     stampTrack();
   }
@@ -4959,7 +4959,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       const x = vt[j];
       if (s.k === 'session') markers.push({ x, kind: 'session', step: i, label: [historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · ') });
       else if (s.k === 'c' && s.what === 'paste') {
-        markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', step: i, label: s.internal ? t('Pasted from this book ({n} characters)', { n: s.len }) : t('Pasted from elsewhere ({n} characters)', { n: s.len }) });
+        markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', step: i, label: s.internal ? t('Moved text ({n} characters)', { n: s.len }) : t('Pasted from elsewhere ({n} characters)', { n: s.len }) });
       } else if (s.k === 'x' && HISTORY_CAUSES[s.cause] && Rec.QUIET.has(s.cause) && !reached(j)) {
         // (another device's text the page already showed)
       } else if (s.k === 'x' && HISTORY_CAUSES[s.cause]) {
@@ -5050,7 +5050,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       while (pos < steps.length && vt[pos] <= clock) playStep(pos++, now);
       if (pos >= steps.length || !pauses[pos]) break;
       // in a long pause: the badge says how long it really was, for as long
-      // as it plays (3 s at most), and ▶▶ skips it
+      // as it plays (1.5 s at most), and ▶▶ skips it
       const fast = historyPrefs.speed === HISTORY_FAST;
       if (pauseSaid !== pos) {
         pauseSaid = pos;

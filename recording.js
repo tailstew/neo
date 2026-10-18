@@ -3190,6 +3190,27 @@
     return j;
   }
 
+  // Where a player's clock starts: after the lead steps, and, when the
+  // chapter shown (`ch`, or any chapter of the book when null) isn't there
+  // yet, after the step that brings it, so the first moment shows words.
+  // `vt` is moved back so that moment is 0 on the clock (the steps before
+  // it all at 0); returns how many view steps come before it.
+  function playFrom(h, view, vt, ch = null) {
+    const want = (c) => c !== undefined && (ch ? c === ch : !isStream(c));
+    let at = leadSteps(h.steps, view, vt);
+    const doc = h.doc(at <= 0 ? (view.length ? view[0] : 0) : view[at - 1] + 1);
+    if (!Object.keys(doc).some(want)) {
+      for (let j = at; j < view.length; j++) {
+        if (h.bad.has(view[j])) continue;
+        const s = h.steps[view[j]];
+        if (want(s.ch) && (s.sync !== undefined || (s.k === 'b' && typeof s.html === 'string' && s.page !== false))) { at = j + 1; break; }
+      }
+    }
+    const off = at ? vt[at - 1] : 0;
+    if (off) for (let j = 0; j < vt.length; j++) vt[j] = Math.max(0, vt[j] - off);
+    return at;
+  }
+
   return {
     FORMAT, READS, PLAYER, CARET_BLOCK, INPUT_TYPES, MOD, inputCode, inputName,
     STREAMS, isStream, streamTexts,
@@ -3202,7 +3223,7 @@
     replay, replayCheck, ANCHOR_CHARS, ANCHOR_TIMES, anchorDue, baseLines,
     QUIET, Page, sessionOrder,
     sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
-    textOffset, compileSession, History, leadSteps,
+    textOffset, compileSession, History, leadSteps, playFrom,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,

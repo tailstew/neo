@@ -884,7 +884,7 @@
   "Paragraph restored from {when}.": "A bekezdés visszaállítva erre: {when}.",
   "Paragraphs restored from {when}.": "A bekezdések visszaállítva erre: {when}.",
   "Pasted from elsewhere ({n} characters)": "Máshonnan beillesztve ({n} karakter)",
-  "Pasted from this book ({n} characters)": "Ebből a könyvből beillesztve ({n} karakter)",
+  "Moved text ({n} characters)": "Áthelyezett szöveg ({n} karakter)",
   "Pause": "Szünet",
   "paused {n} h": "{n} ó szünet",
   "paused {n} min": "{n} perc szünet",
