@@ -3779,6 +3779,7 @@ function exportReplayAsk(meta, name) {
 // their English: every T('…') there is here (scripts/replay-page.test.js
 // checks it), and goes into the page in the writer's language
 const REPLAY_PAGE_WORDS = [
+  tk('paused {n} h'), tk('paused {n} min'), tk('paused {n} s'),
   tk('it can’t be read'),
   tk('seals before it are missing'),
   tk('it is signed with another key than the first seal'),

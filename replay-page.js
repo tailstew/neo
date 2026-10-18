@@ -424,7 +424,7 @@
     let h = null;      // its History
     let steps = [];    // the steps this view plays (indexes into h.steps)
     let vt = new Float64Array(0); // each one's moment on the player's clock
-    let pauses = new Uint8Array(0); // 1 where the pause before a step was longer than SKIP
+    let pauses = new Float64Array(0); // how long the pause before a step really was, where it was longer than SKIP
     let lead = 0;      // steps that only say what was there before (Rec.leadSteps): played at once
     let total = 0;
     let pos = 0;       // view steps played
@@ -521,7 +521,15 @@
     strip.setAttribute('role', 'listbox');
     strip.setAttribute('aria-label', T('Days'));
     bottom.append(dayline, strip);
-    box.append(scroll, status, bottom);
+    // a long pause, as NEO's own player says it: how long it really was
+    const badge = el('div', 'rx-badge');
+    badge.hidden = true;
+    badge.setAttribute('aria-live', 'polite');
+    box.append(scroll, badge, status, bottom);
+    let badgeUntil = 0;
+    let pauseSaid = -1; // the step whose pause the badge last told
+    const pauseWords = (ms) => (ms >= 3600000 ? T('paused {n} h', { n: Math.round(ms / 360000) / 10 })
+      : ms >= 60000 ? T('paused {n} min', { n: Math.round(ms / 60000) }) : T('paused {n} s', { n: Math.round(ms / 1000) }));
 
     // the pop-ups: the evidence, and what the page checks
     const pop = (bodyEl, label) => {
@@ -724,7 +732,7 @@
       steps = [];
       h.steps.forEach((s, i) => { if ((!mode && !Rec.isStream(s.ch)) || s.ch === mode || s.k === 'session' || s.k === 'f') steps.push(i); });
       vt = new Float64Array(steps.length);
-      pauses = new Uint8Array(steps.length);
+      pauses = new Float64Array(steps.length);
       const acts = (s) => s.k === 'e' || s.k === 'x' || s.k === 'd' || s.k === 'o' || s.k === 'c' || (s.k === 's' && s.by !== 'n');
       const first = new Int32Array(steps.length);
       const lastA = new Int32Array(steps.length);
@@ -744,7 +752,7 @@
         let gap = j ? s.t - h.steps[steps[j - 1]].t : 0;
         if (s.k === 'session' && j) gap = s.session ? Math.max(0, s.t - h.sessions[s.session - 1].t1) : 0;
         else if (j <= first[j] || j > lastA[j]) gap = 0;
-        if (gap > SKIP) { pauses[j] = 1; gap = SKIP; }
+        if (gap > SKIP) { pauses[j] = gap; gap = SKIP; }
         v += gap;
         vt[j] = v;
       }
@@ -841,6 +849,7 @@
     // follow: scroll the sheet to the caret, as playing does (a seek from the timeline)
     function seek(p, follow = false) {
       pos = Math.max(Math.min(lead, steps.length), Math.min(p, steps.length));
+      pauseSaid = -1;
       n = nAt(pos);
       cur = h.doc(n);
       clock = pos ? vt[pos - 1] : 0;
@@ -1031,7 +1040,18 @@
         return;
       }
       clock += dt * speed;
-      if (speed === FAST && pauses[pos] && clock < vt[pos]) clock = vt[pos]; // ▶▶ skips a long pause
+      if (pauses[pos] && clock < vt[pos]) {
+        // in a long pause: the badge says how long it really was, for as long
+        // as it plays (SKIP at most), and ▶▶ skips it
+        if (pauseSaid !== pos) {
+          pauseSaid = pos;
+          badge.textContent = pauseWords(pauses[pos]);
+          badge.hidden = false;
+          badgeUntil = now + (speed === FAST ? 1200 : (vt[pos] - clock) / speed + 600);
+        }
+        if (speed === FAST) clock = vt[pos];
+      }
+      if (badgeUntil && now > badgeUntil) { badge.hidden = true; badgeUntil = 0; }
       const to = posAt(clock);
       if (to > pos) {
         pos = to;
@@ -1043,6 +1063,7 @@
 
     function setPlaying(on) {
       playing = !!on && !!h && view === 'player';
+      if (!playing) { badge.hidden = true; badgeUntil = 0; }
       playBtn.textContent = playing ? '❚❚' : '▶';
       playBtn.title = (playing ? T('Pause') : T('Play')) + ' (Space)';
       fastBtn.setAttribute('aria-pressed', String(playing && speed === FAST));
