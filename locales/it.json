@@ -1099,5 +1099,9 @@
   "Not typed": "Non digitato",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "La Cronologia di scrittura mostra come e quando sono state digitate le parole. Non può mostrare di chi fossero le idee.",
   "How It Was Written…": "Come è stato scritto…",
-  "How it was written": "Come è stato scritto"
+  "How it was written": "Come è stato scritto",
+  "Joined to another chapter": "Uniti a un altro capitolo",
+  "Moved to loose cards": "Spostati tra le schede sparse",
+  "{name} (joined to another chapter)": "{name} (unito a un altro capitolo)",
+  "{name} (moved to a loose card)": "{name} (spostato su una scheda sparsa)"
 }

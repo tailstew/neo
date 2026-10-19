@@ -1099,5 +1099,9 @@
   "Not typed": "Não digitado",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram digitadas. Não pode mostrar de quem eram as ideias.",
   "How It Was Written…": "Como foi escrito…",
-  "How it was written": "Como foi escrito"
+  "How it was written": "Como foi escrito",
+  "Joined to another chapter": "Juntados a outro capítulo",
+  "Moved to loose cards": "Movidos para as fichas soltas",
+  "{name} (joined to another chapter)": "{name} (juntado a outro capítulo)",
+  "{name} (moved to a loose card)": "{name} (movido para uma ficha solta)"
 }

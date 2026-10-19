@@ -1179,5 +1179,9 @@
   "Not typed": "Не напечатано",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "История письма показывает, как и когда набирались слова. Она не может показать, чьи это были идеи.",
   "How It Was Written…": "Как это написано…",
-  "How it was written": "Как это написано"
+  "How it was written": "Как это написано",
+  "Joined to another chapter": "Присоединённые к другой главе",
+  "Moved to loose cards": "Перенесённые в отдельные карточки",
+  "{name} (joined to another chapter)": "{name} (присоединена к другой главе)",
+  "{name} (moved to a loose card)": "{name} (перенесена в отдельную карточку)"
 }

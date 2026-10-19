@@ -3899,7 +3899,7 @@ const EV_NOKEY_NAMES = {
   format: tk('Formatting from a menu: {n}.'),
   other: tk('Other changes made by the system or a program: {n}.')
 };
-function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, order = [], partial = false } = {}) {
+function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, gone = () => 'delete', order = [], partial = false } = {}) {
   const e = escHtml;
   const n = (x) => fmtNum(Math.round(x || 0));
   const pct = (x) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : (x > 0 && x < 0.01 ? '<1' : Math.round(x * 100)) + '%');
@@ -3997,7 +3997,10 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
         ids.map((ch) => {
           const c = ev.chapters[ch];
           const cr = c ? Rec.evidenceRead(c, ev.chars[ch] || 0) : null;
-          const label = ev.words[ch] === undefined ? t('{name} (deleted)', { name: name(ch) }) : name(ch);
+          // a chapter no longer in the book: deleted, or its words gone on elsewhere
+          const why = ev.words[ch] === undefined ? gone(ch) : null;
+          const label = !why ? name(ch) : why === 'merge' ? t('{name} (joined to another chapter)', { name: name(ch) })
+            : why === 'outline' ? t('{name} (moved to a loose card)', { name: name(ch) }) : t('{name} (deleted)', { name: name(ch) });
           return `<tr data-ch="${e(ch)}"><td>${e(label)}</td><td>${ev.words[ch] === undefined ? '—' : n(ev.words[ch])}</td><td>${cr ? n(cr.days) : '—'}</td><td>${cr ? n(cr.typed) : '—'}</td><td>${cr ? e(pct(cr.revised)) : '—'}</td><td>${cr ? e(pct(cr.pastedShare)) : '—'}</td></tr>`;
         }).join('') + '</table>';
     }
@@ -4603,6 +4606,15 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const kind = chapterKind(ch, m);
     if (kind === 'unnumbered') return title || t('Untitled');
     return title ? chapterName(ch, m) + ' — ' + title : chapterName(ch, m);
+  }
+
+  // what took a chapter no longer in the book ('merge', 'outline', 'delete', …)
+  function goneWhy(ch) {
+    for (let i = S.sessions.length - 1; i >= 0; i--) {
+      const c = S.sessions[i].stats.chapters[ch];
+      if (c && c.gone) return c.gone;
+    }
+    return 'delete';
   }
 
   function goneLead(ch) {
@@ -5672,7 +5684,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     }
     if (!sh.isConnected) return;
     const show = (scope) => {
-      body.innerHTML = evidenceHtml(res.evidence, res.cover, { scope, title: scope ? evName(scope) : evTitle(), name: evName, order: meta.chapterOrder });
+      body.innerHTML = evidenceHtml(res.evidence, res.cover, { scope, title: scope ? evName(scope) : evTitle(), name: evName, gone: goneWhy, order: meta.chapterOrder });
       back.hidden = !scope;
       for (const tr of body.querySelectorAll('.ev-chapters tr[data-ch]')) {
         tr.tabIndex = 0;
@@ -5699,7 +5711,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     try {
       await evFlush();
       const res = await window.neo.recEvidence(bookId, picked.chapters);
-      const report = evidenceHtml(res.evidence, res.cover, { title: evTitle(), name: evName, order: meta.chapterOrder, partial: !!picked.chapters });
+      const report = evidenceHtml(res.evidence, res.cover, { title: evTitle(), name: evName, gone: goneWhy, order: meta.chapterOrder, partial: !!picked.chapters });
       const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: evName(ch) }));
       const title = isUntitled(meta.title) ? t('Untitled') : meta.title;
       const saved = await window.neo.recExport(bookId, {
@@ -6492,7 +6504,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         let x = seen.get(ch);
         if (!x) { x = { ch, first: s.stats.start, last: s.stats.start, dropped: false }; seen.set(ch, x); }
         x.last = s.stats.start;
-        x.dropped = !!c.gone;
+        x.dropped = c.gone || false; // what took it: 'merge', 'outline', 'delete', …
       }
     }
     const span = (c) => {
@@ -6508,12 +6520,20 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const elsewhere = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && !c.dropped);
     const dropped = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && c.dropped);
     for (const c of elsewhere) item(t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
-    if (dropped.length) {
+    // a chapter joined to another, or moved onto a loose card, wasn't deleted: its words went on
+    const groups = [
+      [t('Joined to another chapter'), (c) => c.dropped === 'merge'],
+      [t('Moved to loose cards'), (c) => c.dropped === 'outline'],
+      [t('Deleted'), (c) => c.dropped !== 'merge' && c.dropped !== 'outline']
+    ];
+    for (const [head, fits] of groups) {
+      const these = dropped.filter(fits);
+      if (!these.length) continue;
       const hd = document.createElement('div');
       hd.className = 'hs-list-head';
-      hd.textContent = t('Deleted');
+      hd.textContent = head;
       list.appendChild(hd);
-      for (const c of dropped) item(goneLead(c.ch) || t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
+      for (const c of these) item(goneLead(c.ch) || t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
     }
     renderTagList();
   }
@@ -9446,12 +9466,14 @@ function newChapter() {
   focusChapter(chId);
 }
 
-async function deleteChapterQuiet(chId) {
+// cause: what Writing History says took it ('merge' when its words went
+// into another chapter, 'outline' onto a loose card)
+async function deleteChapterQuiet(chId, cause = 'delete') {
   // a save still queued for this chapter must not resurrect it (nejcc, #70)
   clearTimeout(saveTimers[chId]);
   delete saveTimers[chId];
   book.chapterOrder = book.chapterOrder.filter((c) => c !== chId);
-  dropChapterHTML(chId, 'delete');
+  dropChapterHTML(chId, cause);
   delete wordCache[chId];
   if (book.sectionNotes) delete book.sectionNotes[chId];
   if (book.chapterNotes) delete book.chapterNotes[chId];
@@ -13820,7 +13842,7 @@ async function joinChapter(chId, intoCh) {
   try { await persistChapter(intoCh); } catch (err) { window.neo.logError('join: ' + (err && err.message || err)); return null; }
   if (book.chapterTitles) delete book.chapterTitles[chId];
   rec.streams('outline');
-  await deleteChapterQuiet(chId);
+  await deleteChapterQuiet(chId, 'merge');
   updateCounters();
   return sec.id;
 }
@@ -14568,7 +14590,7 @@ async function chapterToLoose(chId) {
   if (!(await saveHeldCard(card))) return;
   if (book.chapterTitles) delete book.chapterTitles[chId];
   if (currentChapterId === chId) currentChapterId = null;
-  await deleteChapterQuiet(chId);
+  await deleteChapterQuiet(chId, 'outline');
   renderLooseCards();
   if (currentTab === 'outline') renderBoard();
   updateCounters();

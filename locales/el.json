@@ -1037,5 +1037,9 @@
   "Not typed": "Χωρίς πληκτρολόγηση",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Το Ιστορικό γραφής δείχνει πώς και πότε πληκτρολογήθηκαν οι λέξεις. Δεν μπορεί να δείξει ποιανού ήταν οι ιδέες.",
   "How It Was Written…": "Πώς γράφτηκε…",
-  "How it was written": "Πώς γράφτηκε"
+  "How it was written": "Πώς γράφτηκε",
+  "Joined to another chapter": "Ενώθηκαν με άλλο κεφάλαιο",
+  "Moved to loose cards": "Μετακινήθηκαν στις αταξινόμητες κάρτες",
+  "{name} (joined to another chapter)": "{name} (ενώθηκε με άλλο κεφάλαιο)",
+  "{name} (moved to a loose card)": "{name} (μετακινήθηκε σε αταξινόμητη κάρτα)"
 }

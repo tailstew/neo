@@ -1032,5 +1032,9 @@
   "Not typed": "Nem gépelt",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Az Írástörténet megmutatja, hogyan és mikor gépelték be a szavakat. Azt nem tudja megmutatni, kinek az ötletei voltak.",
   "How It Was Written…": "Hogyan készült…",
-  "How it was written": "Hogyan készült"
+  "How it was written": "Hogyan készült",
+  "Joined to another chapter": "Másik fejezethez csatolva",
+  "Moved to loose cards": "A szabad kártyák közé áthelyezve",
+  "{name} (joined to another chapter)": "{name} (másik fejezethez csatolva)",
+  "{name} (moved to a loose card)": "{name} (szabad kártyára áthelyezve)"
 }

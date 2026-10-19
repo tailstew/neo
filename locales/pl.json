@@ -1161,5 +1161,9 @@
   "Not typed": "Nie wpisane",
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Historia pisania pokazuje, jak i kiedy wpisano słowa. Nie może pokazać, czyje były pomysły.",
   "How It Was Written…": "Jak to powstało…",
-  "How it was written": "Jak to powstało"
+  "How it was written": "Jak to powstało",
+  "Joined to another chapter": "Dołączone do innego rozdziału",
+  "Moved to loose cards": "Przeniesione do luźnych fiszek",
+  "{name} (joined to another chapter)": "{name} (dołączony do innego rozdziału)",
+  "{name} (moved to a loose card)": "{name} (przeniesiony na luźną fiszkę)"
 }

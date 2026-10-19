@@ -66,6 +66,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Close and reopen History: nothing is rebuilt (instant).
 - [ ] The search toggles keep their setting while NEO is open, and go back to the defaults after a restart.
 - [ ] With a chapter picked in the side pane, only the days that touched it have tiles, and a split, joined or deleted chapter is labelled as such.
+- [ ] Join a chapter to the one before it (Backspace at its start), join another into a chapter as a section (a chapter card dropped on another, or Tab on its line in the List), move a third to loose cards, and delete a fourth. In History's side pane the first two are under **Joined to another chapter**, the third under **Moved to loose cards**, and only the fourth under **Deleted**. How It Was Written…'s chapter table says the same after each name.
 - [ ] Keyboard only: Tab reaches every control in the days and the player, each shows on focus, and Esc always gets out.
 - [ ] In German (long words) and in Romanian, the dialog's labels fit and nothing overlaps, at the window's smallest size too.
 - [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged.
