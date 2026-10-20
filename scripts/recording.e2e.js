@@ -1085,8 +1085,11 @@ test('one chapter on its own; Esc goes back to the days, then puts the caret bac
 test('a deleted chapter is listed, and a chapter’s menu opens it at the start, paused', async () => {
   await js('openHistory()');
   await daysReady();
-  // the chapter typed in and deleted earlier
-  assert.ok(await js(`[...document.querySelectorAll('.hs-list-head')].some((x) => x.textContent === 'Deleted')`));
+  // the side pane lists the chapters at the moment shown: at the day's end,
+  // not the chapter typed in and deleted earlier
+  const listed = `document.querySelectorAll('.hs-list .hs-ch:not(.hs-tag-item)').length - 1`;
+  const now = (await chapterIds()).length;
+  assert.equal(await js(listed), now);
   // the days: a tile for today, with what was written
   assert.ok(await js(`document.querySelectorAll('.hs-strip .hs-tile[data-day]').length >= 1`));
   // a day picked opens the player on it, paused: nothing plays until Play
@@ -1094,6 +1097,15 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await playerReady({ drawn: false });
   await tick(300);
   assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'a day picked doesn’t play');
+  // just before it was deleted, it's listed
+  await js(`(() => {
+    const p = historyShown.player;
+    const h = p.h();
+    const j = p.steps().findIndex((i) => h.steps[i].k === 'd' && !h.steps[i].ch.startsWith(':'));
+    p.seek(j);
+  })()`);
+  await tick(100);
+  assert.equal(await js(listed), now + 1, 'a chapter about to be deleted is listed');
   key('Escape');
   await tick(300);
   key('Escape');
