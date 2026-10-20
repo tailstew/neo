@@ -4504,7 +4504,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   close.focusFind = () => { if ($h('.hs-find').hidden) return; qIn.focus(); qIn.select(); };
   // for the tests and the console: historyShown.player.h() and the rest
   close.player = {
-    h: () => h, loaded: () => loaded, view: () => view, steps: () => steps, pos: () => pos, mode: () => mode,
+    h: () => h, loaded: () => loaded, view: () => view, steps: () => steps, pos: () => pos, lead: () => lead, mode: () => mode,
     chapters: () => Object.fromEntries(Object.entries(chapters).map(([ch, c]) => [ch, c.toString()])),
     sessions: () => S.sessions, days: () => S.days, day: () => dsel, building: () => S.building,
     seek, setMode, setPlaying, openPlayer, showDays, skipSession, paper,
@@ -6214,6 +6214,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     let di = curDay();
     let p = { ch, a: part.a, b: part.b };
     let found = dir > 0 ? Rec.partNext(x, p, part.n) : Rec.partPrev(x, p, part.n);
+    // a stop before the player's first moment (Rec.playFrom) can't be shown:
+    // the version before it is the day's start, so look before that
+    if (dir < 0 && found && lead && found.n < nAt(lead)) {
+      found = null;
+      p = Rec.partMove(x, { ch, a: part.a, b: part.b }, part.n, 0);
+    }
     let cur = (dir > 0 ? x.end[ch] : x.start[ch]) || '';
     const starts = new Map();
     const startOf = async (d) => {
