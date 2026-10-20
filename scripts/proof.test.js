@@ -484,6 +484,9 @@ test('the backup mirror copies seals and stamps once', async () => {
   const io = Files.nodeIO({ fs, path, zlib, write: put, log: () => {} });
   const root = path.join(tmp(), 'recording');
   copyDir(path.join(FIX, 'recording'), root);
+  // just arrived, as by sync: Windows' copy keeps the fixture's own times
+  const seals = path.join(root, DEV, 'seals');
+  for (const f of fs.readdirSync(seals)) fs.utimesSync(path.join(seals, f), new Date(), new Date());
   const mirror = path.join(tmp(), 'mirror');
   await Files.sweep(io, root, mirror, DEV);
   assert.deepEqual(fs.readdirSync(path.join(mirror, DEV, 'seals')).sort(),

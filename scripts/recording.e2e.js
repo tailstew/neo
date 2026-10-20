@@ -821,9 +821,19 @@ const playerHTML = () => js(`(() => {
   }
   return out;
 })()`);
+// What History is doing, for a failure's message: whether it's open, its
+// view, the cache's build, the day's load, and where the player is
+const historyState = () => js(`(() => {
+  if (!historyShown) return { open: false };
+  const p = historyShown.player;
+  const h = p.h();
+  const play = document.querySelector('.hs-play');
+  return { open: true, view: p.view(), building: p.building(), loaded: p.loaded(), mode: p.mode(), day: h && h.day,
+    pos: p.pos(), lead: p.lead(), steps: p.steps().length, part: !!p.part(), play: play && play.getAttribute('aria-label') };
+})()`).catch((err) => ({ error: String((err && err.message) || err) }));
 const waitFor = async (code, ms = 8000) => {
   for (const end = Date.now() + ms; Date.now() < end; await tick(50)) if (await js(code)) return;
-  throw new Error('timed out waiting for ' + code);
+  throw new Error('timed out waiting for ' + code + (/historyShown/.test(code) ? '\nHistory: ' + JSON.stringify(await historyState()) : ''));
 };
 const menuItem = (label) => {
   const find = (items) => {
@@ -919,7 +929,7 @@ test('the player seeks anywhere, and plays forward to the same text', async () =
   const n = await js('historyShown.player.steps().length');
   for (const at of [0, 1, Math.floor(n / 3), Math.floor(n / 2), n - 1]) {
     await js(`historyShown.player.seek(${at})`);
-    const want = await js(`(() => { const p = historyShown.player; const v = p.steps(); return p.h().state(${at} ? v[${at} - 1] + 1 : v[0]); })()`);
+    const want = await js(`(() => { const p = historyShown.player; const v = p.steps(); const at = Math.max(${at}, p.lead()); return p.h().state(at ? v[at - 1] + 1 : v[0]); })()`);
     const got = await playerHTML();
     for (const [ch, html] of Object.entries(got)) assert.equal(html, want[ch], `at ${at}, ${ch}`);
   }
@@ -965,8 +975,8 @@ test('⇧← goes to the start of the session, then the one before; ⇧→ to th
   const ids = await js('historyShown.player.h().sessions.map((s) => s.id)');
   assert.ok(ids.length >= 2, 'the day has sessions to skip between');
   await js('historyShown.player.speed(1)'); // (a second into a session is its start)
-  const atStart = () => js(`(() => { const p = historyShown.player; const h = p.h(); const v = p.steps(); const i = p.pos(); return i === 0 || h.steps[v[i - 1]].k === 'session' || h.steps[v[i - 1]].session !== h.steps[v[i]].session; })()`);
-  // (the day's first session starts before its first chapter is there)
+  const atStart = () => js(`(() => { const p = historyShown.player; const h = p.h(); const v = p.steps(); const i = p.pos(); return i === p.lead() || h.steps[v[i - 1]].k === 'session' || h.steps[v[i - 1]].session !== h.steps[v[i]].session; })()`);
+  // (the day's first session starts before its first chapter is there, so its start is where the player's clock starts: Rec.playFrom)
   const shift = async (k) => { key(k, ['shift']); await tick(300); await playerReady({ drawn: false }); };
   // halfway through the day's first session, which ran for minutes
   await js(`(() => { const p = historyShown.player; const h = p.h(); const v = p.steps(); p.seek(Math.floor(v.findIndex((i) => h.steps[i].session === 1) / 2)); })()`);
@@ -1097,15 +1107,31 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await playerReady({ drawn: false });
   await tick(300);
   assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'a day picked doesn’t play');
-  // just before it was deleted, it's listed
-  await js(`(() => {
+  // just before it was deleted, it's listed (in the whole book: History
+  // opens on the caret's chapter, whose steps hold no other's delete)
+  await js('historyShown.player.setMode("book")');
+  await playerReady({ drawn: false });
+  const deleteAt = await js(`(() => {
     const p = historyShown.player;
     const h = p.h();
     const j = p.steps().findIndex((i) => h.steps[i].k === 'd' && !h.steps[i].ch.startsWith(':'));
     p.seek(j);
+    return j;
   })()`);
   await tick(100);
-  assert.equal(await js(listed), now + 1, 'a chapter about to be deleted is listed');
+  // (what the sheet and the side pane show, should it fail)
+  const shown = () => js(`({
+    listed: [...document.querySelectorAll('.hs-list .hs-ch:not(.hs-tag-item) .hs-ch-name')].map((e) => e.textContent),
+    days: [...document.querySelectorAll('.hs-strip .hs-tile[data-day]')].map((b) => b.dataset.day),
+    deletes: historyShown.player.h().steps.filter((s) => s.k === 'd').map((s) => s.ch)
+  })`);
+  // (the day added chapters after it, so it's the moment just after that has one fewer, not now)
+  const before = await js(listed);
+  const says = JSON.stringify({ deleteAt, ...(await historyState()), ...(await shown()) });
+  assert.ok(deleteAt >= 0, 'the day deletes a chapter: ' + says);
+  await js(`historyShown.player.seek(${deleteAt + 1})`);
+  await tick(100);
+  assert.equal(await js(listed), before - 1, 'a chapter about to be deleted is listed, and once deleted isn’t: ' + says + ' then ' + JSON.stringify(await shown()));
   key('Escape');
   await tick(300);
   key('Escape');
@@ -1919,6 +1945,15 @@ async function main() {
       } catch (err) {
         failed++;
         console.log('FAIL ' + t.name + '\n     ' + String(err.message).replace(/\n/g, '\n     '));
+        // a failed test can leave History open, mid-load or in the player,
+        // and every test after it would wait out its timeouts: say how it
+        // was left, and close it
+        const left = await historyState();
+        if (left.open) {
+          console.log('     History left open: ' + JSON.stringify(left));
+          await js('historyShown && historyShown()').catch(() => {});
+          await tick(500);
+        }
       }
     }
     const r = await check();
