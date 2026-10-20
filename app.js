@@ -5040,7 +5040,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     drawHead();
   };
 
-  function playStep(j, now) {
+  function playStep(j) {
     const i = steps[j];
     const s = h.steps[i];
     if (h.bad.has(i)) return;
@@ -5069,7 +5069,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     lastFrame = now;
     clock += dt * historyPrefs.speed;
     for (;;) {
-      while (pos < steps.length && vt[pos] <= clock) playStep(pos++, now);
+      while (pos < steps.length && vt[pos] <= clock) playStep(pos++);
       if (pos >= steps.length || !pauses[pos]) break;
       // in a long pause: the badge says how long it really was, for as long
       // as it plays (1.5 s at most), and ▶▶ skips it
@@ -6671,7 +6671,8 @@ async function openBook(bookId) {
   diskWordsAt = Date.now();
   // a book being exported from the shelf finishes first (it borrows the
   // open book's place for the moment it takes)
-  while (shelfExport) await new Promise((r) => setTimeout(r, 50));
+  // oxlint-disable-next-line no-unmodified-loop-condition -- the shelf's export clears it
+  while (shelfExport) await new Promise((resolve) => setTimeout(resolve, 50));
   // Everything is read first and only then becomes the open book, so a
   // second book opened while this one loads (a double click, a slow cloud
   // read) never ends up with a mix of the two.
@@ -9980,6 +9981,7 @@ function spFromFdx(xml) {
 function spToFdx(lines, title = {}) {
   const NAMES = { heading: 'Scene Heading', action: 'Action', character: 'Character', paren: 'Parenthetical', dialogue: 'Dialogue', transition: 'Transition', shot: 'Shot' };
   const CAPS = ['heading', 'character', 'transition', 'shot'];
+  // oxlint-disable-next-line no-control-regex -- characters XML can't hold
   const esc = (s) => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const textEl = (r, caps) => {
     const style = [r.b && 'Bold', r.i && 'Italic', r.u && 'Underline', r.s && 'Strikeout'].filter(Boolean).join('+');
@@ -19231,6 +19233,7 @@ ${opts.stamp ? `<p class="prov">${t('{n} words · exported from NEO on {date}', 
 // (characters XML 1.0 forbids, pasted in from a PDF or a terminal, come
 // out: one of them makes a whole EPUB or Word file unreadable)
 const escXml = (s) => String(s)
+  // oxlint-disable-next-line no-control-regex
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
