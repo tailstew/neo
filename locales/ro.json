@@ -731,7 +731,6 @@
   "Chapter deleted": "Capitol șters",
   "Chapter split": "Capitol despărțit",
   "Chapters joined": "Capitole unite",
-  "Deleted": "Șterse",
   "From another device": "De pe alt dispozitiv",
   "As it was on {name}": "Așa cum era pe {name}",
   "another device": "alt dispozitiv",
@@ -1144,8 +1143,6 @@
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Istoricul scrisului arată cum și când au fost tastate cuvintele. Nu poate arăta ale cui erau ideile.",
   "How It Was Written…": "Cum a fost scris…",
   "How it was written": "Cum a fost scris",
-  "Joined to another chapter": "Unite cu alt capitol",
-  "Moved to loose cards": "Mutate la fișele libere",
   "{name} (joined to another chapter)": "{name} (unit cu alt capitol)",
   "{name} (moved to a loose card)": "{name} (mutat pe o fișă liberă)"
 }

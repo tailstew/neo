@@ -66,7 +66,8 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Close and reopen History: nothing is rebuilt (instant).
 - [ ] The search toggles keep their setting while NEO is open, and go back to the defaults after a restart.
 - [ ] With a chapter picked in the side pane, only the days that touched it have tiles, and a split, joined or deleted chapter is labelled as such.
-- [ ] Join a chapter to the one before it (Backspace at its start), join another into a chapter as a section (a chapter card dropped on another, or Tab on its line in the List), move a third to loose cards, and delete a fourth. In History's side pane the first two are under **Joined to another chapter**, the third under **Moved to loose cards**, and only the fourth under **Deleted**. How It Was Written…'s chapter table says the same after each name.
+- [ ] Join a chapter to the one before it (Backspace at its start), join another into a chapter as a section (a chapter card dropped on another, or Tab on its line in the List), move a third to loose cards, and delete a fourth. In History, the side pane lists only the chapters in the book at the moment shown, in its order then: on today's tile none of the four is listed; play the day and each leaves the list at the moment it went; go back to an earlier day and they're listed again. How It Was Written…'s chapter table still says what took each.
+- [ ] In History, pick a chapter in the side pane, then go to a day before it was written: it stays in the list, dimmed, and the sheet says it doesn't exist yet. The other chapters listed are only those there at that moment.
 - [ ] Keyboard only: Tab reaches every control in the days and the player, each shows on focus, and Esc always gets out.
 - [ ] In German (long words) and in Romanian, the dialog's labels fit and nothing overlaps, at the window's smallest size too.
 - [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged.
@@ -81,7 +82,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] In the days, ← to an earlier day and restore from there (the day as it ended).
 - [ ] In the whole book, click a paragraph of chapter 3: the restore goes to Chapter 3 (its name is in the button's tooltip); with nothing picked, to the caret's chapter.
 - [ ] At the moment that's the chapter as it is now, the button says **Same as now** and does nothing.
-- [ ] Pick a deleted chapter under **Deleted**. The days show it as it was just before it went; **Put This Chapter Back** brings it back after the chapter it followed, with its old title, at once.
+- [ ] Go to a day before a chapter was deleted and pick it in the side pane, then the day it was deleted. The days show it as it was just before it went; **Put This Chapter Back** brings it back after the chapter it followed, with its old title, at once.
 - [ ] Restore from History opened on the shelf (book menu): it asks once whether to open the book (naming the book open now, if any, which is saved and closed); yes opens it and restores.
 - [ ] Click a paragraph on the sheet at an earlier moment: the button beside it is **Restore This Paragraph** (several selected: **Restore Paragraphs**, in its tooltip), and the footer's button still restores the whole chapter. Restoring changes only that paragraph, at once; nothing goes to Darlings; the day gets a "Before restoring to …" tag; Ctrl+Z undoes it.
 - [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.

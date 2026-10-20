@@ -699,7 +699,6 @@
   "Chapter deleted": "Capítulo excluído",
   "Chapter split": "Capítulo dividido",
   "Chapters joined": "Capítulos unidos",
-  "Deleted": "Excluídos",
   "From another device": "De outro dispositivo",
   "As it was on {name}": "Como estava em {name}",
   "another device": "outro dispositivo",
@@ -1100,8 +1099,6 @@
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram digitadas. Não pode mostrar de quem eram as ideias.",
   "How It Was Written…": "Como foi escrito…",
   "How it was written": "Como foi escrito",
-  "Joined to another chapter": "Juntados a outro capítulo",
-  "Moved to loose cards": "Movidos para as fichas soltas",
   "{name} (joined to another chapter)": "{name} (juntado a outro capítulo)",
   "{name} (moved to a loose card)": "{name} (movido para uma ficha solta)"
 }

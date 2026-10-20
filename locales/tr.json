@@ -644,7 +644,6 @@
   "Chapter deleted": "Bölüm silindi",
   "Chapter split": "Bölüm bölündü",
   "Chapters joined": "Bölümler birleştirildi",
-  "Deleted": "Silinenler",
   "From another device": "Başka bir cihazdan",
   "As it was on {name}": "{name} üzerindeki hâliyle",
   "another device": "başka bir cihaz",
@@ -1015,8 +1014,6 @@
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Yazım Geçmişi sözcüklerin nasıl ve ne zaman yazıldığını gösterir. Fikirlerin kime ait olduğunu gösteremez.",
   "How It Was Written…": "Nasıl yazıldı…",
   "How it was written": "Nasıl yazıldı",
-  "Joined to another chapter": "Başka bir bölüme katılanlar",
-  "Moved to loose cards": "Serbest kartlara taşınanlar",
   "{name} (joined to another chapter)": "{name} (başka bir bölüme katıldı)",
   "{name} (moved to a loose card)": "{name} (serbest bir karta taşındı)"
 }

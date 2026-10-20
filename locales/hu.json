@@ -834,7 +834,6 @@
   "Delete history": "Előzmények törlése",
   "Delete the Writing History of “{title}”?": "Törlöd a(z) „{title}” írástörténetét?",
   "Delete this book’s history…": "A könyv előzményeinek törlése…",
-  "Deleted": "Törölve",
   "Deleting this folder deletes the history. The book itself is untouched.": "A mappa törlése az előzményeket törli. Magához a könyvhöz nem nyúl.",
   "Draft 2, Sent to my agent…": "2. vázlat, Elküldve az ügynökömnek…",
   "Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.": "Minden eszköz csak a saját mappájába ír. A fájlok egyszerű szövegek, eseményenként egy sor, a munkamenet végén gzippel tömörítve. Innen soha semmi nem megy el sehová.",
@@ -1033,8 +1032,6 @@
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Az Írástörténet megmutatja, hogyan és mikor gépelték be a szavakat. Azt nem tudja megmutatni, kinek az ötletei voltak.",
   "How It Was Written…": "Hogyan készült…",
   "How it was written": "Hogyan készült",
-  "Joined to another chapter": "Másik fejezethez csatolva",
-  "Moved to loose cards": "A szabad kártyák közé áthelyezve",
   "{name} (joined to another chapter)": "{name} (másik fejezethez csatolva)",
   "{name} (moved to a loose card)": "{name} (szabad kártyára áthelyezve)"
 }

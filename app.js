@@ -4426,6 +4426,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   let raf = 0;
   let follow = true;
   let shown = {};         // ch -> what its sheet was last drawn from
+  let listKey = null;     // the chapters the side pane last listed, joined
   let markers = [];       // { x (clock), kind, label, step }
   let badgeUntil = 0;
   let pauseSaid = -1;     // the view index whose pause the badge last told
@@ -5237,6 +5238,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   function draw(now = performance.now()) {
     if (!h) return;
     syncPart();
+    // the side pane's chapters, again when one came or went
+    if (listedChapters().ids.join(',') !== listKey) renderList();
     const showing = shownChapters();
     const order = h.order(nAt(pos)) || dayOrder();
     const empty = paper.querySelector('.hs-empty');
@@ -6497,14 +6500,13 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   };
 
   function renderChapters() {
-    // each chapter the recording saw: the days it was first and last written, and whether it went
+    // each chapter the recording saw: the days it was first and last written
     const seen = new Map();
     for (const s of S.sessions) {
-      for (const [ch, c] of Object.entries(s.stats.chapters)) {
+      for (const ch of Object.keys(s.stats.chapters)) {
         let x = seen.get(ch);
-        if (!x) { x = { ch, first: s.stats.start, last: s.stats.start, dropped: false }; seen.set(ch, x); }
+        if (!x) { x = { ch, first: s.stats.start, last: s.stats.start }; seen.set(ch, x); }
         x.last = s.stats.start;
-        x.dropped = c.gone || false; // what took it: 'merge', 'outline', 'delete', …
       }
     }
     const span = (c) => {
@@ -6513,29 +6515,41 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       return a === b ? a : a + ' – ' + b;
     };
     item(t('The whole book'), S.sessions.length ? t('{n} sessions', { n: S.sessions.length }) : '', mode === 'book', () => setMode('book'));
-    for (const ch of meta.chapterOrder) {
+    // the chapters in the book at the moment shown, in its order then: they
+    // come and go as the sheet plays through a merge or a delete. The one
+    // picked stays, dimmed, at a moment it isn't there.
+    const { ids, order } = listedChapters();
+    listKey = ids.join(',');
+    const absent = mode !== 'book' && !ids.includes(mode) && seen.has(mode);
+    for (const ch of absent ? [...ids, mode] : ids) {
       const c = seen.get(ch);
-      item(chapterLabel(ch, meta.chapterOrder), c ? span(c) : t('Not recorded yet'), mode === ch, c ? () => setMode(ch) : null);
-    }
-    const elsewhere = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && !c.dropped);
-    const dropped = [...seen.values()].filter((c) => !meta.chapterOrder.includes(c.ch) && c.dropped);
-    for (const c of elsewhere) item(t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
-    // a chapter joined to another, or moved onto a loose card, wasn't deleted: its words went on
-    const groups = [
-      [t('Joined to another chapter'), (c) => c.dropped === 'merge'],
-      [t('Moved to loose cards'), (c) => c.dropped === 'outline'],
-      [t('Deleted'), (c) => c.dropped !== 'merge' && c.dropped !== 'outline']
-    ];
-    for (const [head, fits] of groups) {
-      const these = dropped.filter(fits);
-      if (!these.length) continue;
-      const hd = document.createElement('div');
-      hd.className = 'hs-list-head';
-      hd.textContent = head;
-      list.appendChild(hd);
-      for (const c of these) item(goneLead(c.ch) || t('Untitled'), span(c), mode === c.ch, () => setMode(c.ch));
+      const b = item(listLabel(ch, order), c ? span(c) : t('Not recorded yet'), mode === ch, c ? () => setMode(ch) : null);
+      if (absent && ch === mode) b.classList.add('hs-ch-absent');
     }
     renderTagList();
+  }
+
+  // the chapters at the moment on the sheet (the book as it is now until a
+  // day is loaded), and the order they're named in. A chapter the recording
+  // never saw is there throughout.
+  function listedChapters() {
+    if (!h) return { ids: meta.chapterOrder.slice(), order: meta.chapterOrder };
+    const order = h.order(nAt(pos)) || dayOrder();
+    const untouched = S.untouched || [];
+    const ids = order.filter((ch) => chapters[ch] !== undefined || untouched.includes(ch));
+    for (const ch of Object.keys(chapters)) if (!ids.includes(ch) && !Rec.isStream(ch)) ids.push(ch);
+    for (const ch of untouched) if (!ids.includes(ch)) ids.push(ch);
+    return { ids, order };
+  }
+
+  // a chapter's name in the list: one no longer in the book has no title
+  // now, so its first words name it
+  function listLabel(ch, order) {
+    const label = chapterLabel(ch, order);
+    const lead = meta.chapterOrder.includes(ch) || ((meta.chapterTitles || {})[ch] || '').trim() ? '' : goneLead(ch);
+    if (!lead) return label;
+    const m = { ...meta, chapterOrder: order.includes(ch) ? order : [...order, ch] };
+    return chapterKind(ch, m) === 'unnumbered' ? lead : label + ' — ' + lead;
   }
 
   // the whole book, or one chapter: the overview marks it, the player plays only it

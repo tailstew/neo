@@ -208,7 +208,6 @@
   "This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to play the writing back and to bring back any earlier version of a chapter.": "Este é o histórico de escrita do NEO para este livro: como foi escrito, tecla a tecla. O NEO usa-o para reproduzir a escrita e recuperar qualquer versão anterior de um capítulo.",
   "Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.": "Cada dispositivo grava apenas na sua própria pasta. Os ficheiros são texto simples, uma linha por evento, comprimidos com gzip quando a sessão termina. Nada aqui é enviado para lado nenhum.",
   "Chapter deleted": "Capítulo eliminado",
-  "Deleted": "Eliminados",
   "Moved in the Outline": "Movido no esquema",
   "Nothing recorded yet. Write in this book and its history shows here.": "Ainda não há nada gravado. Escreva neste livro e o histórico dele aparece aqui.",
   "Pasted from elsewhere ({n} characters)": "Colado de outro sítio ({n} caracteres)",

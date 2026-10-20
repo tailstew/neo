@@ -696,7 +696,6 @@
   "Chapter deleted": "Hoofdstuk verwijderd",
   "Chapter split": "Hoofdstuk gesplitst",
   "Chapters joined": "Hoofdstukken samengevoegd",
-  "Deleted": "Verwijderd",
   "From another device": "Van een ander apparaat",
   "As it was on {name}": "Zoals het was op {name}",
   "another device": "een ander apparaat",
@@ -1097,8 +1096,6 @@
   "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "De schrijfgeschiedenis laat zien hoe en wanneer de woorden getypt zijn. Ze kan niet laten zien wiens ideeën het waren.",
   "How It Was Written…": "Hoe het geschreven is…",
   "How it was written": "Hoe het geschreven is",
-  "Joined to another chapter": "Bij een ander hoofdstuk gevoegd",
-  "Moved to loose cards": "Naar de losse kaarten verplaatst",
   "{name} (joined to another chapter)": "{name} (bij een ander hoofdstuk gevoegd)",
   "{name} (moved to a loose card)": "{name} (naar een losse kaart verplaatst)"
 }
