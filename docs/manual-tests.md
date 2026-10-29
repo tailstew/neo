@@ -13,7 +13,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [x] Switch the interface language (View → Language), quit and start NEO again (switching only reloads the window). `Backups/README.txt` is rewritten in that language (once the strings are translated). *(2026-10-29, 4871622)*
 - [ ] Delete a book from the shelf. Both the book folder and its mirror folder are in the Recycle Bin; restore both and the book and its history come back.
 - [x] Delete one session's `.jsonl.gz` from a book's `recording/<device>/`. Writing History still plays that day, from the mirror, and nothing is copied back into the book. *(2026-10-29, 4871622)*
-- [ ] Follow `Backups/README.txt` to restore a chapter from a zip. NEO opens it, and History shows the text going back as the book opens, before anything is typed or clicked ("Changed while NEO wasn’t recording").
+- [x] Follow `Backups/README.txt` to restore a chapter from a zip. NEO opens it, and History shows the text going back as the book opens, before anything is typed or clicked ("Changed while NEO wasn’t recording"). *(2026-10-29, d96a03b)*
 - [ ] Unzip a zip made before 4g over the library (it holds `recording/` with open session folders). Opening the book doesn't close those sessions again: the stale folders go, the closed files are unchanged, and History plays as before.
 - [ ] **(2 computers)** A session written on the other computer is not copied into the mirror by this one within 7 days; after 7 days without the other computer, it is.
 - [ ] **(2 computers)** No conflict copies (`… 2.jsonl.gz`, `.sync-conflict-…`) appear in `Backups/recordings/` after a week of normal use on both.
