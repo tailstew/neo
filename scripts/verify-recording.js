@@ -58,7 +58,7 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
       if (!r || !r.text) { d.problems.push(`session ${s.id} can’t be read`); continue; }
       const v = R.verifyChain(r.text);
       const { header } = R.parseSession(r.text);
-      const one = { id: s.id, open: r.open, lines: v.lines, chain: v.ok || (r.open && v.breaks.every((b) => b.reason === 'unsealed')), last: v.last, ...span(r.text) };
+      const one = { id: s.id, open: r.open, lines: v.lines, chain: v.ok || (r.open && v.breaks.every((b) => b.reason === 'unsealed')), last: v.last, settled: v.settled, wrote: v.wrote, ...span(r.text) };
       if (!one.chain) d.problems.push(`session ${s.id}: its chain breaks at line ${v.breaks[0].line} (${v.breaks[0].reason})`);
       if (r.gaps.length || r.bad.length) d.problems.push(`session ${s.id}: lines missing or unreadable`);
       if (prevLast !== undefined && header && header.prev !== prevLast) one.unchained = true;

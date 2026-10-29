@@ -878,16 +878,13 @@ const recReadme = () => [
   t('Deleting this folder deletes the history. The book itself is untouched.')
 ].join('\n\n') + '\n';
 
-// A book opens: sessions this device left open are closed (and sealed, as
-// a session closed with words is), and the window learns where the last
-// recording left each chapter.
+// A book opens: sessions this device left open are closed, and the window
+// learns where the last recording left each chapter.
 ipcMain.handle('rec:start', async (_e, bookId, proof) => {
   const device = recDevice();
-  const { crashed, ...r } = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
+  const r = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
   await recMirrorMine(bookId);
   proofSetFlags(proof);
-  for (const text of crashed) proofWrote(bookId, text);
-  if (proofWords.has(bookId)) proofRun(bookId, 'now');
   proofRun(bookId, 'start');
   return { device, app: app.getVersion(), ...r };
 });
@@ -1289,8 +1286,9 @@ ipcMain.handle('proof:serviceRemove', (_e, id) => {
 
 // A book's seals, one call at a time: `words` seals what changed if words
 // were written since the last seal (proofWrote), `now` whatever changed,
-// `start` renews a seal nearly a year old; `start` and `retry` seal
-// another device's sessions no seal names yet (Sealer.others); then each
+// `start` renews a seal nearly a year old and seals words here no seal
+// covers yet (NEO quit or crashed before their seal); `start` and `retry`
+// seal another device's sessions no seal names yet (Sealer.others); then each
 // asks for the stamps the newest seal lacks. Resolves to the seal made, or
 // null.
 function proofRun(bookId, how) {
@@ -1303,7 +1301,7 @@ function proofRun(bookId, how) {
   if (w && (how === 'words' || how === 'now')) { clearTimeout(w.timer); proofWords.delete(bookId); }
   const job = p.queue.then(async () => {
     let made = null;
-    if (how === 'start' || how === 'retry') made = await s.seal({ force: how === 'start' && s.renewDue(), ifOthers: true });
+    if (how === 'start' || how === 'retry') made = await s.seal({ force: how === 'start' && s.renewDue(), ifOthers: true, ifWords: how === 'start' });
     else made = await s.seal();
     // (a book never written on here gets this computer's folder now)
     if (made) await recPrepare(bookId);

@@ -469,6 +469,54 @@ test('the time cover takes the earliest seal, whatever order the seals come in',
   assert.equal(c.firstStamped, 1500);
 });
 
+test('a seal after a session’s last words covers it whole; only the caret, focus and the clock came after', () => {
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures', 'recording-v1', fs.readdirSync(path.join(__dirname, 'fixtures', 'recording-v1')).sort()[0]), 'utf8');
+  const v = R.verifyChain(text);
+  assert.equal(v.wrote, true);
+  assert.deepEqual(v.settled, [v.last], 'the fixture ends on words');
+  // then focus moves, the clock, the end: none of it words
+  const later = R.appendLines(R.appendLines(text, [[900, 'f', 'blur'], [60000, 'T', '2026-11-01T10:00:00.000Z']]), [[10, 's', 0, 3], [5, 'end', {}]]);
+  const w = R.verifyChain(later);
+  assert.deepEqual(w.settled, [v.last, R.verifyChain(R.appendLines(text, [[900, 'f', 'blur'], [60000, 'T', '2026-11-01T10:00:00.000Z']])).last, w.last]);
+  const sessions = [{ id: 's', open: false, last: w.last, settled: w.settled, wrote: true, from: 0, to: 1000 }];
+  const [c] = P.timeCover(sessions, [{ ok: true, by: 2000, heads: { s: v.last } }]);
+  assert.equal(c.wholeBy, 2000);
+  assert.equal(c.gap, undefined);
+  // a word after it, and the same seal no longer covers it
+  const more = R.verifyChain(R.appendLines(later, [[10, 'e', 0, 0, 'x']]));
+  assert.deepEqual(more.settled, [more.last]);
+  const [d] = P.timeCover([{ ...sessions[0], last: more.last, settled: more.settled }], [{ ok: true, by: 2000, heads: { s: v.last } }]);
+  assert.equal(d.gap, 'never');
+  // a session that wrote nothing is no gap, sealed or not
+  const [e] = P.timeCover([{ id: 'q', open: false, last: 'h', settled: ['h'], wrote: false, from: 0, to: 1 }], []);
+  assert.equal(e.gap, undefined);
+});
+
+test('a book opened seals words NEO quit or crashed before sealing, and not a caret moved since', async () => {
+  const { dir, open, rest } = deviceFolder();
+  const s = sealer(dir, network());
+  await s.seal();
+  const joined = () => R.joinParts(fs.readdirSync(open).sort().map((name) => ({ name, text: fs.readFileSync(path.join(open, name), 'utf8') }))).text;
+  const chunk = (lines) => {
+    const was = joined();
+    const n = R.splitLines(was).lines.length;
+    const now = R.appendLines(was, lines);
+    put(path.join(open, `c-${String(n + 1).padStart(6, '0')}.jsonl`), R.splitLines(now).lines.slice(n).map((l) => l + '\n').join(''));
+  };
+  // focus and the caret since the seal: nothing to seal
+  chunk([[900, 'f', 'blur'], [100, 's', 0, 1]]);
+  assert.equal(await s.seal({ ifOthers: true, ifWords: true }), null);
+  assert.equal(await s.seal({ ifOthers: true }), null);
+  // words since it, in the fixture's own next chunk (in that one's place):
+  // ifOthers alone waits for the next words; ifWords seals them
+  nextChunk(open, rest);
+  assert.equal(fs.readdirSync(open).length, 2);
+  assert.ok(R.verifyChain(joined()).wrote);
+  assert.equal(await s.seal({ ifOthers: true }), null);
+  const made = await sealer(dir, network()).seal({ ifOthers: true, ifWords: true });
+  assert.deepEqual(Object.keys(made.heads), [path.basename(open)]);
+});
+
 /* ---------- drand ---------- */
 
 test('a drand round’s time comes from quicknet’s genesis; a round that doesn’t hash is refused', async () => {

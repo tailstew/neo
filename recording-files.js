@@ -137,7 +137,7 @@
 
   // A session's folder becomes one file, <session>.jsonl.gz, checked before
   // the folder goes. A session NEO didn't close itself (it quit or crashed)
-  // gets an `end` line saying so. Resolves to the session's text.
+  // gets an `end` line saying so.
   async function closeSession(io, dir, name, crashed) {
     if (!SESSION.test(name)) throw new Error('Invalid recording session');
     const folder = io.join(dir, name);
@@ -159,7 +159,6 @@
       }
     }
     await io.remove(folder);
-    return text;
   }
 
   // Where this device's recordings left each chapter, replayed from its closed
@@ -208,20 +207,18 @@
   // what a backup zip from before the mirror brings back when it's unzipped
   // over the library: the start of a session closed long since, which every
   // line of it holds. It goes, rather than closing that session again.
-  // `crashed`: the text of each session it closed
   async function start(io, dir, device, cacheFile, mirror) {
-    const crashed = [];
     for (const n of await names(io, dir)) {
       if (!SESSION.test(n)) continue;
       try {
         let done = false;
         try { done = !!(await readClosed(io, dir, n, mirror)); } catch { /* not closed */ }
         if (done) await io.remove(io.join(dir, n));
-        else crashed.push(await closeSession(io, dir, n, true));
+        else await closeSession(io, dir, n, true);
       } catch (err) { io.log('recording', err); }
     }
     const k = await known(io, dir, device, cacheFile, mirror);
-    return { prev: k.prev, known: k.chapters, edited: k.edited, crashed: crashed.filter(Boolean) };
+    return { prev: k.prev, known: k.chapters, edited: k.edited };
   }
 
   // The device's folder, with the book's README.txt and its device.json made

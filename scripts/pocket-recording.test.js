@@ -213,9 +213,7 @@ test('Pocket records what the desktop records, and reads it back the same', asyn
     const desk = path.join(base, 'desk');
     fs.cpSync(dir, desk, { recursive: true });
     const again = await neo.recStart(BOOK);
-    const { crashed, ...want } = await Files.start(desktopIO(), desk, start.device, path.join(base, 'desk-known.json'));
-    assert.equal(crashed.length, 1, 'the desktop is handed the session it closed, to seal');
-    assert.ok(!('crashed' in again), 'the window isn’t');
+    const want = await Files.start(desktopIO(), desk, start.device, path.join(base, 'desk-known.json'));
     assert.deepEqual(plain({ prev: again.prev, known: again.known, edited: again.edited }), plain(want), 'where the recording left each chapter, as the desktop works it out');
     assert.deepEqual(tree(dir), tree(desk), 'the same files, the same lines');
     assert.match(gunzipFile(path.join(dir, s2.id + '.jsonl.gz')), /"end",\{"crashed":true\}/);

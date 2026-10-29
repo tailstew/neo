@@ -1007,31 +1007,44 @@
   }
 
   // Checks the hash chain: where the verified part ends, and every break.
+  // `settled`: the h lines after the session's last writing (`wrote`), so
+  // a seal over any of them fixes all its words in time, since only the
+  // caret, focus and the clock came after; every h, when it wrote nothing.
   function verifyChain(text) {
     const { lines: raw, torn } = splitLines(text);
     const breaks = [];
-    if (!raw.length) return { ok: false, verified: 0, lines: 0, last: null, breaks: [{ line: 0, reason: 'empty' }] };
+    if (!raw.length) return { ok: false, verified: 0, lines: 0, last: null, settled: [], wrote: false, breaks: [{ line: 0, reason: 'empty' }] };
     let H = digest(raw[0] + '\n');
     let body = '';
     let verified = 0;
     let sinceH = 0;
+    let settled = [];
+    let wrote = false;
     for (let i = 1; i < raw.length; i++) {
       const no = i + 1;
       const line = parseLine(raw[i]);
       if (!Array.isArray(line)) { breaks.push({ line: no, reason: 'unreadable' }); body += raw[i] + '\n'; sinceH++; continue; }
-      if (line[1] !== 'h') { body += raw[i] + '\n'; sinceH++; continue; }
+      if (line[1] !== 'h') {
+        if (writes(line)) { settled = []; wrote = true; }
+        body += raw[i] + '\n'; sinceH++; continue;
+      }
       const want = chainHash(H, body);
       if (line[2] !== no) breaks.push({ line: no, reason: 'numbering' });
       if (line[3] !== want) breaks.push({ line: no, reason: 'hash' });
       else if (line[2] === no && !breaks.length) verified = no;
       H = line[3];
+      settled.push(H);
       body = '';
       sinceH = 0;
     }
     if (sinceH) breaks.push({ line: raw.length, reason: 'unsealed' });
     if (torn) breaks.push({ line: raw.length + 1, reason: 'torn' });
-    return { ok: !breaks.length, verified, lines: raw.length, last: H, breaks };
+    return { ok: !breaks.length, verified, lines: raw.length, last: H, settled, wrote, breaks };
   }
+  // a line that puts words in the history: an edit, a write, a chapter
+  // taken out, a tag, or a `b` that says more than where it was left
+  const WRITES = new Set(['r', 'rd', 'e', 'w', 'd', 'tag']);
+  const writes = (line) => WRITES.has(line[1]) || (line[1] === 'b' && line[5] !== 'continue');
 
   /* ---------- replay ---------- */
 

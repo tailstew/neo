@@ -124,6 +124,8 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Write for 20 minutes, then stop (leave NEO open): about five minutes later one new seal appears. In History, its dash on the timeline's track is at the end of those 20 minutes, not at the start of the next writing.
 - [ ] Write without stopping for over an hour: a seal once the first unsealed words are an hour old, then one when you stop. Closing the book seals once more only if words were written since the last seal.
 - [ ] With timestamping on, write a sentence, wait 20 s, then `taskkill /F /T /IM NEO.exe`. Start NEO and open the book: within a few seconds a new seal names the crashed session (`verify-recording.js` doesn't list it as "never timestamped").
+- [ ] With timestamping on, write a sentence and quit NEO within a minute (before the five-minute seal). Start it again and open the book: within a few seconds a new seal covers those words. Open and close a book without typing: no seal.
+- [ ] Write, stop for five minutes until the seal comes, then click around for a while and close the book: no new seal, and `verify-recording.js` and How It Was Written… count that session as timestamped within a day.
 - [ ] Open a book, move the caret around and click in and out of the window for a few minutes without typing, then close it: no new seal in `seals/`.
 - [ ] Tag a moment in History (a name you type): a new seal appears within a minute, not at the next hour.
 - [ ] Turn the network off (airplane mode), write, close the book: seals are written but not stamped, and History's toast as it opens says it's waiting for the network. Turn the network on: within half an hour (or at the next book open), the newest seal is stamped.

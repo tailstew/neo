@@ -477,7 +477,11 @@
         const v = checked[device];
         if (!v && !mine.length) continue;
         const spans = new Map(evidence.sessions.filter((s) => s.device === device).map((s) => [s.id, s]));
-        const sessions = mine.map((s) => ({ id: s.id, open: s.open, last: R.verifyChain(s.text).last, from: (spans.get(s.id) || {}).from || null, to: (spans.get(s.id) || {}).to || null }));
+        const sessions = mine.map((s) => {
+          const v = R.verifyChain(s.text);
+          const span = spans.get(s.id) || {};
+          return { id: s.id, open: s.open, last: v.last, settled: v.settled, wrote: v.wrote, from: span.from || null, to: span.to || null };
+        });
         const seals = v ? v.seals : [];
         out.push({
           device, key: v ? v.publicKey : null, seals: seals.length,

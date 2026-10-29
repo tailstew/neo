@@ -606,6 +606,22 @@ class Sealer {
     return learnt;
   }
 
+  // Whether any of these sessions (changed since the last seal) wrote after
+  // the last head sealed: past it, more than the caret, focus and the clock
+  async wordsUnsealed(changed, st) {
+    for (const s of Object.keys(changed)) {
+      let text = null;
+      try {
+        const gz = path.join(this.dir, s + '.jsonl.gz');
+        text = fs.existsSync(gz) ? this.io.readGz(gz) : R.joinParts(await Files.readParts(this.io, path.join(this.dir, s))).text;
+      } catch (err) { this.log('proof', err); }
+      if (!text) continue;
+      const v = R.verifyChain(text);
+      if (v.wrote && !v.settled.includes(st.sealed.get(s))) return true;
+    }
+    return false;
+  }
+
   // This device's sessions' heads
   async heads() {
     const out = new Map();
@@ -671,13 +687,15 @@ class Sealer {
   // that seal nothing themselves; null when nothing did, unless `force` (a
   // yearly renewal, which seals the stamps alone). `ifOthers`: only if
   // another device's sessions want sealing (a book looked at while nothing
-  // is written here).
-  async seal({ force = false, ifOthers = false } = {}) {
+  // is written here), or, with `ifWords`, words here no seal covers yet (a
+  // session NEO quit or crashed before its seal).
+  async seal({ force = false, ifOthers = false, ifWords = false } = {}) {
     const st = this.load();
     const changed = {};
     for (const [s, h] of await this.heads()) if (st.sealed.get(s) !== h) changed[s] = h;
     const others = await this.others();
     const anyOthers = Object.keys(others).length > 0;
+    if (!force && !anyOthers && ifOthers && ifWords && await this.wordsUnsealed(changed, st)) ifOthers = false;
     if (!force && !anyOthers && (ifOthers || !Object.keys(changed).length)) return null;
     const tokens = {};
     for (const f of this.files()) {
@@ -910,9 +928,12 @@ async function verifyDevice(dir, { sessions = null, others = null, online = fals
 // in part (a seal over the session while it was open) and when as a whole
 // (a seal naming its last `h`), from the seals verifyDevice checked, in any
 // order (R.sealsOver: its own, and other devices' that sealed it).
-// Sessions are { id, open, last (its last h), from, to }. A closed session
-// with no whole stamp, or one stamped more than a day after it ended, is a
-// gap: [{ session, from, to, firstStamped, wholeBy, gap: 'never' | 'late' }]
+// Sessions are { id, open, last (its last h), settled, wrote, from, to }:
+// a seal over any `settled` h (R.verifyChain) covers it whole, since only
+// the caret, focus and the clock came after; without them, only its last.
+// A closed session that wrote, with no whole stamp or one stamped more
+// than a day after it ended, is a gap:
+// [{ session, from, to, firstStamped, wholeBy, gap: 'never' | 'late' }]
 const DAY_MS = 24 * 3600 * 1000;
 function timeCover(sessions, seals) {
   const bySession = new Map();
@@ -921,13 +942,15 @@ function timeCover(sessions, seals) {
     for (const [id, h] of Object.entries(s.heads || {})) {
       const was = bySession.get(id) || { first: null, whole: null };
       if (when && (was.first === null || when < was.first)) was.first = when;
-      if (s.ok && when && (was.whole === null || when < was.whole) && h === (sessions.find((x) => x.id === id) || {}).last) was.whole = when;
+      const x = sessions.find((y) => y.id === id) || {};
+      if (s.ok && when && (was.whole === null || when < was.whole) && (x.settled ? x.settled.includes(h) : h === x.last)) was.whole = when;
       bySession.set(id, was);
     }
   }
   return sessions.map((s) => {
     const b = bySession.get(s.id) || { first: null, whole: null };
     const c = { session: s.id, from: s.from, to: s.to, firstStamped: b.first, wholeBy: b.whole };
+    if (s.wrote === false) return c;
     if (!b.whole && !s.open) c.gap = 'never';
     else if (b.whole && s.to !== null && b.whole - s.to > DAY_MS) c.gap = 'late';
     return c;

@@ -728,7 +728,7 @@
       // window learns where its last recording left each chapter
       recStart: async (bookId) => {
         const device = await recDevice();
-        const { crashed, ...r } = await Files.start(recIO, p(recBook(bookId), device), device, DATA + 'recording-cache/' + bookId + '/known.json', p(recMirror(bookId), device));
+        const r = await Files.start(recIO, p(recBook(bookId), device), device, DATA + 'recording-cache/' + bookId + '/known.json', p(recMirror(bookId), device));
         return { device, app: POCKET_VERSION, ...r };
       },
       recChunk: async (bookId, session, first, text) => {
