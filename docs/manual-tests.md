@@ -10,7 +10,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [x] `Backups/recordings/<book folder>/<this computer's id>/` holds each finished session and `device.json`, and no open session folder. *(2026-10-29, 7c87c3e)*
 - [x] Kill NEO while writing (`taskkill /F /T /IM NEO.exe`: Task Manager's End task closes it nicely), start it, open the book. The crashed session is closed and appears in the mirror. *(2026-10-29, 7c87c3e)*
 - [x] Start NEO again the same day. Nothing in the mirror changes (same modified times), and the README isn't rewritten. *(2026-10-29, 7c87c3e)*
-- [ ] Switch the interface language, restart. `Backups/README.txt` is rewritten in that language (once the strings are translated).
+- [x] Switch the interface language (View → Language), quit and start NEO again (switching only reloads the window). `Backups/README.txt` is rewritten in that language (once the strings are translated). *(2026-10-29, 4871622)*
 - [ ] Delete a book from the shelf. Both the book folder and its mirror folder are in the Recycle Bin; restore both and the book and its history come back.
 - [ ] Delete one session's `.jsonl.gz` from a book's `recording/<device>/`. Writing History still plays that day, from the mirror, and nothing is copied back into the book.
 - [ ] Follow `Backups/README.txt` to restore a chapter from a zip. NEO opens it, and History shows the text going back on the next day.
