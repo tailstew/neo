@@ -878,13 +878,16 @@ const recReadme = () => [
   t('Deleting this folder deletes the history. The book itself is untouched.')
 ].join('\n\n') + '\n';
 
-// A book opens: sessions this device left open are closed, and the window
-// learns where the last recording left each chapter.
+// A book opens: sessions this device left open are closed (and sealed, as
+// a session closed with words is), and the window learns where the last
+// recording left each chapter.
 ipcMain.handle('rec:start', async (_e, bookId, proof) => {
   const device = recDevice();
-  const r = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
+  const { crashed, ...r } = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
   await recMirrorMine(bookId);
   proofSetFlags(proof);
+  for (const text of crashed) proofWrote(bookId, text);
+  if (proofWords.has(bookId)) proofRun(bookId, 'now');
   proofRun(bookId, 'start');
   return { device, app: app.getVersion(), ...r };
 });

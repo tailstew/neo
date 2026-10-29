@@ -6,10 +6,10 @@ Each item says what to do and what should happen. Tick it with the date and the 
 
 ## Backups (4g)
 
-- [ ] Start NEO with a book that has Writing History. `Backups/` gets `README.txt`, and today's `neo-backup-<date>.zip` has no `book-…/recording/` folders in it and has `_recordings.txt` at the top.
-- [ ] `Backups/recordings/<book folder>/<this computer's id>/` holds each finished session and `device.json`, and no open session folder.
-- [ ] Kill NEO in Task Manager while writing, start it, open the book. The crashed session is closed and appears in the mirror.
-- [ ] Start NEO again the same day. Nothing in the mirror changes (same modified times), and the README isn't rewritten.
+- [x] Start NEO with a book that has Writing History. `Backups/` gets `README.txt`, and today's `neo-backup-<date>.zip` has no `book-…/recording/` folders in it and has `_recordings.txt` at the top. *(2026-10-29, 7c87c3e)*
+- [x] `Backups/recordings/<book folder>/<this computer's id>/` holds each finished session and `device.json`, and no open session folder. *(2026-10-29, 7c87c3e)*
+- [x] Kill NEO while writing (`taskkill /F /T /IM NEO.exe`: Task Manager's End task closes it nicely), start it, open the book. The crashed session is closed and appears in the mirror. *(2026-10-29, 7c87c3e)*
+- [x] Start NEO again the same day. Nothing in the mirror changes (same modified times), and the README isn't rewritten. *(2026-10-29, 7c87c3e)*
 - [ ] Switch the interface language, restart. `Backups/README.txt` is rewritten in that language (once the strings are translated).
 - [ ] Delete a book from the shelf. Both the book folder and its mirror folder are in the Recycle Bin; restore both and the book and its history come back.
 - [ ] Delete one session's `.jsonl.gz` from a book's `recording/<device>/`. Writing History still plays that day, from the mirror, and nothing is copied back into the book.
@@ -123,6 +123,7 @@ Each item says what to do and what should happen. Tick it with the date and the 
 - [ ] Check a stamp without NEO: `openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem` (from NEO's folder) says `Verification: OK`. The same for Sectigo's.
 - [ ] Write for 20 minutes, then stop (leave NEO open): about five minutes later one new seal appears. In History, its dash on the timeline's track is at the end of those 20 minutes, not at the start of the next writing.
 - [ ] Write without stopping for over an hour: a seal once the first unsealed words are an hour old, then one when you stop. Closing the book seals once more only if words were written since the last seal.
+- [ ] With timestamping on, write a sentence, wait 20 s, then `taskkill /F /T /IM NEO.exe`. Start NEO and open the book: within a few seconds a new seal names the crashed session (`verify-recording.js` doesn't list it as "never timestamped").
 - [ ] Open a book, move the caret around and click in and out of the window for a few minutes without typing, then close it: no new seal in `seals/`.
 - [ ] Tag a moment in History (a name you type): a new seal appears within a minute, not at the next hour.
 - [ ] Turn the network off (airplane mode), write, close the book: seals are written but not stamped, and History's toast as it opens says it's waiting for the network. Turn the network on: within half an hour (or at the next book open), the newest seal is stamped.

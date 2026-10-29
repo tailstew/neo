@@ -30,7 +30,7 @@ function span(text) {
   const { header, lines } = R.parseSession(text);
   const from = header ? Date.parse(header.startedAt) : null;
   let to = from;
-  for (const l of lines) if (Array.isArray(l) && l[1] === 'T') to = Math.max(to, Date.parse(l[2]));
+  for (const w of R.lineWalls(header, lines).walls) if (Number.isFinite(w)) to = Math.max(to, w);
   return { from, to };
 }
 
