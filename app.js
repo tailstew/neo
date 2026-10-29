@@ -779,13 +779,27 @@ async function loadLibrary() {
   applyShelfZoom();
   library = applyDeviceLook(await window.neo.readLibrary());
   // A first shelf is named in the language NEO had when it was made. If the
-  // writer never renamed it, it follows a change of language.
+  // writer never renamed it, it follows a change of language: from English,
+  // or from the language this device last showed (any language, the first
+  // time). Not from another device's, so a phone in another language and
+  // this computer don't take turns renaming it in library.json.
   const DEFAULT_SHELF = 'Works in Progress';
   const own = t(DEFAULT_SHELF);
+  const lang = NeoI18n.getLocale();
+  let was = null;
+  try { was = localStorage.getItem('neo.shelfLanguage'); } catch { /* none */ }
+  const names = new Set([DEFAULT_SHELF]);
+  if (was !== lang && window.neo.translationsOf) {
+    try {
+      const all = await window.neo.translationsOf(DEFAULT_SHELF);
+      for (const x of was ? [all[was]] : Object.values(all)) if (x) names.add(x);
+    } catch { /* English alone, as before */ }
+  }
   // (each writing name has a first shelf of its own, made the same way)
-  const untouched = (library.shelves || []).filter((s) => s.name === DEFAULT_SHELF && own !== DEFAULT_SHELF);
+  const untouched = (library.shelves || []).filter((s) => names.has(s.name) && s.name !== own);
   for (const s of untouched) s.name = own;
   if (untouched.length) await writeLibrary(library);
+  try { localStorage.setItem('neo.shelfLanguage', lang); } catch { /* fine */ }
   if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
   if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   if (!library.firstRunDone) {

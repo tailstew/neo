@@ -150,6 +150,17 @@ function setUiLanguage(code) {
   sendToWindow({ type: 'uiLanguage', value: uiLanguage });
 }
 
+// One string in every language NEO has: { code: text }
+ipcMain.handle('i18n:translations', (_e, key) => {
+  const out = {};
+  if (typeof key !== 'string') return out;
+  for (const { code } of listLanguages()) {
+    const v = localeDict(code)[key];
+    if (typeof v === 'string' && v) out[code] = v;
+  }
+  return out;
+});
+
 ipcMain.handle('i18n:reload', (e) => {
   e.sender.reload();
   return true;

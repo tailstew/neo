@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld('neo', {
   i18n: ipcRenderer.sendSync('i18n:get'),
   paper: ipcRenderer.sendSync('paper:get'), // 'Letter' or 'A4', from the computer's region
   reloadForLanguage: () => ipcRenderer.invoke('i18n:reload'),
+  translationsOf: (key) => ipcRenderer.invoke('i18n:translations', key),
 
   writingStyleState: (st) => ipcRenderer.send('style:state', st),
   viewState: (st) => ipcRenderer.send('view:state', st),
