@@ -2787,6 +2787,10 @@ const rec = {
     if (cause === 'open') { // the book as it opened: nothing happened yet
       this.model[chId] = html;
       if (Rec.isStream(chId)) this.wrote[chId] = html;
+      // a chapter changed while nothing recorded (a file put back from a
+      // backup, another program) is caught up now, not at its first edit,
+      // so History shows the book as it is
+      else if (this.known[chId] !== undefined && this.known[chId] !== html) this.establish(chId, html);
       return;
     }
     this.tick(); // (a new day's session starts before the change, not after)

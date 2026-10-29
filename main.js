@@ -1102,13 +1102,14 @@ let proofTimer = null;
 const proofSealers = new Map(); // bookId -> { sealer, queue }
 const proofWords = new Map();   // bookId -> { since, timer }: words written since its last seal
 
-// A chunk that wrote words (a chapter or stream written, taken out, or a
-// tag) wants a seal: once the writing has stopped for PROOF_IDLE, so the
-// seal, and its mark on History's timeline, comes at the end of the
-// stretch it covers, or once the first unsealed words are an hour old.
+// A chunk that wrote words (a chapter or stream written, taken out, a tag,
+// or a catch-up of text changed while nothing recorded) wants a seal: once
+// the writing has stopped for PROOF_IDLE, so the seal, and its mark on
+// History's timeline, comes at the end of the stretch it covers, or once
+// the first unsealed words are an hour old.
 // A chunk of caret moves and focus alone changes nothing worth sealing.
 function proofWrote(bookId, text) {
-  if (!proofOn || !/^\[\d+,"(?:w|d|tag)",/m.test(text)) return;
+  if (!proofOn || !/^\[\d+,"(?:w|d|tag)",|^\[\d+,"x","catch-up"\]/m.test(text)) return;
   let w = proofWords.get(bookId);
   if (!w) proofWords.set(bookId, w = { since: Date.now(), timer: null });
   clearTimeout(w.timer);

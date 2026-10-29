@@ -658,6 +658,11 @@ test('a chapter changed while NEO was closed is caught up, not taken as typing',
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8') + '<p>Edited elsewhere.</p>');
   await js(`openBook(${JSON.stringify(BOOK)})`);
   await tick(500);
+  // caught up as the book opens, before anything is typed or clicked
+  await flush();
+  const opened = R.parseSession(readOpen(await sessionId()).text).lines;
+  assert.ok(opened.some((l) => l[1] === 'x' && l[2] === 'catch-up'), 'caught up as it opened');
+  assert.ok(!opened.some((l) => l[1] === 'k' || l[1] === 'r'), 'with nothing typed');
   await caretAt(0, 0, -1);
   await type(' Here again.');
   await flush();
