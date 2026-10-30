@@ -74,7 +74,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [ ] In History, pick a chapter in the side pane, then go to a day before it was written: it stays in the list, dimmed, and the sheet says it doesn't exist yet. The other chapters listed are only those there at that moment.
 - [ ] Keyboard only: Tab reaches every control in the days and the player, each shows on focus, and Esc always gets out.
 - [ ] In German (long words) and in Romanian, the dialog's labels fit and nothing overlaps, at the window's smallest size too.
-- [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged.
+- [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged. *(first half passed 2026-10-30, 6947c24: Teacher's Pet, the laptop and the Chromebook, in order and named, on both; the divergence still to see, with the next item)*
 - [ ] **(2 computers)** NEO open on both at once on the same book (iCloud or Syncthing): no words lost, the twin chapter appears, and History shows both.
 
 ## Restore (phases 3 and 7)
