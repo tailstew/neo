@@ -734,6 +734,56 @@ ipcMain.handle('chapter:delete', (_e, bookId, chapterId) => {
   return true;
 });
 
+// A sync program that finds a chapter changed on two devices at once keeps
+// one and leaves the other beside it under a name of its own: Syncthing's
+// "<id>.sync-conflict-<date>-<time>-<device>.html", Dropbox's and
+// Nextcloud's "<id> (… conflicted copy …).html", iCloud's "<id> 2.html".
+// NEO reads chapters by id, so it would never show that version.
+const CONFLICT_COPY = [
+  /^(.+?)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}\.html$/,
+  /^(.+?) \([^)]*conflicted copy[^)]*\)\.html$/i,
+  /^(.+?) \d+\.html$/
+];
+function conflictCopyOf(file) {
+  for (const re of CONFLICT_COPY) {
+    const m = re.exec(file);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// [{ file, chapterId, html }] for each such copy in a book's chapters folder
+ipcMain.handle('chapter:conflicts', (_e, bookId) => {
+  const dir = path.join(bookDir(bookId), 'chapters');
+  const out = [];
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return out; }
+  for (const file of names) {
+    const chapterId = conflictCopyOf(file);
+    if (!chapterId) continue;
+    try { out.push({ file, chapterId, html: fs.readFileSync(path.join(dir, file), 'utf8') }); } catch { /* vanished */ }
+  }
+  return out;
+});
+
+// The copy's words are kept in the book now: it moves out of chapters/ into
+// the book's sync-conflicts/ folder, so it isn't taken in again, and is
+// still there, as the sync program left it, for anyone who looks.
+ipcMain.handle('chapter:conflictDone', (_e, bookId, file) => {
+  if (!conflictCopyOf(String(file))) return false;
+  const kept = path.join(bookDir(bookId), 'sync-conflicts');
+  const to = path.join(kept, libName(file));
+  if (fs.existsSync(to)) return false;
+  try {
+    fs.mkdirSync(kept, { recursive: true });
+    fs.renameSync(path.join(bookDir(bookId), 'chapters', libName(file)), to);
+    return true;
+  } catch (err) {
+    logError('conflict copy', err);
+    return false;
+  }
+});
+
 ipcMain.handle('aux:read', (_e, bookId, name) => {
   // name: 'notes' | 'outline'
   const file = path.join(bookDir(bookId), libName(name) + '.html');

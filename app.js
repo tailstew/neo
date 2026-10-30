@@ -6746,6 +6746,7 @@ async function openBook(bookId) {
 
   renderChapters();
   renderStickies();
+  takeConflictCopies(bookId); // what a sync program set aside while the book was closed
   migrateDarlingAnchors(); // sweep legacy invisible markers out of the prose
   reconcileMarks();        // re-adopt any note marks orphaned by cut/paste
   updateCounters();
@@ -15423,8 +15424,8 @@ function twinChapterTitle(title) {
   const when = new Date().toLocaleTimeString(NeoI18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
   return ((title || '') + ' ' + t('from other device, {time}', { time: when })).trim();
 }
-async function keepOtherDeviceVersion(bookId, chId, disk) {
-  const twinId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+async function keepOtherDeviceVersion(bookId, chId, disk, twinId) {
+  twinId = twinId || 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
   if (book && book.id === bookId) {
     const idx = book.chapterOrder.indexOf(chId);
     book.chapterOrder.splice(idx < 0 ? book.chapterOrder.length : idx + 1, 0, twinId);
@@ -15452,6 +15453,43 @@ async function keepOtherDeviceVersion(bookId, chId, disk) {
   meta.chapterTitles = meta.chapterTitles || {};
   meta.chapterTitles[twinId] = twinChapterTitle(meta.chapterTitles[chId]);
   await writeBookMeta(bookId, meta);
+}
+
+// A sync program that found a chapter changed on two devices at once kept
+// one and left the other beside it as a copy of its own (Syncthing's
+// .sync-conflict-…, Dropbox's conflicted copy, iCloud's "… 2"; found by
+// chapter:conflicts), which NEO would never show: each device saved its own
+// words, then simply adopted the file it was handed. The copy's words become
+// the chapter after, as a version NEO finds itself does, and once that
+// chapter reads back from disk the copy moves to the book's sync-conflicts/
+// folder (chapter:conflictDone), kept, never deleted. Its id
+// comes from the copy's name, so two devices taking in the same copy make
+// one chapter, not two. A copy of a chapter no longer in the book stays.
+function conflictTwinId(file) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < file.length; i++) h = Math.imul(h ^ file.charCodeAt(i), 0x01000193) >>> 0;
+  return 'ch-sync-' + h.toString(36);
+}
+let takingConflicts = false;
+async function takeConflictCopies(bookId) {
+  if (takingConflicts || !window.neo.chapterConflicts) return;
+  takingConflicts = true;
+  try {
+    for (const c of await window.neo.chapterConflicts(bookId)) {
+      if (!book || book.id !== bookId) return;
+      if (!book.chapterOrder.includes(c.chapterId)) continue;
+      const twinId = conflictTwinId(c.file);
+      if (!book.chapterOrder.includes(twinId) && wordsBeyond(c.html, chapterHTML[c.chapterId])) {
+        await keepOtherDeviceVersion(bookId, c.chapterId, c.html, twinId);
+        if ((await window.neo.readChapter(bookId, twinId)) !== c.html) continue; // not on disk yet: next look
+      }
+      await window.neo.chapterConflictDone(bookId, c.file);
+    }
+  } catch (err) {
+    window.neo.logError('conflict copies: ' + ((err && err.message) || err));
+  } finally {
+    takingConflicts = false;
+  }
 }
 
 function scheduleChapterSave(chId) {
@@ -16400,6 +16438,8 @@ async function refreshFromDisk() {
       else if (replaced.length) toast(t('Updated from your other device — the text it replaced is in Darlings'), 8000);
       else toast(t('Updated from your other device'));
     }
+
+    await takeConflictCopies(bookId);
 
     // The writer moved on to the other device since last touching this one:
     // the caret goes where they left off there. (Its chapter's words may

@@ -121,6 +121,37 @@ describe('filesystem', { concurrency: 1 }, () => {
     }
   });
 
+  test("a sync program's conflict copies of a chapter are found, and only those move to sync-conflicts/", () => {
+    const dir = tempLibrary();
+    try {
+      const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
+      const chapters = path.join(dir, book.id, 'chapters');
+      const copies = {
+        'ch-a1-b2.sync-conflict-20261030-144927-Q7EGGF3.html': 'ch-a1-b2', // Syncthing
+        "ch-a1-b2 (Ada's conflicted copy 2026-10-30).html": 'ch-a1-b2', // Dropbox
+        'ch-a1-b2 (conflicted copy 2026-10-30 144927).html': 'ch-a1-b2', // Nextcloud
+        'ch-a1-b2 2.html': 'ch-a1-b2' // iCloud
+      };
+      fs.writeFileSync(path.join(chapters, 'ch-a1-b2.html'), '<p>here</p>');
+      for (const name of Object.keys(copies)) fs.writeFileSync(path.join(chapters, name), '<p>there</p>');
+      fs.writeFileSync(path.join(chapters, 'ch-a1-b2.html.tmp'), '<p>half</p>');
+      const found = main.call('chapter:conflicts', book.id);
+      assert.equal(JSON.stringify(found.map((c) => [c.file, c.chapterId]).sort()), JSON.stringify(Object.entries(copies).sort()));
+      assert.ok(found.every((c) => c.html === '<p>there</p>'));
+
+      assert.equal(main.call('chapter:conflictDone', book.id, 'ch-a1-b2.html'), false, 'a chapter is no copy');
+      assert.throws(() => main.call('chapter:conflictDone', book.id, '../x.sync-conflict-20261030-144927-Q7EGGF3.html'), /Invalid library name/);
+      for (const name of Object.keys(copies)) assert.equal(main.call('chapter:conflictDone', book.id, name), true);
+      assert.deepEqual(fs.readdirSync(chapters).sort(), ['ch-a1-b2.html', 'ch-a1-b2.html.tmp']);
+      const kept = path.join(dir, book.id, 'sync-conflicts');
+      assert.deepEqual(fs.readdirSync(kept).sort(), Object.keys(copies).sort());
+      for (const name of Object.keys(copies)) assert.equal(fs.readFileSync(path.join(kept, name), 'utf8'), '<p>there</p>', 'as it was');
+      assert.equal(main.call('chapter:conflicts', book.id).length, 0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('notes round-trip, and a JSON replace leaves the whole file and no .tmp', () => {
     const dir = tempLibrary();
     try {
