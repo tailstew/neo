@@ -164,6 +164,127 @@ test("a copy of book.json.bak, or a book.json copy with nothing more in it, is o
   assert.equal(keptBook(same), true);
 });
 
+// book.json as the other device would save it, knowing nothing since `meta`
+const standing = () => JSON.parse(fs.readFileSync(path.join(bookDir(), 'book.json'), 'utf8'));
+const saveAsOther = (meta, name = 'book.json') => {
+  const m = JSON.parse(JSON.stringify(meta));
+  m.lastPosition = { ...(m.lastPosition || {}), at: Date.now(), pIdx: 7 }; // only the caret moved there
+  fs.writeFileSync(path.join(bookDir(), name), JSON.stringify(m, null, 2));
+};
+const newChapter = (id, text, title) => js(`(async () => {
+  book.chapterOrder.push(${JSON.stringify(id)});
+  if (${JSON.stringify(title || '')}) (book.chapterTitles = book.chapterTitles || {})[${JSON.stringify(id)}] = ${JSON.stringify(title || '')};
+  setChapterHTML(${JSON.stringify(id)}, ${JSON.stringify(text)}, 'new');
+  await persistChapter(${JSON.stringify(id)});
+  await saveMeta();
+})()`);
+const cards = () => js('(book.looseCards || []).map((c) => c.html || c.text || "")');
+// a look at the disk, then until what it joined is saved (on a timer, which
+// a window in the background may run late)
+const lookAndSave = async () => {
+  await js('refreshFromDisk()');
+  for (let i = 0; i < 100 && !(await js('metaSig(book) === savedMetaSig')); i++) await tick(100);
+  await tick(200);
+};
+
+test("a chapter set on a loose card here doesn't come back with the other device's older book.json", async () => {
+  await newChapter('ch-aside-0003', '<p>Words that go on a card.</p>');
+  const old = standing();
+  await js("chapterToLoose('ch-aside-0003')");
+  await tick(300);
+  assert.equal((await order()).includes('ch-aside-0003'), false);
+  saveAsOther(old);
+  await lookAndSave();
+  assert.equal((await order()).includes('ch-aside-0003'), false, 'still out');
+  assert.equal((await cards()).filter((h) => /go on a card/.test(h)).length, 1, 'the card, once');
+  const saved = standing();
+  assert.equal(saved.chapterOrder.includes('ch-aside-0003'), false, 'on disk');
+  assert.equal(saved.looseCards.filter((c) => /go on a card/.test(c.html || '')).length, 1);
+  assert.equal(saved.removed['ch-aside-0003'].back, undefined);
+});
+
+test("a chapter added here keeps its place and title when the other device's older book.json arrives", async () => {
+  const old = standing();
+  await newChapter('ch-here-0004', '<p>Written on this computer.</p>', 'Mine');
+  saveAsOther(old);
+  await lookAndSave();
+  assert.equal((await order()).at(-1), 'ch-here-0004');
+  assert.equal(await js("book.chapterTitles['ch-here-0004']"), 'Mine');
+  assert.equal(standing().chapterOrder.at(-1), 'ch-here-0004', 'on disk');
+});
+
+test('a loose card made here stays when the other device\'s older book.json arrives', async () => {
+  const old = standing();
+  await js(`(async () => {
+    book.looseCards.push({ id: 'lc-here-0005', text: 'A card noted here' });
+    await saveMeta();
+  })()`);
+  saveAsOther(old);
+  await lookAndSave();
+  assert.equal((await js('book.looseCards.map((c) => c.id)')).includes('lc-here-0005'), true);
+  assert.equal(standing().looseCards.some((c) => c.id === 'lc-here-0005'), true, 'on disk');
+});
+
+test("a book.json copy from the device that set a chapter aside takes it out here too, and brings its card", async () => {
+  await newChapter('ch-there-0006', '<p>Set aside over there.</p>');
+  const text = await html('ch-there-0006');
+  const name = 'book.sync-conflict-20261030-170000-ZJR4MCC.json';
+  bookCopy(name, (m) => {
+    m.chapterOrder = m.chapterOrder.filter((id) => id !== 'ch-there-0006');
+    m.looseCards.push({ id: 'lc-there-0006', held: 'chapter', html: text, text: '', words: 3 });
+    m.removed = { ...(m.removed || {}), 'ch-there-0006': { at: Date.now(), hash: null } };
+  });
+  // the copy's fingerprint, as the other device made it
+  const hash = await js(`textHash(${JSON.stringify(text)})`);
+  const m = JSON.parse(fs.readFileSync(path.join(bookDir(), name), 'utf8'));
+  m.removed['ch-there-0006'].hash = hash;
+  fs.writeFileSync(path.join(bookDir(), name), JSON.stringify(m, null, 2));
+  await js('refreshFromDisk()');
+  await tick(1200);
+  assert.equal((await order()).includes('ch-there-0006'), false);
+  assert.equal((await cards()).filter((h) => /Set aside over there/.test(h)).length, 1);
+  assert.equal(standing().chapterOrder.includes('ch-there-0006'), false, 'on disk');
+  assert.equal(keptBook(name), true);
+});
+
+test('a chapter written in here after the other device took it out stays, and goes back in there', async () => {
+  await newChapter('ch-both-0007', '<p>Begun.</p>');
+  const name = 'book.sync-conflict-20261030-170100-ZJR4MCC.json';
+  const hash = await js("textHash('<p>Begun.</p>')");
+  await js(`(async () => {
+    setChapterHTML('ch-both-0007', '<p>Begun. And carried on here.</p>', 'input');
+    await persistChapter('ch-both-0007');
+  })()`);
+  bookCopy(name, (m) => {
+    m.chapterOrder = m.chapterOrder.filter((id) => id !== 'ch-both-0007');
+    m.removed = { ...(m.removed || {}), 'ch-both-0007': { at: Date.now(), hash } };
+  });
+  await js('refreshFromDisk()');
+  await tick(1200);
+  assert.equal((await order()).includes('ch-both-0007'), true);
+  const saved = standing();
+  assert.equal(saved.chapterOrder.includes('ch-both-0007'), true, 'on disk');
+  assert.equal(saved.removed['ch-both-0007'].back, true, 'back, for the other device');
+  assert.match(fs.readFileSync(path.join(chapters(), 'ch-both-0007.html'), 'utf8'), /carried on here/);
+});
+
+test('⌘Z on a chapter set on a card marks it back', async () => {
+  await newChapter('ch-undo-0008', '<p>Undone.</p>');
+  await js("chapterToLoose('ch-undo-0008')");
+  await tick(300);
+  assert.equal(standing().removed['ch-undo-0008'].back, undefined);
+  await js('structuralUndo()');
+  await tick(300);
+  await js('saveMeta()');
+  await tick(300);
+  assert.equal((await order()).includes('ch-undo-0008'), true);
+  const saved = standing();
+  assert.equal(saved.removed['ch-undo-0008'].back, true);
+  assert.equal(saved.looseCards.some((c) => /Undone/.test(c.html || '')), false, 'the card went');
+  const card = Object.entries(saved.removed).find(([id, r]) => id.startsWith('lc-') && r.hash && !r.back);
+  assert.ok(card, 'the card noted as removed');
+});
+
 /* ---------- runner ---------- */
 
 async function main() {

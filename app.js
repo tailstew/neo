@@ -953,6 +953,7 @@ async function shelfMeta(bookId) {
 // read-only, so the assignment threw and app.js stopped loading.
 function writeBookMeta(bookId, meta) {
   bookMetaCache.delete(bookId);
+  if (meta === book) noteStructure();
   return window.neo.writeBookMeta(bookId, meta);
 }
 
@@ -3096,6 +3097,7 @@ function setChapterHTML(chId, html, cause, opts) {
   rec.change(chId, html, cause, opts);
 }
 function dropChapterHTML(chId, cause) {
+  noteRemoved(chId, textHash(String(chapterHTML[chId] || ''))); // so another device's book.json can't bring it back
   delete chapterHTML[chId];
   rec.drop(chId, cause);
 }
@@ -6707,6 +6709,7 @@ async function openBook(bookId) {
   if (gen !== openGeneration) return;
   tabPlaces = {}; // a fresh book starts with fresh places
   book = meta;
+  knowCards();
   showWindowTitle();
   snapShown = null;
   snapCache = null;
@@ -15473,54 +15476,71 @@ function conflictTwinId(file) {
 // book.json's own conflict copies (book:conflicts): the other device's
 // book.json, set aside when both saved it at once (every flush saves the
 // caret's place in it, so this is common). The book.json that stands wins,
-// as when both devices restructured (refreshFromDisk), but nothing holding
-// words is dropped: a chapter in the copy's order that this one lacks, whose
-// file is still there with words in it (a chapter just made on the other
-// device; a deleted one's file is gone), goes back in after the chapter
-// before it there, with what the copy held for it (its title, kind, notes);
-// so does a loose card with words this book lacks. The rest of the copy
-// gives way, and the copy is kept as it was in sync-conflicts/.
+// as when both devices restructured (refreshFromDisk), but the chapters and
+// loose cards are joined by both files' removals (book.removed, above): a
+// chapter or card the copy took out goes here too, unless it holds words
+// written here since, and nothing holding words is dropped. A chapter in the
+// copy's order that this one lacks, that neither took out, whose file is
+// there with words in it (a chapter just made on the other device), goes
+// back in after the chapter before it there, with what the copy held for it
+// (its title, kind, notes); so does a loose card with words this book
+// lacks. The rest of the copy gives way, and the copy is kept as it was in
+// sync-conflicts/.
 async function takeBookConflictCopies(bookId) {
   for (const c of await window.neo.bookConflicts(bookId)) {
     if (!book || book.id !== bookId) return;
     const meta = c.meta;
     let back = 0;
+    let noted = false; // only its removals were news: saved, with nothing to show
     if (meta && Array.isArray(meta.chapterOrder)) {
-      const order = book.chapterOrder;
-      for (const [i, chId] of meta.chapterOrder.entries()) {
-        if (typeof chId !== 'string' || order.includes(chId)) continue;
-        const html = await window.neo.readChapter(bookId, chId);
+      const removed = mergeRemoved(book.removed, meta.removed);
+      const files = {};
+      for (const chId of meta.chapterOrder) {
+        if (typeof chId !== 'string' || book.chapterOrder.includes(chId) || (removed[chId] && !removed[chId].back)) continue;
+        files[chId] = await window.neo.readChapter(bookId, chId);
         if (!book || book.id !== bookId) return;
-        if (!wordsBeyond(html, '')) continue;
-        const prev = meta.chapterOrder.slice(0, i).reverse().find((x) => order.includes(x));
-        order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, chId);
-        for (const [k, v] of Object.entries(meta)) {
-          if (!v || typeof v !== 'object' || Array.isArray(v) || !(chId in v)) continue;
-          if (book[k] === undefined) book[k] = {};
-          if (book[k] && typeof book[k] === 'object' && !(chId in book[k])) book[k][chId] = v[chId];
-        }
-        setChapterHTML(chId, html, 'disk-new');
-        savedHTML[chId] = html;
-        knowDisk(bookId, chId, html);
-        back++;
       }
-      for (const card of Array.isArray(meta.looseCards) ? meta.looseCards : []) {
-        if (!card || typeof card !== 'object' || (book.looseCards || []).some((x) => x.id === card.id)) continue;
-        if (!wordsBeyond((card.text || '') + ' ' + (card.html || ''), '')) continue;
-        (book.looseCards = book.looseCards || []).push(card);
-        back++;
+      let stamps = null;
+      if (window.neo.chapterStamps) {
+        try { stamps = await window.neo.chapterStamps(bookId); } catch { stamps = null; }
+        if (!book || book.id !== bookId) return;
       }
+      const cards = book.looseCards || [];
+      const j = joinStructure(book, meta, removed, stamps, (chId) => wordsBeyond(files[chId], ''));
+      const gone = book.chapterOrder.filter((chId) => !j.order.includes(chId));
+      const added = j.order.filter((chId) => !book.chapterOrder.includes(chId));
+      // a card the copy had with no words in it stays behind
+      const newCards = j.cards.filter((x) => cards.includes(x) || wordsBeyond((x.text || '') + ' ' + (x.html || ''), ''));
+      back = added.length + gone.length + j.back.length +
+        newCards.filter((x) => !cards.includes(x)).length + cards.filter((x) => !newCards.includes(x)).length;
+      noted = JSON.stringify(removed) !== JSON.stringify(book.removed || {});
+      for (const chId of added) {
+        carryChapterFields(book, meta, chId);
+        setChapterHTML(chId, files[chId], 'disk-new');
+        savedHTML[chId] = files[chId];
+        knowDisk(bookId, chId, files[chId]);
+      }
+      book.chapterOrder = j.order;
+      book.looseCards = newCards;
+      book.removed = removed;
+      knowCards();
+      if (gone.includes(currentChapterId)) currentChapterId = null;
+      // kept here against a removal there: its file goes back for them
+      for (const chId of j.back) if (j.order.includes(chId)) persistChapter(chId).catch(() => {});
     }
-    if (back) {
+    if (back || noted) {
       rec.streams('disk-new'); // the titles and cards that came back with them
       await saveMeta();
       if (!book || book.id !== bookId || metaSig(book) !== savedMetaSig) continue; // not on disk yet: next look
+    }
+    if (back) {
       const caret = captureCaret();
       const keepScroll = $('#paper-scroll').scrollTop;
       renderChapters();
       $('#paper-scroll').scrollTop = keepScroll;
       if (caret) restoreCaret(caret);
       renderLooseCards();
+      if (currentTab === 'outline') renderBoard();
       updateCounters();
       scheduleNavRefresh();
       toast(t('Updated from your other device'));
@@ -15589,6 +15609,19 @@ function scheduleMetaSave() {
 async function saveMeta() {
   if (!book || shelfExport) return;
   const bookId = book.id;
+  // Nothing restructured here, only the caret moved: if another device has
+  // restructured the book meanwhile, this book.json is the old one, and
+  // writing it would put that back. The look at the disk takes theirs
+  // first; the caret's place goes with the next save.
+  if (metaSig(book) === savedMetaSig && !refreshing) {
+    const disk = await window.neo.readBookMeta(bookId).catch(() => null);
+    if (!book || book.id !== bookId) return;
+    if (disk && Array.isArray(disk.chapterOrder) && metaSig(disk) !== savedMetaSig && metaSig(book) === savedMetaSig) {
+      refreshFromDisk();
+      return;
+    }
+  }
+  noteStructure();
   rec.streams('edit', [Rec.STREAMS.titles, Rec.STREAMS.outline]); // what book.json holds of the writing
   const sig = metaSig(book);
   const stamp = await writeBookMeta(bookId, book);
@@ -16273,6 +16306,111 @@ function onlyDrops(page, disk) {
   return false;
 }
 
+// book.removed: each chapter and loose card taken out of the book (deleted,
+// joined to another, set on a card, a card placed or deleted), by id, with
+// when and a fingerprint of what it held, { at, hash }; { at, back: true }
+// once it came back under the same id (⌘Z). Two book.json files that
+// disagree (the other device's, saved before it saw a change made here,
+// every flush saving the caret's place; or a copy a sync program set aside)
+// are joined by it: what either took out stays out, and what one lacks with
+// no entry is something it never knew of, so it stays in. A chapter taken
+// out there that has words here the other device may not have had (unsaved,
+// or its file newer than the removal) stays, and goes back in there too.
+// Entries go after a month.
+const REMOVED_DAYS = 30;
+function noteRemoved(id, hash) {
+  if (!book) return;
+  const removed = (book.removed = book.removed || {});
+  if (removed[id] && !removed[id].back) return;
+  removed[id] = { at: Date.now(), hash };
+}
+function noteBack(id) {
+  const r = book && book.removed && book.removed[id];
+  if (r && !r.back) book.removed[id] = { at: Date.now(), back: true };
+}
+function cardHash(card) {
+  return textHash(JSON.stringify([card.title || '', card.text || '', card.html || '']));
+}
+// the loose cards as this device last saved or read them, id → cardHash
+let cardsKnown = new Map();
+function knowCards() {
+  cardsKnown = new Map(((book && book.looseCards) || []).map((c) => [c.id, cardHash(c)]));
+}
+// Before book.json is written: the cards gone since it was last written,
+// and whatever is back. (A chapter's removal is noted as it goes, in
+// dropChapterHTML, while its text is still there to fingerprint.)
+function noteStructure() {
+  if (!book) return;
+  const cards = new Set();
+  for (const c of book.looseCards || []) { cards.add(c.id); noteBack(c.id); }
+  for (const [id, hash] of cardsKnown) if (!cards.has(id)) noteRemoved(id, hash);
+  knowCards();
+  for (const id of book.chapterOrder || []) noteBack(id);
+  const old = Date.now() - REMOVED_DAYS * 86400000;
+  for (const [id, r] of Object.entries(book.removed || {})) if (!r || !(r.at >= old)) delete book.removed[id];
+}
+function mergeRemoved(a, b) {
+  const out = { ...(a || {}) };
+  for (const [id, r] of Object.entries(b || {})) {
+    if (r && typeof r.at === 'number' && (!out[id] || out[id].at < r.at)) out[id] = r;
+  }
+  return out;
+}
+// A chapter taken out on another device, as this one holds it: can it go
+// here too? Not with words unsaved here, nor when its file was written
+// after (or just before) the removal with other text than went: those are
+// words the other device may not have had. `stamps` are the chapter
+// files' "mtime:size" (null when unknown: then it stays).
+function goesToo(chId, r, stamps) {
+  if (chapterHTML[chId] === undefined) return true;
+  if (chapterHTML[chId] !== savedHTML[chId]) return false;
+  if (r.hash === textHash(String(chapterHTML[chId]))) return true;
+  if (!stamps) return false;
+  if (!(chId in stamps)) return true; // its file is gone here too
+  return parseFloat(stamps[chId]) < r.at - 120000;
+}
+// The chapters and loose cards of two book.json files, joined by `removed`
+// (both files' removals): `base`'s order leads, and a chapter only `other`
+// lists goes in after the one before it there when `wanted(id)` says so.
+// What stays against a removal is marked back in `removed`.
+function joinStructure(base, other, removed, stamps, wanted) {
+  const back = new Set();
+  const stays = (id) => {
+    const r = removed[id];
+    if (!r || r.back) return true;
+    if (chapterHTML[id] === undefined || goesToo(id, r, stamps)) return false;
+    back.add(id);
+    return true;
+  };
+  const order = (base.chapterOrder || []).filter(stays);
+  const from = Array.isArray(other.chapterOrder) ? other.chapterOrder : [];
+  from.forEach((id, i) => {
+    if (typeof id !== 'string' || order.includes(id) || !stays(id) || !wanted(id)) return;
+    const prev = from.slice(0, i).reverse().find((x) => order.includes(x));
+    order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, id);
+  });
+  const cards = [];
+  for (const c of [...(base.looseCards || []), ...(Array.isArray(other.looseCards) ? other.looseCards : [])]) {
+    if (!c || typeof c !== 'object' || cards.some((x) => x.id === c.id)) continue;
+    const r = removed[c.id];
+    if (r && !r.back) {
+      if (r.hash === cardHash(c)) continue;
+      back.add(c.id); // changed after it went: kept
+    }
+    cards.push(c);
+  }
+  for (const id of back) removed[id] = { at: Date.now(), back: true };
+  return { order, cards, back: [...back] };
+}
+// what `from` holds for a chapter (its title, kind, notes), where `into` has nothing
+function carryChapterFields(into, from, chId) {
+  for (const [k, v] of Object.entries(from)) {
+    if (k === 'removed' || !v || typeof v !== 'object' || Array.isArray(v) || !(chId in v)) continue;
+    if (into[k] === undefined) into[k] = {};
+    if (into[k] && typeof into[k] === 'object' && !(chId in into[k])) into[k][chId] = v[chId];
+  }
+}
+
 // True when `a` holds a word (or more of one) that `b` doesn't
 function wordsBeyond(a, b) {
   const bag = (html) => {
@@ -16366,19 +16504,22 @@ async function refreshFromDisk() {
     // Then decide it all in one go: nothing waits from here to the page.
     let restructured = false;
     if (theirs && metaSig(book) === sigHere) {
-      // The other device added, renamed or moved chapters. Whichever
-      // book.json stands, no chapter holding words is dropped: theirs keeps
-      // the chapters with unsaved words here, and ours (when this device
+      // The other device added, renamed or moved chapters, or saved a
+      // book.json from before it saw a change made here. Whichever stands,
+      // the chapters and loose cards are joined by both files' removals
+      // (book.removed): what either took out stays out, and no chapter
+      // holding words is dropped. Theirs keeps the chapters here they never
+      // knew of (a file, or unsaved words), and ours (when this device
       // restructured too and hasn't saved yet) takes in the chapters they wrote.
-      const order = [...(mine ? book.chapterOrder : meta.chapterOrder)];
-      const other = mine ? meta.chapterOrder : book.chapterOrder;
-      other.forEach((chId, i) => {
-        if (order.includes(chId)) return;
-        if (mine ? !/[^\s]/.test(String(incoming[chId] || '').replace(/<[^>]*>/g, '')) : chapterHTML[chId] === savedHTML[chId]) return;
-        const prev = other.slice(0, i).reverse().find((c) => order.includes(c));
-        order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, chId);
-      });
-      if (!mine || order.length !== book.chapterOrder.length) {
+      const removed = mergeRemoved(book.removed, meta.removed);
+      const j = mine
+        ? joinStructure(book, meta, removed, stamps, (chId) => /[^\s]/.test(String(incoming[chId] || '').replace(/<[^>]*>/g, '')))
+        : joinStructure(meta, book, removed, stamps, (chId) => chapterHTML[chId] !== savedHTML[chId] || !stamps || chId in stamps);
+      const order = j.order;
+      const same = order.join('\n') === book.chapterOrder.join('\n') &&
+        JSON.stringify(j.cards) === JSON.stringify(book.looseCards || []) &&
+        JSON.stringify(removed) === JSON.stringify(book.removed || {});
+      if (!mine || !same) {
         for (const chId of order) {
           if (!(chId in incoming)) continue;
           setChapterHTML(chId, incoming[chId], 'disk-new');
@@ -16386,12 +16527,20 @@ async function refreshFromDisk() {
           knowDisk(bookId, chId, incoming[chId]);
         }
         if (mine) {
+          for (const chId of order) if (!book.chapterOrder.includes(chId)) carryChapterFields(book, meta, chId);
           book.chapterOrder = order;
+          book.looseCards = j.cards;
+          book.removed = removed;
         } else {
-          book = { ...meta, chapterOrder: order, lastPosition: book.lastPosition };
+          const here = book;
+          book = { ...meta, chapterOrder: order, looseCards: j.cards, removed, lastPosition: book.lastPosition };
+          for (const chId of order) if (!meta.chapterOrder.includes(chId)) carryChapterFields(book, here, chId);
           savedMetaSig = metaSig(meta);
-          rec.streams('disk-adopt'); // their titles and outline
         }
+        rec.streams('disk-adopt'); // their titles and outline
+        knowCards();
+        // kept here against a removal there: its file goes back for them
+        for (const chId of j.back) if (order.includes(chId)) persistChapter(chId).catch(() => {});
         if (metaSig(book) !== savedMetaSig) scheduleMetaSave();
         if (!book.chapterOrder.includes(currentChapterId)) currentChapterId = null;
         undoStack = []; // snapshots of the old structure must not replay over the new one
