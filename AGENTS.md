@@ -169,7 +169,7 @@ NEO Library/
     outline.html
     darlings.json
     stickies.json
-    sync-conflicts/     a sync program's conflict copies of chapters, once NEO has taken their words in
+    sync-conflicts/     a sync program's conflict copies of chapters and book.json, once NEO has taken their words in
     cover-<ts>.<ext>    writer-chosen image
     art-<ts>.<ext>      painted image, plus art.json
     recording/          Writing History; README.txt, then one folder per device
@@ -194,7 +194,7 @@ The window holds the open book in memory (`chapterHTML`, `book`, `stickies`, `da
 - `refreshFromDisk` runs on focus, on visibility, and every 30 s while visible. It compares `mtimeMs:size` stamps and re-reads only changed chapters.
 - Unchanged local chapter plus a changed file: adopt the file. If the file only has fewer words, adopt it and keep the displaced text in Darlings.
 - Both sides changed: keep the local text on the page and insert the disk text as the next chapter, titled as from the other device.
-- A sync program that finds a chapter changed on both devices keeps one and leaves the other beside it (Syncthing's `.sync-conflict-…`, Dropbox's conflicted copy, iCloud's `… 2`). NEO had already saved its own words, so the file it is handed looks like an ordinary edit. `takeConflictCopies` (on open and on each look at the disk) makes such a copy, when it holds words the chapter lacks, the next chapter, as above, with an id from the copy's name so two devices make one chapter; once that reads back from disk, `chapter:conflictDone` moves the copy into the book's `sync-conflicts/` folder. Nothing is deleted. A copy of a chapter no longer in the book stays where it is. `book.json`'s own conflict copies are not looked at. `npm run test:sync-conflicts` tests it.
+- A sync program that finds a chapter changed on both devices keeps one and leaves the other beside it (Syncthing's `.sync-conflict-…`, Dropbox's conflicted copy, iCloud's `… 2`). NEO had already saved its own words, so the file it is handed looks like an ordinary edit. `takeConflictCopies` (on open and on each look at the disk) makes such a copy, when it holds words the chapter lacks, the next chapter, as above, with an id from the copy's name so two devices make one chapter; once that reads back from disk, `chapter:conflictDone` moves the copy into the book's `sync-conflicts/` folder. Nothing is deleted. A copy of a chapter no longer in the book stays where it is. `book.json`'s own copies (`book:conflicts`, common, since every flush saves `lastPosition` there) give way to the `book.json` that stands, except that a chapter in the copy's order that the book lacks, whose file is still there with words, goes back after the chapter before it there with what the copy held for it, and a loose card with words comes back (`takeBookConflictCopies`); then the copy, and any copy of `book.json.bak`, moves to `sync-conflicts/`. `npm run test:sync-conflicts` tests it.
 - Skip a chapter whose write is still in flight. Drop a read that overlapped a local save. An empty read must not wipe a chapter that already has text.
 - The same generation check applies to `library.json` on the shelf (`libraryGeneration`, `libraryWritesPending`).
 

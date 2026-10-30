@@ -152,6 +152,37 @@ describe('filesystem', { concurrency: 1 }, () => {
     }
   });
 
+  test("a sync program's conflict copies of book.json are found, read, and move to sync-conflicts/", () => {
+    const dir = tempLibrary();
+    try {
+      const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
+      const folder = path.join(dir, book.id);
+      const copies = {
+        'book.sync-conflict-20261030-155357-ZJR4MCC.json': '{"chapterOrder":["a"]}',
+        "book (Ada's conflicted copy 2026-10-30).json": '{"chapterOrder":["b"]}',
+        'book 2.json': '{"chapterOrder":',
+        'book.json.sync-conflict-20261030-155358-ZJR4MCC.bak': '{"chapterOrder":["c"]}'
+      };
+      for (const [name, text] of Object.entries(copies)) fs.writeFileSync(path.join(folder, name), text);
+      fs.writeFileSync(path.join(folder, 'notes.sync-conflict-20261030-155357-ZJR4MCC.html'), '<p>not book.json</p>');
+      const found = main.call('book:conflicts', book.id);
+      assert.equal(JSON.stringify(found.map((c) => [c.file, c.meta && c.meta.chapterOrder]).sort()), JSON.stringify([
+        ["book (Ada's conflicted copy 2026-10-30).json", ['b']],
+        ['book 2.json', null], // half there
+        ['book.json.sync-conflict-20261030-155358-ZJR4MCC.bak', null], // a backup: moved, not read
+        ['book.sync-conflict-20261030-155357-ZJR4MCC.json', ['a']]
+      ]));
+      assert.equal(main.call('book:conflictDone', book.id, 'book.json'), false);
+      assert.equal(main.call('book:conflictDone', book.id, 'notes.sync-conflict-20261030-155357-ZJR4MCC.html'), false);
+      for (const name of Object.keys(copies)) assert.equal(main.call('book:conflictDone', book.id, name), true);
+      assert.deepEqual(fs.readdirSync(path.join(folder, 'sync-conflicts')).sort(), Object.keys(copies).sort());
+      assert.equal(main.call('book:conflicts', book.id).length, 0);
+      assert.equal(fs.existsSync(path.join(folder, 'book.json')), true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('notes round-trip, and a JSON replace leaves the whole file and no .tmp', () => {
     const dir = tempLibrary();
     try {

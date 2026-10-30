@@ -734,23 +734,31 @@ ipcMain.handle('chapter:delete', (_e, bookId, chapterId) => {
   return true;
 });
 
-// A sync program that finds a chapter changed on two devices at once keeps
+// A sync program that finds a file changed on two devices at once keeps
 // one and leaves the other beside it under a name of its own: Syncthing's
-// "<id>.sync-conflict-<date>-<time>-<device>.html", Dropbox's and
-// Nextcloud's "<id> (… conflicted copy …).html", iCloud's "<id> 2.html".
-// NEO reads chapters by id, so it would never show that version.
+// "<name>.sync-conflict-<date>-<time>-<device>.<ext>", Dropbox's and
+// Nextcloud's "<name> (… conflicted copy …).<ext>", iCloud's "<name> 2.<ext>".
+// NEO reads its files by name, so it would never see that version.
+// Returns the name of the file it is a copy of.
 const CONFLICT_COPY = [
-  /^(.+?)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}\.html$/,
-  /^(.+?) \([^)]*conflicted copy[^)]*\)\.html$/i,
-  /^(.+?) \d+\.html$/
+  /^(.+?)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}(\.[^.]+)$/,
+  /^(.+?) \([^)]*conflicted copy[^)]*\)(\.[^.]+)$/i,
+  /^(.+?) \d+(\.[^.]+)$/
 ];
-function conflictCopyOf(file) {
+function conflictOriginal(file) {
   for (const re of CONFLICT_COPY) {
     const m = re.exec(file);
-    if (m) return m[1];
+    if (m) return m[1] + m[2];
   }
   return null;
 }
+// a copy of a chapter: its chapter id
+function conflictCopyOf(file) {
+  const of = conflictOriginal(file);
+  return of && of.endsWith('.html') ? of.slice(0, -5) : null;
+}
+// a copy of book.json, or of NEO's own book.json.bak
+const bookConflictOf = (file) => ['book.json', 'book.json.bak'].includes(conflictOriginal(file));
 
 // [{ file, chapterId, html }] for each such copy in a book's chapters folder
 ipcMain.handle('chapter:conflicts', (_e, bookId) => {
@@ -766,23 +774,44 @@ ipcMain.handle('chapter:conflicts', (_e, bookId) => {
   return out;
 });
 
-// The copy's words are kept in the book now: it moves out of chapters/ into
+// [{ file, meta }] for each copy of book.json in a book's folder: meta is the
+// copy read whole, or null (a copy of book.json.bak, or one that won't parse)
+ipcMain.handle('book:conflicts', (_e, bookId) => {
+  const dir = bookDir(bookId);
+  const out = [];
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return out; }
+  for (const file of names) {
+    if (!bookConflictOf(file)) continue;
+    let meta = null;
+    if (conflictOriginal(file) === 'book.json') {
+      try { meta = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')); } catch { /* half there, or not JSON */ }
+    }
+    out.push({ file, meta: meta && typeof meta === 'object' ? meta : null });
+  }
+  return out;
+});
+
+// The copy's words are kept in the book now: it moves out of the way into
 // the book's sync-conflicts/ folder, so it isn't taken in again, and is
 // still there, as the sync program left it, for anyone who looks.
-ipcMain.handle('chapter:conflictDone', (_e, bookId, file) => {
-  if (!conflictCopyOf(String(file))) return false;
+function keepConflictCopy(bookId, from, file) {
   const kept = path.join(bookDir(bookId), 'sync-conflicts');
   const to = path.join(kept, libName(file));
   if (fs.existsSync(to)) return false;
   try {
     fs.mkdirSync(kept, { recursive: true });
-    fs.renameSync(path.join(bookDir(bookId), 'chapters', libName(file)), to);
+    fs.renameSync(path.join(from, libName(file)), to);
     return true;
   } catch (err) {
     logError('conflict copy', err);
     return false;
   }
-});
+}
+ipcMain.handle('chapter:conflictDone', (_e, bookId, file) =>
+  !!conflictCopyOf(String(file)) && keepConflictCopy(bookId, path.join(bookDir(bookId), 'chapters'), file));
+ipcMain.handle('book:conflictDone', (_e, bookId, file) =>
+  bookConflictOf(String(file)) && keepConflictCopy(bookId, bookDir(bookId), file));
 
 ipcMain.handle('aux:read', (_e, bookId, name) => {
   // name: 'notes' | 'outline'

@@ -87,7 +87,7 @@ test('a copy another device already took in makes no second chapter', async () =
   const twin = await js(`conflictTwinId(${JSON.stringify(name)})`);
   await js(`(async () => {
     book.chapterOrder.push(${JSON.stringify(twin)});
-    chapterHTML[${JSON.stringify(twin)}] = '<p>chromebook words</p>';
+    setChapterHTML(${JSON.stringify(twin)}, '<p>chromebook words</p>', 'disk-new');
     await persistChapter(${JSON.stringify(twin)});
   })()`);
   put(name, '<p>Chapter one, chromebook words.</p>');
@@ -106,6 +106,62 @@ test('a copy of a chapter no longer in the book stays where it is', async () => 
   await tick(300);
   assert.equal((await order()).length, 4);
   assert.equal(there(name), true);
+});
+
+const bookDir = () => path.join(tmp, 'NEO Library', bookId);
+const keptBook = (name) => fs.existsSync(path.join(bookDir(), 'sync-conflicts', name));
+const bookCopy = (name, change) => {
+  const meta = JSON.parse(fs.readFileSync(path.join(bookDir(), 'book.json'), 'utf8'));
+  change(meta);
+  fs.writeFileSync(path.join(bookDir(), name), JSON.stringify(meta, null, 2));
+};
+
+test("a chapter only the other device's book.json had comes back after the one before it, with its title", async () => {
+  const before = await order();
+  // made on the other device: its file arrived, its book.json lost to ours
+  put('ch-new-0001.html', '<p>A chapter written on the other device.</p>');
+  const name = 'book.sync-conflict-20261030-160000-ZJR4MCC.json';
+  bookCopy(name, (m) => {
+    m.chapterOrder.splice(1, 0, 'ch-new-0001');
+    m.chapterTitles = { ...(m.chapterTitles || {}), 'ch-new-0001': 'Written elsewhere' };
+  });
+  await js('refreshFromDisk()');
+  await tick(500);
+  const ids = await order();
+  assert.deepEqual(ids, [before[0], 'ch-new-0001', ...before.slice(1)]);
+  assert.equal(await js("book.chapterTitles['ch-new-0001']"), 'Written elsewhere');
+  assert.match(await html('ch-new-0001'), /other device/);
+  const saved = JSON.parse(fs.readFileSync(path.join(bookDir(), 'book.json'), 'utf8'));
+  assert.deepEqual(saved.chapterOrder, ids, 'on disk');
+  assert.equal(fs.existsSync(path.join(bookDir(), name)), false);
+  assert.equal(keptBook(name), true);
+});
+
+test("a chapter the other device's book.json had whose file is gone doesn't come back; a loose card with words does", async () => {
+  const before = await order();
+  const name = "book (Ada's conflicted copy 2026-10-30).json";
+  bookCopy(name, (m) => {
+    m.chapterOrder.push('ch-deleted-0002');
+    m.looseCards = [...(m.looseCards || []), { id: 'lc-elsewhere', text: 'A card noted on the other device' }, { id: 'lc-empty', text: '' }];
+  });
+  await js('refreshFromDisk()');
+  await tick(500);
+  assert.deepEqual(await order(), before);
+  assert.deepEqual(await js('(book.looseCards || []).map((c) => c.id)'), ['lc-elsewhere']);
+  assert.equal(keptBook(name), true);
+});
+
+test("a copy of book.json.bak, or a book.json copy with nothing more in it, is only moved aside", async () => {
+  const before = await order();
+  const bak = 'book.json.sync-conflict-20261030-160100-ZJR4MCC.bak';
+  fs.writeFileSync(path.join(bookDir(), bak), '{"half":');
+  const same = 'book 2.json';
+  bookCopy(same, () => {});
+  await js('refreshFromDisk()');
+  await tick(500);
+  assert.deepEqual(await order(), before);
+  assert.equal(keptBook(bak), true);
+  assert.equal(keptBook(same), true);
 });
 
 /* ---------- runner ---------- */

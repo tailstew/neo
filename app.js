@@ -15470,11 +15470,71 @@ function conflictTwinId(file) {
   for (let i = 0; i < file.length; i++) h = Math.imul(h ^ file.charCodeAt(i), 0x01000193) >>> 0;
   return 'ch-sync-' + h.toString(36);
 }
+// book.json's own conflict copies (book:conflicts): the other device's
+// book.json, set aside when both saved it at once (every flush saves the
+// caret's place in it, so this is common). The book.json that stands wins,
+// as when both devices restructured (refreshFromDisk), but nothing holding
+// words is dropped: a chapter in the copy's order that this one lacks, whose
+// file is still there with words in it (a chapter just made on the other
+// device; a deleted one's file is gone), goes back in after the chapter
+// before it there, with what the copy held for it (its title, kind, notes);
+// so does a loose card with words this book lacks. The rest of the copy
+// gives way, and the copy is kept as it was in sync-conflicts/.
+async function takeBookConflictCopies(bookId) {
+  for (const c of await window.neo.bookConflicts(bookId)) {
+    if (!book || book.id !== bookId) return;
+    const meta = c.meta;
+    let back = 0;
+    if (meta && Array.isArray(meta.chapterOrder)) {
+      const order = book.chapterOrder;
+      for (const [i, chId] of meta.chapterOrder.entries()) {
+        if (typeof chId !== 'string' || order.includes(chId)) continue;
+        const html = await window.neo.readChapter(bookId, chId);
+        if (!book || book.id !== bookId) return;
+        if (!wordsBeyond(html, '')) continue;
+        const prev = meta.chapterOrder.slice(0, i).reverse().find((x) => order.includes(x));
+        order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, chId);
+        for (const [k, v] of Object.entries(meta)) {
+          if (!v || typeof v !== 'object' || Array.isArray(v) || !(chId in v)) continue;
+          if (book[k] === undefined) book[k] = {};
+          if (book[k] && typeof book[k] === 'object' && !(chId in book[k])) book[k][chId] = v[chId];
+        }
+        setChapterHTML(chId, html, 'disk-new');
+        savedHTML[chId] = html;
+        knowDisk(bookId, chId, html);
+        back++;
+      }
+      for (const card of Array.isArray(meta.looseCards) ? meta.looseCards : []) {
+        if (!card || typeof card !== 'object' || (book.looseCards || []).some((x) => x.id === card.id)) continue;
+        if (!wordsBeyond((card.text || '') + ' ' + (card.html || ''), '')) continue;
+        (book.looseCards = book.looseCards || []).push(card);
+        back++;
+      }
+    }
+    if (back) {
+      rec.streams('disk-new'); // the titles and cards that came back with them
+      await saveMeta();
+      if (!book || book.id !== bookId || metaSig(book) !== savedMetaSig) continue; // not on disk yet: next look
+      const caret = captureCaret();
+      const keepScroll = $('#paper-scroll').scrollTop;
+      renderChapters();
+      $('#paper-scroll').scrollTop = keepScroll;
+      if (caret) restoreCaret(caret);
+      renderLooseCards();
+      updateCounters();
+      scheduleNavRefresh();
+      toast(t('Updated from your other device'));
+    }
+    await window.neo.bookConflictDone(bookId, c.file);
+  }
+}
+
 let takingConflicts = false;
 async function takeConflictCopies(bookId) {
   if (takingConflicts || !window.neo.chapterConflicts) return;
   takingConflicts = true;
   try {
+    if (window.neo.bookConflicts) await takeBookConflictCopies(bookId);
     for (const c of await window.neo.chapterConflicts(bookId)) {
       if (!book || book.id !== bookId) return;
       if (!book.chapterOrder.includes(c.chapterId)) continue;
