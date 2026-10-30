@@ -211,7 +211,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 ## Sync conflict copies (branch `sync-conflict-copies`)
 
 - [ ] **(2 computers)** With both builds on that branch, edit the same chapter on both within a few seconds, five times. Every version shows: one as the chapter, each other as the chapter after it ("… from other device, <time>"), the same on both computers once synced, with no chapter twice. Each `….sync-conflict-….html` has moved from `chapters/` into the book's `sync-conflicts/`, unchanged.
-- [ ] Open record test (it still holds the copies made on 2026-10-30): "lapyop", "laptop", "chromebookwww2" and "chromebookwww1 fred" each come in as a chapter after chapter 1, and the copies move to `sync-conflicts/`.
+- [x] Open record test (it still holds the copies made on 2026-10-30): "lapyop", "laptop", "chromebookwww2" and "chromebookwww1 fred" each come in as a chapter after chapter 1, and the copies move to `sync-conflicts/`. *(2026-10-30, 9c93ec1: on the laptop, then the Chromebook showed the same four chapters, none twice; a new `book.sync-conflict-…json` differed only in `lastPosition` and `modified`)*
 
 ## Upgrading from earlier builds
 
