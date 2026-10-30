@@ -4,6 +4,8 @@ What `npm test` and `npm run test:recording` can't reach: real keyboards and inp
 
 Each item says what to do and what should happen. Tick it with the date and the commit when it passes; when a change touches an area, untick what it could have broken. Items marked **(2 computers)** or **(phone)** need that setup.
 
+The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-unpacked` packed as a tarball (`npm run package:linux` can't make the AppImage on Windows without Developer Mode, since it needs symlinks), and the library is synced with Syncthing over the Wi-Fi, `Documents\NEO Library` here and `~/Documents/NEO Library` there. The phone is the Android phone, with Pocket.
+
 ## Backups (4g)
 
 - [x] Start NEO with a book that has Writing History. `Backups/` gets `README.txt`, and today's `neo-backup-<date>.zip` has no `book-…/recording/` folders in it and has `_recordings.txt` at the top. *(2026-10-29, 7c87c3e)*
@@ -197,6 +199,13 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [ ] Open two books quickly one after the other (double-click, then another): only the second is open, and its session holds only its own chapters.
 - [ ] Edit the same chapter on two devices so a save finds the other's version: the chapter kept beside it is "From another device, kept beside this one".
 - [ ] Change stickies on another device while the book is open here: the comments stream picks the change up as from another device.
+
+## Linux (branch `linux-documents-folder`)
+
+- [ ] On the Chromebook, with `T=$(mktemp -d); mkdir -p "$T/Documents"; cp -r ~/Documents/"NEO Library" "$T/Documents/"`, run `HOME=$T ~/NEO-linuxdocs/neo`. NEO opens on that library's shelves and doesn't ask your name like a first run.
+- [ ] With `T=$(mktemp -d)` (no Documents folder at all), `HOME=$T ~/NEO-linuxdocs/neo` asks your name, and the library is made in `$T/Documents/NEO Library`.
+- [ ] A library already in the home folder stays there: `T=$(mktemp -d); mkdir -p "$T/Documents"; cp -r ~/Documents/"NEO Library" "$T/"`, then `HOME=$T ~/NEO-linuxdocs/neo` opens on its shelves, and no `NEO Library` is made in `$T/Documents`.
+- [ ] File → Library Folder… shows the folder NEO is using, and offers no Use Default Folder (it is the default).
 
 ## Upgrading from earlier builds
 
