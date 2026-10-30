@@ -198,7 +198,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [ ] Paste styled text from a web page into a chapter: the spans NEO strips afterwards are a tidy, not part of the next key.
 - [ ] Type a dedication in the paperback dialog on a book without one: the new Dedication page is recorded.
 - [ ] Open two books quickly one after the other (double-click, then another): only the second is open, and its session holds only its own chapters.
-- [ ] Edit the same chapter on two devices so a save finds the other's version: the chapter kept beside it is "From another device, kept beside this one".
+- [ ] Edit the same chapter on two devices so a save finds the other's version: the chapter kept beside it is "From another device, kept beside this one". *(failed 2026-10-30, 6947c24, laptop and Chromebook over Syncthing: each saved its own words, Syncthing kept one file and set the other aside as `….sync-conflict-….html`, and NEO showed only the one kept; fix on branch `sync-conflict-copies`)*
 - [ ] Change stickies on another device while the book is open here: the comments stream picks the change up as from another device.
 
 ## Linux (branch `linux-documents-folder`)
@@ -207,6 +207,11 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [ ] With `T=$(mktemp -d)` (no Documents folder at all), `HOME=$T ~/NEO-linuxdocs/neo` asks your name, and the library is made in `$T/Documents/NEO Library`.
 - [ ] A library already in the home folder stays there: `T=$(mktemp -d); mkdir -p "$T/Documents"; cp -r ~/Documents/"NEO Library" "$T/"`, then `HOME=$T ~/NEO-linuxdocs/neo` opens on its shelves, and no `NEO Library` is made in `$T/Documents`.
 - [ ] File → Library Folder… shows the folder NEO is using, and offers no Use Default Folder (it is the default).
+
+## Sync conflict copies (branch `sync-conflict-copies`)
+
+- [ ] **(2 computers)** With both builds on that branch, edit the same chapter on both within a few seconds, five times. Every version shows: one as the chapter, each other as the chapter after it ("… from other device, <time>"), the same on both computers once synced, with no chapter twice. Each `….sync-conflict-….html` has moved from `chapters/` into the book's `sync-conflicts/`, unchanged.
+- [ ] Open record test (it still holds the copies made on 2026-10-30): "lapyop", "laptop", "chromebookwww2" and "chromebookwww1 fred" each come in as a chapter after chapter 1, and the copies move to `sync-conflicts/`.
 
 ## Upgrading from earlier builds
 
