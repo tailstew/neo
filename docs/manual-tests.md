@@ -212,6 +212,9 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 
 - [x] **(2 computers)** With both builds on that branch, edit the same chapter on both within a few seconds, five times. Every version shows: one as the chapter, each other as the chapter after it ("… from other device, <time>"), the same on both computers once synced, with no chapter twice. Each `….sync-conflict-….html` has moved from `chapters/` into the book's `sync-conflicts/`, unchanged. *(2026-10-30, 9c93ec1, record test: two clashes became chapters on both, every word typed on either is in the book; Syncthing left `~syncthing~….tmp` files of its own, and `book.json` has 13 conflict copies, none with a different chapter order)*
 - [x] Open record test (it still holds the copies made on 2026-10-30): "lapyop", "laptop", "chromebookwww2" and "chromebookwww1 fred" each come in as a chapter after chapter 1, and the copies move to `sync-conflicts/`. *(2026-10-30, 9c93ec1: on the laptop, then the Chromebook showed the same four chapters, none twice; a new `book.sync-conflict-…json` differed only in `lastPosition` and `modified`)*
+- [ ] Open record test (its folder holds 13 `book.sync-conflict-…json` and `book.json.sync-conflict-…bak` copies from 2026-10-30, none with another chapter order): the chapters stay as they were, and every one of those copies moves into `sync-conflicts/`.
+- [ ] **(2 computers)** With the book open on both, add a chapter on one and type a few words in it, while typing in another chapter on the other, until a `book.sync-conflict-…json` appears. The new chapter is in the book on both, in its place and with its title, and nothing was put in twice.
+- [ ] **(2 computers)** Move a section card to loose cards on one computer while the other is typing in the same book: the loose card is there on both once synced.
 
 ## Upgrading from earlier builds
 
