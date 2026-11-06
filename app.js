@@ -2691,7 +2691,7 @@ const rec = {
     this.session = { id: recSessionId(), day: writingDay(now) };
     this.w = new Rec.SessionWriter({
       neoRec: Rec.FORMAT, session: this.session.id, device: this.device, app: this.appVersion,
-      platform: navigator.platform || '', book: this.bookId, day: this.session.day, startedAt: now.toISOString(),
+      book: this.bookId, day: this.session.day, startedAt: now.toISOString(),
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', prev: this.prev
     });
     this.startKnown = { ...this.known };

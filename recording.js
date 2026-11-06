@@ -3141,7 +3141,12 @@
     const keep = new Set(ids);
     const { header, known, lines } = parseSession(text);
     if (!header || !known) return '';
-    const out = [JSON.stringify({ ...header, kept: [...keep] })];
+    // a page of some chapters carries no hash lines and no seals, so nothing
+    // on it checks the header's bytes: the computer's platform and time zone
+    // stay out (an older session's, too), its day written in first
+    const { platform: _platform, tz: _tz, ...rest } = header;
+    const day = sessionDay(header);
+    const out = [JSON.stringify({ ...rest, ...(day ? { day } : {}), kept: [...keep] })];
     const spanOf = (line) => {
       let n = line[0] || 0;
       if (line[1] === 'r' || line[1] === 'rd' || line[1] === 'n') for (const dt of line[3] || []) n += dt || 0;

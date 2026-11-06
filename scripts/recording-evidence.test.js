@@ -284,6 +284,14 @@ test('a session cut down to some chapters still replays, on the same clock', () 
   const cut = R.keepChapters(s.text, ['a']);
   const { header, lines } = R.parseSession(cut);
   assert.deepEqual(header.kept, ['a']);
+  // nothing of the computer: no platform, no time zone, and the day still known
+  assert.equal(header.platform, undefined);
+  assert.equal(header.tz, undefined);
+  assert.equal(R.sessionDay(header), R.sessionDay(R.parseSession(s.text).header));
+  const old = R.keepChapters(s.text.replace(/^\{/, '{"platform":"MacIntel","tz":"America/New_York",').replace(/"day":"[^"]*",?/, ''), ['a']);
+  const oh = R.parseSession(old).header;
+  assert.ok(!old.includes('MacIntel') && !old.includes('New_York'));
+  assert.equal(oh.day, '2026-10-01');
   assert.ok(lines.every((l) => l[1] !== 'h'));
   assert.ok(!cut.includes('B.') && !cut.includes('bbbb') && !cut.includes(':titles'));
   const r = R.replayCheck([cut]);

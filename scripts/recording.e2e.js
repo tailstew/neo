@@ -644,7 +644,7 @@ test('opening the book again continues where the recording left off', async () =
   const text = readOpen(id).text;
   const { header, lines } = R.parseSession(text);
   assert.equal(header.prev, R.verifyChain(readClosed(firstId)).last, 'sessions chain together');
-  assert.ok(header.platform, 'the header says which platform recorded it');
+  assert.equal(header.platform, undefined, 'the header doesn’t say which platform recorded it');
   const base = lines.find((l) => l[1] === 'b');
   assert.deepEqual([base[3], base[5]], [null, 'continue']);
   replayAll([text]);
