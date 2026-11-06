@@ -1148,6 +1148,11 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
     seals = {};
     for (const d of new Set(r.texts.map((s) => s.device))) seals[d] = ReplayExport.sealFiles(path.join(recRoot(bookId), libName(d), 'seals'));
   }
+  // the page never carries a device's own name (device.json's, the computer's
+  // hostname): each is Device 1, 2, … in the order it first wrote
+  const shown = new Map();
+  for (const s of r.texts) if (!shown.has(s.device)) shown.set(s.device, t('Device {n}', { n: shown.size + 1 }));
+  r.texts = r.texts.map((s) => ({ ...s, name: shown.get(s.device) }));
   const str = (v, n) => String(v || '').slice(0, n);
   const strings = {};
   for (const [k, v] of Object.entries(opts.strings || {})) if (typeof v === 'string') strings[k.slice(0, 2000)] = v.slice(0, 2000);

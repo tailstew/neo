@@ -1827,6 +1827,10 @@ test('the evidence report shows how the book was written; Export replay… write
   assert.ok(data.sessions.length >= 2);
   assert.ok(data.sessions.some((s) => s.open), 'the session being written, as far as it’s on disk');
   assert.match(html, /keys pressed/, 'the report as History showed it');
+  // no device's own name: each is Device 1, 2, … in the order it first wrote
+  assert.ok(data.sessions.every((s) => /^Device \d+$/.test(s.name)), data.sessions.map((s) => s.name).join(', '));
+  assert.equal(data.sessions[0].name, 'Device 1');
+  assert.ok(!html.includes(os.hostname()), 'the computer’s name stays out of the page');
   key('Escape');
   await tick(300);
   // opened in a browser window of its own, it checks out
