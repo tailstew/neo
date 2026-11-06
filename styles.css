@@ -674,7 +674,11 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-modal input[type="radio"], .ex-modal input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
 .ex-modal .ex-some { cursor: pointer; }
 .ex-modal input.ex-range { flex: 1; min-width: 0; margin: 0; }
-.ex-chapters { max-height: 200px; overflow-y: auto; margin: 0 0 12px 26px; }
+.ex-chapters { max-height: 200px; overflow-y: scroll; margin: 0 0 12px 26px; padding: 4px; background: var(--bg); border: 1px solid #3a3a3a; border-radius: 6px; }
+/* the list's scroll bar always shows, track and thumb, so it reads as a list that goes on */
+.ex-chapters::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 6px; }
+.ex-chapters::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.22); }
+.ex-chapters::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.36); }
 .ex-chapters .ex-ch { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
 .ex-chapters .ex-ch:hover, .ex-chapters .ex-ch:focus-visible { background: rgba(201, 168, 106, 0.12); }
 .ex-chapters .ex-ch.on { color: var(--accent); font-weight: 600; }
@@ -1901,6 +1905,10 @@ body.light .modal { border-color: #dcd7ce; box-shadow: 0 18px 60px rgba(0,0,0,0.
 body.light .font-picker .modal { box-shadow: 0 8px 30px rgba(0,0,0,0.16); }
 body.light .modal input { background: #fff; border-color: #cfcac0; color: #1c1a17; }
 body.light .modal input:focus { border-color: var(--accent); }
+body.light .ex-chapters { background: #fff; border-color: #cfcac0; }
+body.light .ex-chapters::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); }
+body.light .ex-chapters::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.22); }
+body.light .ex-chapters::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.36); }
 body.light .btn-quiet { color: #5f5b53; }
 body.light .btn-quiet:hover { color: #1c1a17; }
 body.light .fr-font, body.light .fr-choice { background: #fff; border-color: #d6d1c7; color: #2b2926; }
