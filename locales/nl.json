@@ -923,7 +923,6 @@
   "Every seal": "Alle zegels",
   "Every session was timestamped within a day of ending.": "Elke sessie kreeg binnen een dag na afloop een tijdstempel.",
   "Export the Writing History of “{title}”": "De schrijfgeschiedenis van ‘{title}’ exporteren",
-  "Export Writing History…": "Schrijfgeschiedenis exporteren…",
   "Files": "Bestanden",
   "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "De helft van de tussenpozen tussen toetsen lag tussen {low} en {high}; de middelste was {mid}.",
   "How “{title}” was written": "Hoe ‘{title}’ geschreven is",
@@ -957,7 +956,6 @@
   "Nothing was written while NEO was recording.": "Er is niets geschreven terwijl NEO opnam.",
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Daarvan geplakt binnen tien seconden na terugkeer naar NEO vanuit een andere app: {chars} tekens.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Eén webpagina die afspeelt hoe het boek geschreven is, toetsaanslag voor toetsaanslag, met het verslag van de aanwijzingen, en zichzelf controleert. Hij opent in elke browser, zonder NEO. Alleen de woorden van de hoofdstukken die je kiest staan erin.",
-  "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Eén webpagina die afspeelt hoe dit boek geschreven is en zichzelf controleert, voor een uitgever, een agent of een prijs",
   "Chapters:": "Hoofdstukken:",
   "e.g. {example}": "bijv. {example}",
   "Chapters, as numbers and ranges, such as 1–3, 7": "Hoofdstukken, als nummers en reeksen, zoals 1–3, 7",
@@ -1101,5 +1099,8 @@
   "How It Was Written…": "Hoe het geschreven is…",
   "How it was written": "Hoe het geschreven is",
   "{name} (joined to another chapter)": "{name} (bij een ander hoofdstuk gevoegd)",
-  "{name} (moved to a loose card)": "{name} (naar een losse kaart verplaatst)"
+  "{name} (moved to a loose card)": "{name} (naar een losse kaart verplaatst)",
+  "Think before you share this page.": "Denk na voor je deze pagina deelt.",
+  "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones). Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Ze bevat elke toetsaanslag in de hoofdstukken die erin zitten: de woorden die je hebt gewist en die je hebt gehouden, elke pauze, en wanneer en waar je schreef (de datums, de uren, de namen van je computers en telefoons). Wie haar van je krijgt, kan haar doorgeven, en terugnemen kan niet. Je deelt haar op eigen risico.",
+  "This book has no Writing History to export yet.": "Dit boek heeft nog geen schrijfgeschiedenis om te exporteren."
 }

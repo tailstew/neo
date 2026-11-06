@@ -967,7 +967,6 @@
   "Every seal": "Toate sigiliile",
   "Every session was timestamped within a day of ending.": "Fiecare sesiune a primit marcaj temporal în ziua de după încheiere.",
   "Export the Writing History of “{title}”": "Exportă istoricul scrisului pentru „{title}”",
-  "Export Writing History…": "Exportă istoricul scrisului…",
   "Files": "Fișiere",
   "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "Jumătate din pauzele dintre taste au fost între {low} și {high}; mediana a fost {mid}.",
   "How “{title}” was written": "Cum a fost scrisă „{title}”",
@@ -1001,7 +1000,6 @@
   "Nothing was written while NEO was recording.": "Nu s-a scris nimic în timp ce NEO înregistra.",
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Dintre acestea, lipite în zece secunde de la revenirea în NEO din altă aplicație: {chars} caractere.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "O pagină web care redă cum a fost scrisă cartea, apăsare cu apăsare, cu raportul de indicii, și se verifică singură. Se deschide în orice browser, fără NEO. Conține doar cuvintele capitolelor pe care le alegi.",
-  "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "O pagină web care redă cum a fost scrisă această carte și se verifică singură, pentru o editură, un agent sau un premiu",
   "Chapters:": "Capitole:",
   "e.g. {example}": "de ex. {example}",
   "Chapters, as numbers and ranges, such as 1–3, 7": "Capitole, ca numere și intervale, de exemplu 1–3, 7",
@@ -1148,5 +1146,8 @@
   "How It Was Written…": "Cum a fost scris…",
   "How it was written": "Cum a fost scris",
   "{name} (joined to another chapter)": "{name} (unit cu alt capitol)",
-  "{name} (moved to a loose card)": "{name} (mutat pe o fișă liberă)"
+  "{name} (moved to a loose card)": "{name} (mutat pe o fișă liberă)",
+  "Think before you share this page.": "Gândește-te înainte să dai această pagină altcuiva.",
+  "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones). Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Conține fiecare tastă apăsată în capitolele pe care le poartă: cuvintele șterse la fel ca și cele păstrate, fiecare pauză, și când și unde ai scris (datele, orele, numele calculatoarelor și telefoanelor tale). Oricine o primește o poate da mai departe și nu mai poate fi luată înapoi. O dai mai departe pe propriul risc.",
+  "This book has no Writing History to export yet.": "Această carte nu are încă un Istoric al scrisului de exportat."
 }

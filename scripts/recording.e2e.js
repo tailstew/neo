@@ -1813,7 +1813,7 @@ test('the evidence report shows how the book was written; Export replay… write
   const file = path.join(tmp, 'replay.html');
   dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
   try {
-    await js('document.querySelector(".hs-export").click()');
+    await js("setTimeout(() => exportWritingHistory(), 0), true");
     await waitFor('!!document.querySelector(".ex-modal")');
     await js('document.querySelector(".ex-modal .m-ok").click()');
     for (let i = 0; i < 300 && !fs.existsSync(file); i++) await tick(100);

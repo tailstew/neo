@@ -648,7 +648,7 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .hs-tile { position: relative; }
 .hs-tile.hs-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; width: 0; height: 0; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
 /* the history's own, at the right: the first of them shown takes the gap */
-.hs-foot .hs-evidence, .hs-foot .hs-evidence[hidden] + .hs-export, .hs-foot .hs-evidence[hidden] + .hs-export[hidden] + .hs-delete { margin-left: auto; }
+.hs-foot .hs-evidence, .hs-foot .hs-evidence[hidden] + .hs-delete { margin-left: auto; }
 .ev-backdrop { z-index: 950; }
 .modal.ev-modal { width: min(760px, calc(100vw - 48px)); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
 .ev-bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid #2a2a2a; }
@@ -680,6 +680,9 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-chapters .ex-ch.on { color: var(--accent); font-weight: 600; }
 .ex-chapters .ex-num { min-width: 2.2em; text-align: right; color: #8f8a80; font-variant-numeric: tabular-nums; }
 .ex-chapters .ex-ch.on .ex-num { color: var(--accent); }
+.ex-warn { border-left: 3px solid var(--red); background: rgba(192, 57, 43, 0.07); border-radius: 4px; padding: 8px 12px; margin: 0 0 14px; font-size: 13px; }
+.ex-warn p { margin: 0; }
+.ex-warn .ex-warn-head { font-weight: 600; margin-bottom: 4px; }
 .ex-note { color: #8f8a80; }
 .ex-note.ex-bad { color: var(--red); }
 @media (max-width: 720px) {

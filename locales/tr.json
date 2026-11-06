@@ -850,7 +850,6 @@
   "Every seal": "Tüm mühürler",
   "Every session was timestamped within a day of ending.": "Her oturum bitişinden sonraki bir gün içinde zaman damgası aldı.",
   "Export the Writing History of “{title}”": "“{title}” kitabının Yazım Geçmişini dışa aktar",
-  "Export Writing History…": "Yazım Geçmişini Dışa Aktar…",
   "Files": "Dosyalar",
   "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "Tuşlar arasındaki aralıkların yarısı {low} ile {high} arasındaydı; ortadaki {mid} idi.",
   "How “{title}” was written": "“{title}” nasıl yazıldı",
@@ -884,7 +883,6 @@
   "Nothing was written while NEO was recording.": "NEO kayıttayken hiçbir şey yazılmadı.",
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Bunlardan, başka bir uygulamadan NEO’ya dönüldükten sonraki on saniye içinde yapıştırılan: {chars} karakter.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Kitabın nasıl yazıldığını tuş tuş, kanıt raporuyla birlikte oynatan ve kendini denetleyen tek bir web sayfası. NEO olmadan her tarayıcıda açılır. İçinde yalnızca seçtiğiniz bölümlerin sözcükleri vardır.",
-  "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Bu kitabın nasıl yazıldığını oynatan ve kendini denetleyen tek bir web sayfası; bir yayınevi, bir ajans ya da bir ödül için",
   "Chapters:": "Bölümler:",
   "e.g. {example}": "ör. {example}",
   "Chapters, as numbers and ranges, such as 1–3, 7": "Bölümler, numara ve aralık olarak, örneğin 1–3, 7",
@@ -1019,5 +1017,8 @@
   "How It Was Written…": "Nasıl yazıldı…",
   "How it was written": "Nasıl yazıldı",
   "{name} (joined to another chapter)": "{name} (başka bir bölüme katıldı)",
-  "{name} (moved to a loose card)": "{name} (serbest bir karta taşındı)"
+  "{name} (moved to a loose card)": "{name} (serbest bir karta taşındı)",
+  "Think before you share this page.": "Bu sayfayı paylaşmadan önce iyi düşünün.",
+  "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones). Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Taşıdığı bölümlerdeki her tuş vuruşunu içerir: tuttuğunuz kelimeler kadar sildikleriniz de, her duraklama, ve ne zaman ve nerede yazdığınız (tarihler, saatler, bilgisayarlarınızın ve telefonlarınızın adları). Kime verirseniz başkalarına iletebilir ve geri alınamaz. Riski size ait olmak üzere paylaşırsınız.",
+  "This book has no Writing History to export yet.": "Bu kitabın henüz dışa aktarılacak bir Yazım Geçmişi yok."
 }

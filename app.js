@@ -2079,9 +2079,11 @@ function bookTile(meta, opts = {}) {
     } else if (choice === 'export' && script) {
       const fmt = await optionModal(t('Export “{title}”', { title: escHtml(shownTitle(meta.title)) }), null, [
         { label: 'PDF (.pdf)', value: 'pdf' },
-        { label: 'Fountain (.fountain)', value: 'fountain' }, { label: 'Final Draft (.fdx)', value: 'fdx' }
+        { label: 'Fountain (.fountain)', value: 'fountain' }, { label: 'Final Draft (.fdx)', value: 'fdx' },
+        ...(canExportHistory() ? [{ label: t('Writing History…'), value: 'history' }] : [])
       ]);
       if (!fmt) return;
+      if (fmt === 'history') { await exportWritingHistory(meta.id); return; }
       await openBook(meta.id);
       await doExport(fmt);
     } else if (choice === 'export') {
@@ -2089,9 +2091,11 @@ function bookTile(meta, opts = {}) {
         { label: t('Text (.txt)'), value: 'txt' }, { label: t('Markdown (.md)'), value: 'md' }, { label: t('HTML (.html)'), value: 'html' },
         { label: 'PDF (.pdf)', value: 'pdf' },
         { label: t('Word (.docx)'), value: 'docx' }, { label: t('EPUB (.epub)'), value: 'epub' },
-        ...(window.Capacitor || isPageMeta(meta) ? [] : [{ label: t('Paperback for KDP…'), value: 'paperback' }])
+        ...(window.Capacitor || isPageMeta(meta) ? [] : [{ label: t('Paperback for KDP…'), value: 'paperback' }]),
+        ...(canExportHistory() && !isPageMeta(meta) ? [{ label: t('Writing History…'), value: 'history' }] : [])
       ]);
       if (!fmt) return;
+      if (fmt === 'history') { await exportWritingHistory(meta.id); return; }
       if (window.Capacitor || fmt === 'paperback') {
         await openBook(meta.id);
         await doExport(fmt);
@@ -3780,6 +3784,7 @@ function exportReplayAsk(meta, name) {
       <div class="modal ex-modal" role="dialog" aria-modal="true" style="width:480px">
         <h2 style="font-size:16px"></h2>
         <p class="ex-what"></p>
+        <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p></div>
         <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
         <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
         <div class="ex-chapters"></div>
@@ -3793,6 +3798,8 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('h2').textContent = title;
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
+    bd.querySelector('.ex-warn-head').textContent = t('Think before you share this page.');
+    bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones). Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.');
     bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
     bd.querySelector('.ex-some').textContent = t('Chapters:');
     const order = meta.chapterOrder;
@@ -3855,6 +3862,73 @@ function exportReplayAsk(meta, name) {
     document.body.appendChild(bd);
     ok.focus();
   });
+}
+
+// a chapter as History names it: its number and its title
+function historyChapterLabel(meta, ch, order) {
+  const m = { ...meta, chapterOrder: order.includes(ch) ? order : [...order, ch] };
+  const title = ((meta.chapterTitles || {})[ch] || '').trim();
+  const kind = chapterKind(ch, m);
+  if (kind === 'unnumbered') return title || t('Untitled');
+  return title ? chapterName(ch, m) + ' — ' + title : chapterName(ch, m);
+}
+
+const canExportHistory = () => historyCanOpen() && !!(window.neo.recExport && window.neo.recEvidence);
+
+// Export → Writing History… (the menu, and a book's Export on the shelf): the
+// history as one web page anyone can open, that plays and checks itself. The
+// whole book carries its seals; chosen chapters only their lines.
+let historyExporting = false;
+async function exportWritingHistory(bookId = book && book.id) {
+  if (!bookId) { toast(t('Open a book first')); return; }
+  if (!canExportHistory() || historyExporting) return;
+  historyExporting = true;
+  try {
+    const meta = book && book.id === bookId ? book : await window.neo.readBookMeta(bookId);
+    if (!meta) return;
+    meta.chapterOrder = meta.chapterOrder || [];
+    // what's typed now reaches the files first
+    if (rec.on && rec.bookId === bookId) {
+      const c = rec.flush();
+      if (c) await c.saved;
+    }
+    let devices = [];
+    try { devices = ((await window.neo.recList(bookId)) || []).filter((d) => d.sessions.length); } catch (err) { window.neo.logError('export replay: ' + (err && err.stack || err)); }
+    if (!devices.length) { toast(t('This book has no Writing History to export yet.')); return; }
+    // chapters no longer in the book are named as History names them, from
+    // the sessions' stats
+    const sessions = [];
+    try {
+      const r = await window.neo.recDays(bookId);
+      for (const e of (r && r.entries) || []) for (const x of e.sessions) sessions.push(x);
+    } catch (err) { window.neo.logError('export replay: ' + (err && err.stack || err)); }
+    const goneOf = (ch) => {
+      for (let i = sessions.length - 1; i >= 0; i--) {
+        const c = sessions[i].stats && sessions[i].stats.chapters && sessions[i].stats.chapters[ch];
+        if (c && c.gone) return c;
+      }
+      return null;
+    };
+    const name = (ch) => (meta.chapterOrder.includes(ch) ? historyChapterLabel(meta, ch, meta.chapterOrder) : (goneOf(ch) || {}).lead || t('Untitled'));
+    const gone = (ch) => (goneOf(ch) || {}).gone || 'delete';
+    const picked = await exportReplayAsk(meta, name);
+    if (!picked) return;
+    toast(t('Making the page…'));
+    const res = await window.neo.recEvidence(bookId, picked.chapters);
+    const title = isUntitled(meta.title) ? t('Untitled') : meta.title;
+    const report = evidenceHtml(res.evidence, res.cover, { title: t('How “{title}” was written', { title }), name, gone, order: meta.chapterOrder, partial: !!picked.chapters });
+    const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: name(ch) }));
+    const saved = await window.neo.recExport(bookId, {
+      chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
+      strings: replayPageStrings(), report, order, fileName: t('{title} — Writing History', { title })
+    });
+    if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
+  } catch (err) {
+    window.neo.logError('export replay: ' + (err && err.stack || err));
+    toast(t('The Writing History couldn’t be exported.'));
+  } finally {
+    historyExporting = false;
+  }
 }
 
 // The exported replay page's words (replay-page.js, replay-export.js), by
@@ -4407,7 +4481,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <button class="hs-tag" type="button" hidden></button>
       <button class="hs-restore" type="button" hidden></button>
       <button class="hs-evidence" type="button" hidden></button>
-      <button class="hs-export" type="button" hidden></button>
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
   const $h = (sel) => bd.querySelector(sel);
@@ -4683,13 +4756,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // a device as the history names it, when the book has more than one
   const deviceName = (device) => (S.devices.length > 1 ? S.names[device] || '' : '');
 
-  function chapterLabel(ch, order) {
-    const m = { ...meta, chapterOrder: order.includes(ch) ? order : [...order, ch] };
-    const title = ((meta.chapterTitles || {})[ch] || '').trim();
-    const kind = chapterKind(ch, m);
-    if (kind === 'unnumbered') return title || t('Untitled');
-    return title ? chapterName(ch, m) + ' — ' + title : chapterName(ch, m);
-  }
+  const chapterLabel = (ch, order) => historyChapterLabel(meta, ch, order);
 
   // what took a chapter no longer in the book ('merge', 'outline', 'delete', …)
   function goneWhy(ch) {
@@ -5724,13 +5791,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // The evidence report: how the book was written, in figures and the
   // judgements they support, from every device's sessions (plan, part 2)
   const evBtn = $h('.hs-evidence');
-  const exBtn = $h('.hs-export');
   evBtn.hidden = !window.neo.recEvidence;
   evBtn.textContent = t('How It Was Written…');
   evBtn.title = t('How this book was written, in figures: the rhythm of the keys, the revising, what was pasted, and when it was timestamped');
-  exBtn.hidden = !window.neo.recExport;
-  exBtn.textContent = t('Export Writing History…');
-  exBtn.title = t('One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize');
   const evName = (ch) => (meta.chapterOrder.includes(ch) ? chapterLabel(ch, meta.chapterOrder) : goneLead(ch) || t('Untitled'));
   const evTitle = () => t('How “{title}” was written', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
   // what's typed now reaches the files first
@@ -5782,32 +5845,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     };
     back.onclick = () => show(null);
     show(null);
-  });
-
-  // Export Writing History…: the history as one web page anyone can open, that plays
-  // and checks itself. The whole book carries its seals; chosen chapters
-  // only their lines.
-  exBtn.addEventListener('click', async () => {
-    setPlaying(false);
-    const picked = await exportReplayAsk(meta, evName);
-    bd.focus();
-    if (!picked) return;
-    toast(t('Making the page…'));
-    try {
-      await evFlush();
-      const res = await window.neo.recEvidence(bookId, picked.chapters);
-      const report = evidenceHtml(res.evidence, res.cover, { title: evTitle(), name: evName, gone: goneWhy, order: meta.chapterOrder, partial: !!picked.chapters });
-      const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: evName(ch) }));
-      const title = isUntitled(meta.title) ? t('Untitled') : meta.title;
-      const saved = await window.neo.recExport(bookId, {
-        chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
-        strings: replayPageStrings(), report, order, fileName: t('{title} — Writing History', { title })
-      });
-      if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
-    } catch (err) {
-      window.neo.logError('export replay: ' + (err && err.stack || err));
-      toast(t('The Writing History couldn’t be exported.'));
-    }
   });
 
   // Delete this book's history: to the system trash, once the writer has
@@ -20620,6 +20657,7 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'checkUpdate') checkForUpdate();
   if (msg.type === 'update') updateMessage(msg);
   if (msg.type === 'export') doExport(msg.format);
+  if (msg.type === 'exportHistory') { if (book && !$('#editor-view').hidden) exportWritingHistory(book.id); else toast(t('Open a book first')); }
   if (msg.type === 'scriptElement' && book && isScript()) spSetElement(msg.value);
   if (msg.type === 'scriptStyle') spToggleStyle(msg.value);
   if (msg.type === 'scriptPageBreak') spTogglePageBreak();

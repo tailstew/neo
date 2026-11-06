@@ -3011,7 +3011,9 @@ function buildMenu() {
           submenu: scriptState.on ? [
             { label: 'PDF (.pdf)', click: () => sendToWindow({ type: 'export', format: 'pdf' }) },
             { label: 'Fountain (.fountain)', click: () => sendToWindow({ type: 'export', format: 'fountain' }) },
-            { label: 'Final Draft (.fdx)', click: () => sendToWindow({ type: 'export', format: 'fdx' }) }
+            { label: 'Final Draft (.fdx)', click: () => sendToWindow({ type: 'export', format: 'fdx' }) },
+            { type: 'separator' },
+            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) }
           ] : [
             { label: t('Plain Text (.txt)'), click: () => sendToWindow({ type: 'export', format: 'txt' }) },
             { label: 'Markdown (.md)', click: () => sendToWindow({ type: 'export', format: 'md' }) },
@@ -3021,6 +3023,7 @@ function buildMenu() {
             { label: 'EPUB (.epub)', click: () => sendToWindow({ type: 'export', format: 'epub' }) },
             { type: 'separator' },
             { label: t('Paperback for KDP…'), click: () => sendToWindow({ type: 'export', format: 'paperback' }) },
+            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) },
             { type: 'separator' },
             {
               id: 'export-custom-chapter-titles',
