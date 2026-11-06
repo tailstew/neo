@@ -3781,21 +3781,25 @@ function exportReplayAsk(meta, name) {
     const bd = document.createElement('div');
     bd.className = 'modal-backdrop confirm-modal';
     bd.innerHTML = `
-      <div class="modal ex-modal" role="dialog" aria-modal="true">
+      <div class="modal ex-modal" role="dialog" aria-modal="true" style="width:480px">
         <h2 style="font-size:16px"></h2>
-        <p class="ex-what"></p>
-        <div class="ex-cols">
+        <div class="ex-step1">
           <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p><p class="ex-warn-health"></p><p class="ex-warn-risk"></p></div>
-          <div class="ex-picker">
-            <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
-            <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
-            <div class="ex-chapters"></div>
-            <p class="ex-note" hidden></p>
+          <div style="text-align:right;margin-top:16px">
+            <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
+            <button class="m-understand btn-gold"></button>
           </div>
         </div>
-        <div style="text-align:right;margin-top:16px">
-          <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
-          <button class="m-ok btn-gold"></button>
+        <div class="ex-step2" hidden>
+          <p class="ex-what"></p>
+          <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
+          <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
+          <div class="ex-chapters"></div>
+          <p class="ex-note" hidden></p>
+          <div style="text-align:right;margin-top:16px">
+            <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
+            <button class="m-ok btn-gold"></button>
+          </div>
         </div>
       </div>`;
     const title = t('Export the Writing History of “{title}”', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
@@ -3830,7 +3834,15 @@ function exportReplayAsk(meta, name) {
     const someOn = bd.querySelector('#ex-some');
     const ok = bd.querySelector('.m-ok');
     ok.textContent = t('Export…');
-    bd.querySelector('.m-cancel').textContent = t('Cancel');
+    bd.querySelectorAll('.m-cancel').forEach((b) => { b.textContent = t('Cancel'); });
+    // the warning stands alone first; the choices come once it's read
+    const understand = bd.querySelector('.m-understand');
+    understand.textContent = t('I understand');
+    understand.onclick = () => {
+      bd.querySelector('.ex-step1').hidden = true;
+      bd.querySelector('.ex-step2').hidden = false;
+      ok.focus();
+    };
     const chosen = () => chapterRanges(field.value, order.length);
     const update = () => {
       const ids = someOn.checked ? chosen() : null;
@@ -3862,11 +3874,11 @@ function exportReplayAsk(meta, name) {
       if (ok.disabled) return;
       done({ chapters: someOn.checked ? chosen().map((i) => order[i]) : null });
     };
-    bd.querySelector('.m-cancel').onclick = () => done(null);
+    bd.querySelectorAll('.m-cancel').forEach((b) => { b.onclick = () => done(null); });
     bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
     bd.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(null); } });
     document.body.appendChild(bd);
-    ok.focus();
+    understand.focus();
   });
 }
 
