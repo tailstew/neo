@@ -670,6 +670,13 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ev-small { font-size: 12px; color: #8f8a80; }
 .ev-chapters tr[data-ch] { cursor: pointer; }
 .ev-chapters tr[data-ch]:hover td, .ev-chapters tr[data-ch]:focus-visible td { color: var(--accent); }
+.modal.ex-modal { width: 820px; }
+.ex-modal .ex-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.ex-modal .ex-cols .ex-warn { margin: 0; }
+.ex-modal .ex-picker { min-width: 0; }
+.ex-modal .ex-picker .ex-chapters { max-height: 260px; }
+.ex-modal .ex-picker .ex-note { margin-bottom: 0; }
+@media (max-width: 680px) { .ex-modal .ex-cols { grid-template-columns: minmax(0, 1fr); } }
 .ex-modal .ex-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
 .ex-modal input[type="radio"], .ex-modal input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
 .ex-modal .ex-some { cursor: pointer; }

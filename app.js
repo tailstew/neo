@@ -3781,14 +3781,18 @@ function exportReplayAsk(meta, name) {
     const bd = document.createElement('div');
     bd.className = 'modal-backdrop confirm-modal';
     bd.innerHTML = `
-      <div class="modal ex-modal" role="dialog" aria-modal="true" style="width:480px">
+      <div class="modal ex-modal" role="dialog" aria-modal="true">
         <h2 style="font-size:16px"></h2>
         <p class="ex-what"></p>
-        <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p><p class="ex-warn-health"></p><p class="ex-warn-risk"></p></div>
-        <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
-        <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
-        <div class="ex-chapters"></div>
-        <p class="ex-note" hidden></p>
+        <div class="ex-cols">
+          <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p><p class="ex-warn-health"></p><p class="ex-warn-risk"></p></div>
+          <div class="ex-picker">
+            <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
+            <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
+            <div class="ex-chapters"></div>
+            <p class="ex-note" hidden></p>
+          </div>
+        </div>
         <div style="text-align:right;margin-top:16px">
           <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
           <button class="m-ok btn-gold"></button>
