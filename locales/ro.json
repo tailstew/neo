@@ -939,6 +939,8 @@
   "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} a răspuns cu un marcaj temporal valid, dar rădăcina sa, {root}, nu e în nicio listă publică. NEO păstrează rădăcina în biblioteca ta și în fiecare carte pe care o marchează, ca marcajele să poată fi verificate, dar ele sunt dovadă independentă doar pentru cine are încredere în {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} a răspuns cu un marcaj temporal valid. Rădăcina sa, {root}, e în lista de rădăcini de încredere a Mozilla.",
   "{title} — Writing History": "{title} — Istoricul scrisului",
+  "{title}, Chapter {n} — Writing History": "{title}, capitolul {n} — Istoricul scrisului",
+  "{title}, Chapters {list} — Writing History": "{title}, capitolele {list} — Istoricul scrisului",
   "1 character typed": "1 caracter tastat",
   "Timestamps can only be verified when you export the whole book.": "Marcajele de timp pot fi verificate doar când exporți întreaga carte.",
   "a session it seals isn’t in this export": "o sesiune pe care o sigilează nu e în acest export",

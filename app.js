@@ -3888,6 +3888,15 @@ function exportReplayAsk(meta, name) {
   });
 }
 
+// The exported history's file name: the book's title, and the chapters in
+// it when it doesn't hold them all, as their numbers were typed
+function replayFileName(title, order, chapters) {
+  if (!chapters) return t('{title} — Writing History', { title });
+  const nums = chapters.map((ch) => order.indexOf(ch)).filter((i) => i >= 0);
+  if (nums.length === 1) return t('{title}, Chapter {n} — Writing History', { title, n: nums[0] + 1 });
+  return t('{title}, Chapters {list} — Writing History', { title, list: chapterRangesText(nums) });
+}
+
 // a chapter as History names it: its number and its title
 function historyChapterLabel(meta, ch, order) {
   const m = { ...meta, chapterOrder: order.includes(ch) ? order : [...order, ch] };
@@ -3944,7 +3953,7 @@ async function exportWritingHistory(bookId = book && book.id) {
     const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: name(ch) }));
     const saved = await window.neo.recExport(bookId, {
       chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
-      strings: replayPageStrings(), report, order, fileName: t('{title} — Writing History', { title })
+      strings: replayPageStrings(), report, order, fileName: replayFileName(title, meta.chapterOrder, picked.chapters)
     });
     if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
   } catch (err) {

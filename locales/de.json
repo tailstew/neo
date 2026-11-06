@@ -898,6 +898,8 @@
   "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} hat mit einem gültigen Zeitstempel geantwortet, aber sein Stammzertifikat, {root}, steht in keiner öffentlichen Liste. NEO bewahrt es in deiner Bibliothek und in jedem Buch auf, das es stempelt, damit seine Stempel geprüft werden können – unabhängiger Beweis sind sie aber nur für jemanden, der {name} vertraut.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} hat mit einem gültigen Zeitstempel geantwortet. Sein Stammzertifikat, {root}, steht in Mozillas Liste vertrauenswürdiger Stammzertifikate.",
   "{title} — Writing History": "{title} – Schreibverlauf",
+  "{title}, Chapter {n} — Writing History": "{title}, Kapitel {n} – Schreibverlauf",
+  "{title}, Chapters {list} — Writing History": "{title}, Kapitel {list} – Schreibverlauf",
   "1 character typed": "1 Zeichen getippt",
   "Timestamps can only be verified when you export the whole book.": "Zeitstempel lassen sich nur prüfen, wenn du das ganze Buch exportierst.",
   "a session it seals isn’t in this export": "eine Sitzung, die es versiegelt, ist nicht in diesem Export",

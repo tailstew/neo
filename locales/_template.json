@@ -66,6 +66,8 @@
   "{title} — progress": "",
   "{title} — Writing History": "",
   "{title} (copy)": "",
+  "{title}, Chapter {n} — Writing History": "",
+  "{title}, Chapters {list} — Writing History": "",
   "{undo} undoes it; the text it replaced is in a snapshot too.": "",
   "{undo} undoes it; the text it replaced is in Writing History, at “{tag}”.": "",
   "{undo} undoes it; the text they replaced is in a snapshot too.": "",

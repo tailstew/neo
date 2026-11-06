@@ -822,6 +822,8 @@
   "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} geçerli bir zaman damgasıyla yanıt verdi, ama kök sertifikası {root} hiçbir genel listede yok. NEO kökü kitaplığınızda ve damgaladığı her kitapta saklar ki damgaları denetlenebilsin; ancak bu damgalar yalnızca {name} hizmetine güvenen biri için bağımsız kanıttır.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} geçerli bir zaman damgasıyla yanıt verdi. Kök sertifikası {root}, Mozilla’nın güvenilir kökler listesinde.",
   "{title} — Writing History": "{title} — Yazım Geçmişi",
+  "{title}, Chapter {n} — Writing History": "{title}, {n}. Bölüm — Yazım Geçmişi",
+  "{title}, Chapters {list} — Writing History": "{title}, Bölüm {list} — Yazım Geçmişi",
   "1 character typed": "1 karakter yazıldı",
   "Timestamps can only be verified when you export the whole book.": "Zaman damgaları yalnızca kitabın tamamını dışa aktardığınızda doğrulanabilir.",
   "a session it seals isn’t in this export": "mühürlediği bir oturum bu dışa aktarımda yok",

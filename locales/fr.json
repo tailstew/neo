@@ -900,6 +900,8 @@
   "{name} answered with a good timestamp, but its root, {root}, is in no public list. NEO keeps the root in your library and in each book it stamps, so its stamps can be checked, but they’re independent proof only to someone who trusts {name}.": "{name} a répondu par un horodatage valide, mais sa racine, {root}, ne figure dans aucune liste publique. NEO garde la racine dans votre bibliothèque et dans chaque livre qu’il horodate, pour que ses horodatages puissent être vérifiés, mais ils ne sont une preuve indépendante que pour qui fait confiance à {name}.",
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} a répondu par un horodatage valide. Sa racine, {root}, figure dans la liste des racines de confiance de Mozilla.",
   "{title} — Writing History": "{title} — Historique d’écriture",
+  "{title}, Chapter {n} — Writing History": "{title}, chapitre {n} — Historique d’écriture",
+  "{title}, Chapters {list} — Writing History": "{title}, chapitres {list} — Historique d’écriture",
   "1 character typed": "1 caractère tapé",
   "Timestamps can only be verified when you export the whole book.": "Les horodatages ne peuvent être vérifiés que si vous exportez le livre entier.",
   "a session it seals isn’t in this export": "une séance qu’il scelle n’est pas dans cette exportation",
