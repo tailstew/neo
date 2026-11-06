@@ -3806,7 +3806,7 @@ function exportReplayAsk(meta, name) {
     const title = t('Export the Writing History of “{title}”', { title: isUntitled(meta.title) ? t('Untitled') : meta.title });
     bd.querySelector('h2').textContent = title;
     bd.querySelector('.modal').setAttribute('aria-label', title);
-    bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
+    bd.querySelector('.ex-what').textContent = t('One file that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any web browser, without NEO. Only the words of the chapters you choose are in it.');
     bd.querySelector('.ex-warn-head').textContent = t('Think before you share this export.');
     bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).');
     bd.querySelector('.ex-warn-health').textContent = t('How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.');
@@ -3937,7 +3937,7 @@ async function exportWritingHistory(bookId = book && book.id) {
     const gone = (ch) => (goneOf(ch) || {}).gone || 'delete';
     const picked = await exportReplayAsk(meta, name);
     if (!picked) return;
-    toast(t('Making the page…'));
+    toast(t('Making the export…'));
     const res = await window.neo.recEvidence(bookId, picked.chapters);
     const title = isUntitled(meta.title) ? t('Untitled') : meta.title;
     const report = evidenceHtml(res.evidence, res.cover, { title: t('How “{title}” was written', { title }), name, gone, order: meta.chapterOrder, partial: !!picked.chapters });
@@ -3965,13 +3965,13 @@ const REPLAY_PAGE_WORDS = [
   tk('it is signed with another key than the first seal'),
   tk('its signature doesn’t verify'),
   tk('it doesn’t name the seal before it'),
-  tk('a session it seals isn’t on this page'),
+  tk('a session it seals isn’t in this export'),
   tk('a session it seals isn’t what it sealed'),
   tk('a stamp it covers isn’t what it covered'),
   tk('its drand round isn’t drand’s'),
   tk('its drand round is later than the seal says it was made'),
   tk('a timestamp token stamps something else'),
-  tk('This page couldn’t read its history: {why}'),
+  tk('This export couldn’t read its history: {why}'),
   tk('this browser is too old to read it'),
   tk('Nothing was recorded.'),
   tk('The whole book'),
@@ -3984,23 +3984,23 @@ const REPLAY_PAGE_WORDS = [
   tk('Timeline'),
   tk('Loading {day}…'),
   tk('Chapter {n}'),
-  tk('This chapter isn’t on the page at this moment.'),
+  tk('This chapter isn’t in the book at this moment.'),
   tk('Pause'),
-  tk('What this page checks'),
+  tk('What this export checks'),
   tk('Checking…'),
   tk('Checking… {pct}'),
   tk('{n} sessions, each hash chain whole and each following the one before it.'),
   tk('{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between).'),
   tk('Played back: {bad} of {n} chapter writes don’t come out as recorded.'),
   tk('Played back: all {n} chapter writes come out exactly as recorded.'),
-  tk('This page holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
-  tk('Timestamping wasn’t turned on, so nothing on this page fixes the history in time. It shows how the book was written, not when.'),
+  tk('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
+  tk('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'),
   tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
   tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),
   tk('This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.'),
   tk('Seal {n}: {why}'),
-  tk('The figures below were worked out again from the history on this page, and match.'),
-  tk('The figures below don’t match the history on this page.'),
+  tk('The figures below were worked out again from the history in this export, and match.'),
+  tk('The figures below don’t match the history in this export.'),
   tk('Seals of {device}'),
   tk('Every seal'),
   tk('Seal'),
@@ -4010,7 +4010,7 @@ const REPLAY_PAGE_WORDS = [
   tk('Files'),
   tk('by {when} (a later seal)'),
   tk('not stamped'),
-  tk('Check it without this page'),
+  tk('Check it without this export'),
   tk('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:'),
   tk('A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.'),
   tk('Days'),
@@ -4049,8 +4049,8 @@ const REPLAY_PAGE_WORDS = [
   tk('A change the recorder didn’t see'),
   tk('Kept whole again'),
   tk('Writing History'),
-  tk('This page plays back how this book was written, keystroke by keystroke, as NEO recorded it.'),
-  tk('This page holds only some chapters. It plays them back exactly, but it can’t show that they belong to the timestamped whole, so nothing on it fixes them in time.'),
+  tk('This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.'),
+  tk('This export holds only some chapters, so its timestamps can’t be verified. Export the whole book for that.'),
   tk('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'),
   tk('Made with NEO {version} on {date}.')
 ];
@@ -4163,7 +4163,7 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
       ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(late.length), all: n(all.length) })
       : t('Every session was timestamped within a day of ending.'));
     if (cover.some((d) => d.bad)) text += ' ' + t('Some timestamps don’t check: run verify-recording on the book to see why.');
-    if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this page. The page holds only some chapters, so it can’t check them itself.');
+    if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this export. It holds only some chapters, so it can’t check them itself.');
     row(t('Timestamps'), text);
   }
   let html = `<h2 class="ev-h">${e(title)}</h2>

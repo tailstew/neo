@@ -198,7 +198,7 @@
       for (const [mine, hs] of sealed) {
         for (const [id, h] of Object.entries(hs || {})) {
           const held = mine.get(id);
-          if (!held) bad(T('a session it seals isn’t on this page'));
+          if (!held) bad(T('a session it seals isn’t in this export'));
           else if (!held.has(h)) bad(T('a session it seals isn’t what it sealed'));
         }
       }
@@ -324,7 +324,7 @@
     const p = doc.getElementById('rx-status') || doc.getElementById('rx-checks');
     if (!p) return;
     p.hidden = false;
-    p.textContent = T('This page couldn’t read its history: {why}', { why: String(err && err.message || err) });
+    p.textContent = T('This export couldn’t read its history: {why}', { why: String(err && err.message || err) });
   }
 
   async function start(doc) {
@@ -549,7 +549,7 @@
     const report = doc.getElementById('rx-report');
     const evPop = pop(report, T('How it was written'));
     evBtn.addEventListener('click', () => { setPlaying(false); evPop.showModal(); report.scrollTop = 0; });
-    const ckPop = pop(doc.getElementById('rx-checks'), T('What this page checks'));
+    const ckPop = pop(doc.getElementById('rx-checks'), T('What this export checks'));
     ckBtn.addEventListener('click', () => { setPlaying(false); ckPop.showModal(); });
 
     if (!book.days.length) {
@@ -907,7 +907,7 @@
         drawn.set(ch, shown);
         const body = sec.querySelector('.rx-body');
         body.innerHTML = shown || '';
-        if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t on the page at this moment.') : ''));
+        if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t in the book at this moment.') : ''));
       }
       if (follow) {
         const c = sheet.querySelector('.rx-caret');
@@ -1212,7 +1212,7 @@
 
   async function checks(doc, data, sessions, ui) {
     const box = doc.getElementById('rx-checks');
-    box.append(el('h2', '', T('What this page checks')));
+    box.append(el('h2', '', T('What this export checks')));
     const list = el('ul', 'rx-list');
     box.append(list);
     const line = (ok, text) => {
@@ -1247,12 +1247,12 @@
         ? T('Played back: {bad} of {n} chapter writes don’t come out as recorded.', { bad: fmtNum(r.bad + r.problems), n: fmtNum(r.writes) })
         : T('Played back: all {n} chapter writes come out exactly as recorded.', { n: fmtNum(r.writes) })));
     }
-    if (data.partial) line(null, T('This page holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
+    if (data.partial) line(null, T('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
 
     // seals
     if (!data.partial) {
       const devices = Object.keys(res.seals);
-      if (!devices.length) line(null, T('Timestamping wasn’t turned on, so nothing on this page fixes the history in time. It shows how the book was written, not when.'));
+      if (!devices.length) line(null, T('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'));
       for (const d of devices) {
         const r = res.seals[d];
         const stampedOnes = r.seals.filter((s) => s.by !== null);
@@ -1274,8 +1274,8 @@
     if (res.evidence !== null) {
       if (!res.evidence) bad = true;
       const p = el('p', res.evidence ? 'rx-same ok' : 'rx-same bad', res.evidence
-        ? T('The figures below were worked out again from the history on this page, and match.')
-        : T('The figures below don’t match the history on this page.'));
+        ? T('The figures below were worked out again from the history in this export, and match.')
+        : T('The figures below don’t match the history in this export.'));
       const report = doc.getElementById('rx-report');
       report.insertBefore(p, report.firstChild);
     }
@@ -1319,7 +1319,7 @@
 
   function howTo(data) {
     const box = el('div', 'rx-howto');
-    box.append(el('h3', '', T('Check it without this page')));
+    box.append(el('h3', '', T('Check it without this export')));
     box.append(el('p', '', T('Each seal’s timestamp tokens are signed by the authority that issued them. With OpenSSL, and the authorities’ root certificates below, check any of them:')));
     box.append(el('pre', '', 'openssl ts -verify -data 000001.json -in 000001.digicert.tsr -CAfile proof-roots.pem'));
     if (data.roots) {
