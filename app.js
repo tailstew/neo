@@ -3785,9 +3785,10 @@ function exportReplayAsk(meta, name) {
         <h2 style="font-size:16px"></h2>
         <div class="ex-step1">
           <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p><p class="ex-warn-health"></p><p class="ex-warn-risk"></p></div>
+          <label class="ex-pick ex-agree"><input type="checkbox" class="ex-understood"> <span class="ex-understood-text"></span></label>
           <div style="text-align:right;margin-top:16px">
             <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
-            <button class="m-understand btn-gold"></button>
+            <button class="m-continue btn-gold" disabled></button>
           </div>
         </div>
         <div class="ex-step2" hidden>
@@ -3836,9 +3837,14 @@ function exportReplayAsk(meta, name) {
     ok.textContent = t('Export…');
     bd.querySelectorAll('.m-cancel').forEach((b) => { b.textContent = t('Cancel'); });
     // the warning stands alone first; the choices come once it's read
-    const understand = bd.querySelector('.m-understand');
-    understand.textContent = t('I understand');
-    understand.onclick = () => {
+    const understood = bd.querySelector('.ex-understood');
+    bd.querySelector('.ex-understood-text').textContent = t('I understand');
+    const next = bd.querySelector('.m-continue');
+    next.textContent = t('Continue');
+    understood.addEventListener('change', () => { next.disabled = !understood.checked; });
+    understood.addEventListener('keydown', (e) => { if (e.key === 'Enter' && understood.checked) { e.preventDefault(); next.click(); } });
+    next.onclick = () => {
+      if (!understood.checked) return;
       bd.querySelector('.ex-step1').hidden = true;
       bd.querySelector('.ex-step2').hidden = false;
       ok.focus();
@@ -3878,7 +3884,7 @@ function exportReplayAsk(meta, name) {
     bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
     bd.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(null); } });
     document.body.appendChild(bd);
-    understand.focus();
+    understood.focus();
   });
 }
 
