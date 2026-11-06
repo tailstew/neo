@@ -681,8 +681,10 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-chapters .ex-num { min-width: 2.2em; text-align: right; color: #8f8a80; font-variant-numeric: tabular-nums; }
 .ex-chapters .ex-ch.on .ex-num { color: var(--accent); }
 .ex-warn { border-left: 3px solid var(--red); background: rgba(192, 57, 43, 0.07); border-radius: 4px; padding: 8px 12px; margin: 0 0 14px; font-size: 13px; }
-.ex-warn p { margin: 0; }
+.ex-warn p { margin: 0 0 6px; }
+.ex-warn p:last-child { margin-bottom: 0; }
 .ex-warn .ex-warn-head { font-weight: 600; margin-bottom: 4px; }
+.ex-warn .ex-warn-risk { font-weight: 600; }
 .ex-note { color: #8f8a80; }
 .ex-note.ex-bad { color: var(--red); }
 @media (max-width: 720px) {

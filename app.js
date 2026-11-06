@@ -3784,7 +3784,7 @@ function exportReplayAsk(meta, name) {
       <div class="modal ex-modal" role="dialog" aria-modal="true" style="width:480px">
         <h2 style="font-size:16px"></h2>
         <p class="ex-what"></p>
-        <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p></div>
+        <div class="ex-warn"><p class="ex-warn-head"></p><p class="ex-warn-body"></p><p class="ex-warn-health"></p><p class="ex-warn-risk"></p></div>
         <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
         <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
         <div class="ex-chapters"></div>
@@ -3799,7 +3799,9 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
     bd.querySelector('.ex-warn-head').textContent = t('Think before you share this page.');
-    bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones). Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.');
+    bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when and where you wrote (the dates, the hours, the names of your computers and phones).');
+    bd.querySelector('.ex-warn-health').textContent = t('How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.');
+    bd.querySelector('.ex-warn-risk').textContent = t('Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.');
     bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
     bd.querySelector('.ex-some').textContent = t('Chapters:');
     const order = meta.chapterOrder;
