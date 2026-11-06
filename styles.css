@@ -748,7 +748,8 @@ body.light .print-modal select, body.light .print-modal textarea { background: #
   background: var(--accent); border: none; border-radius: 6px;
   padding: 8px 20px; color: #191919; font-size: 14px; cursor: pointer;
 }
-.btn-gold:hover { filter: brightness(1.08); }
+.btn-gold:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-gold:disabled { background: #3a3a3a; color: #77736b; cursor: default; }
 .btn-quiet {
   background: none; border: none; color: #888;
   font-size: 14px; padding: 8px 10px; cursor: pointer;
@@ -1832,6 +1833,7 @@ body.light {
 }
 /* the gold that sits under dark text keeps its own light shade */
 body.light .btn-gold, body.light .stats-row button { background: #c9a86a; color: #191919; }
+body.light .btn-gold:disabled { background: #e4e0d8; color: #9a958b; }
 
 /* the shelf */
 body.light #author-chip:hover, body.light .shelf-label:focus { color: #1c1a17; }
