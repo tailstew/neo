@@ -901,7 +901,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} a répondu par un horodatage valide. Sa racine, {root}, figure dans la liste des racines de confiance de Mozilla.",
   "{title} — Writing History": "{title} — Historique d’écriture",
   "1 character typed": "1 caractère tapé",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Une page de quelques chapitres les rejoue exactement, mais ne peut pas montrer qu’ils appartiennent à l’ensemble horodaté : rien sur elle ne les fixe dans le temps.",
+  "Timestamps can only be verified when you export the whole book.": "Les horodatages ne peuvent être vérifiés que si vous exportez le livre entier.",
   "a session it seals isn’t on this page": "une séance qu’il scelle n’est pas sur cette page",
   "a session it seals isn’t what it sealed": "une séance qu’il scelle n’est plus celle qu’il a scellée",
   "a stamp it covers isn’t what it covered": "un horodatage qu’il couvre n’est plus celui qu’il a couvert",

@@ -896,7 +896,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} antwoordde met een geldige tijdstempel. Het basiscertificaat, {root}, staat in Mozilla’s lijst van vertrouwde basiscertificaten.",
   "{title} — Writing History": "{title} — Schrijfgeschiedenis",
   "1 character typed": "1 teken getypt",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Een pagina met enkele hoofdstukken speelt ze precies af, maar kan niet laten zien dat ze bij het geheel met tijdstempels horen, dus niets erop legt ze in de tijd vast.",
+  "Timestamps can only be verified when you export the whole book.": "Tijdstempels zijn alleen te controleren als je het hele boek exporteert.",
   "a session it seals isn’t on this page": "een sessie die het verzegelt staat niet op deze pagina",
   "a session it seals isn’t what it sealed": "een sessie die het verzegelt is niet meer wat het verzegelde",
   "a stamp it covers isn’t what it covered": "een stempel die het dekt is niet meer wat het dekte",

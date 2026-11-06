@@ -823,7 +823,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} geçerli bir zaman damgasıyla yanıt verdi. Kök sertifikası {root}, Mozilla’nın güvenilir kökler listesinde.",
   "{title} — Writing History": "{title} — Yazım Geçmişi",
   "1 character typed": "1 karakter yazıldı",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Birkaç bölümlük bir sayfa onları tam olarak oynatır, ama zaman damgalı bütüne ait olduklarını gösteremez, bu yüzden üzerindeki hiçbir şey onları zamanda sabitlemez.",
+  "Timestamps can only be verified when you export the whole book.": "Zaman damgaları yalnızca kitabın tamamını dışa aktardığınızda doğrulanabilir.",
   "a session it seals isn’t on this page": "mühürlediği bir oturum bu sayfada yok",
   "a session it seals isn’t what it sealed": "mühürlediği bir oturum artık mühürlediği şey değil",
   "a stamp it covers isn’t what it covered": "kapsadığı bir damga artık kapsadığı şey değil",

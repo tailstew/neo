@@ -3858,7 +3858,7 @@ function exportReplayAsk(meta, name) {
       if (someOn.checked) {
         note.textContent = !field.value.trim() ? t('Type the chapters’ numbers, or click them.')
           : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length })
-            : t('A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.');
+            : t('Timestamps can only be verified when you export the whole book.');
         note.classList.toggle('ex-bad', !!field.value.trim() && !ids);
       }
       ok.disabled = someOn.checked && !ids;

@@ -900,7 +900,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} respondió con un sello de tiempo válido. Su raíz, {root}, está en la lista de raíces de confianza de Mozilla.",
   "{title} — Writing History": "{title} — Historial de escritura",
   "1 character typed": "1 carácter escrito",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Una página de algunos capítulos los reproduce con exactitud, pero no puede mostrar que pertenecen al conjunto sellado en el tiempo, así que nada en ella los fija en el tiempo.",
+  "Timestamps can only be verified when you export the whole book.": "Las marcas de tiempo solo se pueden verificar si exportas el libro entero.",
   "a session it seals isn’t on this page": "una sesión que sella no está en esta página",
   "a session it seals isn’t what it sealed": "una sesión que sella no es la que selló",
   "a stamp it covers isn’t what it covered": "un sello que cubre no es el que cubrió",

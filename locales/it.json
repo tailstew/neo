@@ -899,7 +899,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} ha risposto con una marca temporale valida. La sua radice, {root}, è nell’elenco delle radici fidate di Mozilla.",
   "{title} — Writing History": "{title} — Cronologia di scrittura",
   "1 character typed": "1 carattere digitato",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Una pagina di alcuni capitoli li riproduce esattamente, ma non può mostrare che appartengono all’insieme marcato nel tempo, quindi niente su di essa li fissa nel tempo.",
+  "Timestamps can only be verified when you export the whole book.": "Le marche temporali si possono verificare solo se esporti il libro intero.",
   "a session it seals isn’t on this page": "una sessione che sigilla non è in questa pagina",
   "a session it seals isn’t what it sealed": "una sessione che sigilla non è quella che ha sigillato",
   "a stamp it covers isn’t what it covered": "una marca che copre non è quella che ha coperto",

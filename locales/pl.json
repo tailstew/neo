@@ -955,7 +955,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} odpowiedział ważnym znacznikiem czasu. Jego certyfikat główny, {root}, jest na liście zaufanych certyfikatów głównych Mozilli.",
   "{title} — Writing History": "{title} — Historia pisania",
   "1 character typed": "Wpisano 1 znak",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Strona z kilkoma rozdziałami odtwarza je dokładnie, ale nie może pokazać, że należą do całości opatrzonej znacznikami czasu, więc nic na niej nie ustala ich w czasie.",
+  "Timestamps can only be verified when you export the whole book.": "Znaczniki czasu można zweryfikować tylko wtedy, gdy eksportujesz całą książkę.",
   "a session it seals isn’t on this page": "sesji, którą pieczętuje, nie ma na tej stronie",
   "a session it seals isn’t what it sealed": "sesja, którą pieczętuje, nie jest tą zapieczętowaną",
   "a stamp it covers isn’t what it covered": "znacznik, który obejmuje, nie jest tym objętym",

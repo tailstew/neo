@@ -837,7 +837,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "Η υπηρεσία {name} απάντησε με έγκυρη χρονοσήμανση. Το ριζικό της πιστοποιητικό, {root}, βρίσκεται στη λίστα αξιόπιστων ριζικών πιστοποιητικών της Mozilla.",
   "{title} — Writing History": "{title} — Ιστορικό γραφής",
   "1 character typed": "1 χαρακτήρας πληκτρολογήθηκε",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Μια σελίδα με μερικά κεφάλαια τα αναπαράγει ακριβώς, αλλά δεν μπορεί να δείξει ότι ανήκουν στο χρονοσημασμένο σύνολο, άρα τίποτα σε αυτήν δεν τα τοποθετεί στον χρόνο.",
+  "Timestamps can only be verified when you export the whole book.": "Οι χρονοσφραγίδες μπορούν να επαληθευτούν μόνο όταν εξάγετε ολόκληρο το βιβλίο.",
   "a session it seals isn’t on this page": "μια συνεδρία που σφραγίζει δεν είναι σε αυτή τη σελίδα",
   "a session it seals isn’t what it sealed": "μια συνεδρία που σφραγίζει δεν είναι αυτή που σφράγισε",
   "a stamp it covers isn’t what it covered": "μια χρονοσήμανση που καλύπτει δεν είναι αυτή που κάλυψε",

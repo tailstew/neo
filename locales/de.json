@@ -899,7 +899,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} hat mit einem gültigen Zeitstempel geantwortet. Sein Stammzertifikat, {root}, steht in Mozillas Liste vertrauenswürdiger Stammzertifikate.",
   "{title} — Writing History": "{title} – Schreibverlauf",
   "1 character typed": "1 Zeichen getippt",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Eine Seite mit einigen Kapiteln spielt sie genau ab, kann aber nicht zeigen, dass sie zum mit Zeitstempeln versehenen Ganzen gehören, und legt sie deshalb zeitlich nicht fest.",
+  "Timestamps can only be verified when you export the whole book.": "Zeitstempel lassen sich nur prüfen, wenn du das ganze Buch exportierst.",
   "a session it seals isn’t on this page": "eine Sitzung, die es versiegelt, ist nicht auf dieser Seite",
   "a session it seals isn’t what it sealed": "eine Sitzung, die es versiegelt, ist nicht mehr die versiegelte",
   "a stamp it covers isn’t what it covered": "ein Stempel, den es abdeckt, ist nicht mehr der abgedeckte",

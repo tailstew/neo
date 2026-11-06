@@ -940,7 +940,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} a răspuns cu un marcaj temporal valid. Rădăcina sa, {root}, e în lista de rădăcini de încredere a Mozilla.",
   "{title} — Writing History": "{title} — Istoricul scrisului",
   "1 character typed": "1 caracter tastat",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "O pagină cu câteva capitole le redă exact, dar nu poate arăta că aparțin întregului marcat temporal, așa că nimic de pe ea nu le fixează în timp.",
+  "Timestamps can only be verified when you export the whole book.": "Marcajele de timp pot fi verificate doar când exporți întreaga carte.",
   "a session it seals isn’t on this page": "o sesiune pe care o sigilează nu e pe această pagină",
   "a session it seals isn’t what it sealed": "o sesiune pe care o sigilează nu mai e cea sigilată",
   "a stamp it covers isn’t what it covered": "un marcaj pe care îl acoperă nu mai e cel acoperit",

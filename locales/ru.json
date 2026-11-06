@@ -973,7 +973,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} ответил действительной меткой времени. Его корневой сертификат, {root}, есть в списке доверенных корневых сертификатов Mozilla.",
   "{title} — Writing History": "{title} — История письма",
   "1 character typed": "Набран 1 символ",
-  "A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.": "Страница с несколькими главами воспроизводит их точно, но не может показать, что они часть целого с метками времени, поэтому ничто на ней не закрепляет их во времени.",
+  "Timestamps can only be verified when you export the whole book.": "Метки времени можно проверить, только если экспортировать всю книгу.",
   "a session it seals isn’t on this page": "запечатанного ею сеанса нет на этой странице",
   "a session it seals isn’t what it sealed": "запечатанный ею сеанс уже не тот, что был запечатан",
   "a stamp it covers isn’t what it covered": "охваченная ею метка уже не та, что была охвачена",
