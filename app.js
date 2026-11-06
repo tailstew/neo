@@ -3738,7 +3738,8 @@ const historyWords = (added, removed) => t('+{added} −{removed} words', { adde
 /* ---------- the evidence report (plan, part 2) ---------- */
 
 // Export Writing History…: which chapters go. { chapters: null } for the whole book
-// (with its seals), { chapters: [ids] } for some, null on cancel.
+// (with its seals, the default), { chapters: [ids] } for a run of chapters in
+// the book's order, null on cancel.
 function exportReplayAsk(meta, name) {
   return new Promise((resolve) => {
     const bd = document.createElement('div');
@@ -3749,7 +3750,6 @@ function exportReplayAsk(meta, name) {
         <p class="ex-what"></p>
         <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
         <label class="ex-pick"><input type="radio" name="ex-scope" value="some"> <span class="ex-some"></span></label>
-        <div class="ex-chapters" hidden></div>
         <p class="ex-note" hidden></p>
         <div style="text-align:right;margin-top:16px">
           <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
@@ -3761,32 +3761,43 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
     bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
-    bd.querySelector('.ex-some').textContent = t('Only these chapters:');
     const note = bd.querySelector('.ex-note');
     note.textContent = t('A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.');
-    const box = bd.querySelector('.ex-chapters');
-    for (const ch of meta.chapterOrder) {
-      const l = document.createElement('label');
-      const c = document.createElement('input');
-      c.type = 'checkbox';
-      c.value = ch;
-      l.append(c, ' ', name(ch));
-      box.append(l);
+    // the range is one sentence with two lists in it, where the language puts them
+    const order = meta.chapterOrder;
+    const list = (at) => {
+      const sel = document.createElement('select');
+      sel.className = 'ex-range';
+      order.forEach((ch, i) => {
+        const o = document.createElement('option');
+        o.value = String(i);
+        o.textContent = `${i + 1}. ${name(ch)}`;
+        sel.append(o);
+      });
+      sel.value = String(at);
+      return sel;
+    };
+    const from = list(0);
+    const to = list(Math.max(0, order.length - 1));
+    const some = bd.querySelector('.ex-some');
+    const words = t('Only the chapters from {first} to {last}', { first: '\u0001', last: '\u0002' });
+    for (const part of words.split(/([\u0001\u0002])/)) {
+      if (part === '\u0001') some.append(from);
+      else if (part === '\u0002') some.append(to);
+      else if (part) some.append(part);
     }
     const ok = bd.querySelector('.m-ok');
     ok.textContent = t('Export…');
     bd.querySelector('.m-cancel').textContent = t('Cancel');
-    const some = () => bd.querySelector('input[value="some"]').checked;
-    const picked = () => [...box.querySelectorAll('input:checked')].map((c) => c.value);
-    const update = () => {
-      box.hidden = !some();
-      note.hidden = !some();
-      ok.disabled = some() && !picked().length;
-    };
+    const someOn = bd.querySelector('input[value="some"]');
+    const update = () => { note.hidden = !someOn.checked; };
+    // a list touched is the range chosen; the other end follows so it stays a run
+    from.addEventListener('change', () => { if (+to.value < +from.value) to.value = from.value; someOn.checked = true; update(); });
+    to.addEventListener('change', () => { if (+from.value > +to.value) from.value = to.value; someOn.checked = true; update(); });
     bd.addEventListener('change', update);
     update();
     const done = (v) => { bd.remove(); resolve(v); };
-    ok.onclick = () => { if (!ok.disabled) done({ chapters: some() ? picked() : null }); };
+    ok.onclick = () => done({ chapters: someOn.checked ? order.slice(+from.value, +to.value + 1) : null });
     bd.querySelector('.m-cancel').onclick = () => done(null);
     bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
     bd.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(null); } });

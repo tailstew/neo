@@ -672,8 +672,8 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ev-chapters tr[data-ch]:hover td, .ev-chapters tr[data-ch]:focus-visible td { color: var(--accent); }
 .ex-modal .ex-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
 .ex-modal input[type="radio"], .ex-modal input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
-.ex-chapters { max-height: 220px; overflow-y: auto; margin: 0 0 12px 26px; }
-.ex-chapters label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ex-modal .ex-some { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ex-modal .ex-range { width: auto; max-width: 180px; margin: 0; }
 .ex-note { color: #8f8a80; }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }

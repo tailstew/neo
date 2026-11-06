@@ -899,7 +899,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Από αυτούς, επικολλήθηκαν μέσα σε δέκα δευτερόλεπτα από την επιστροφή στο NEO από άλλη εφαρμογή: {chars} χαρακτήρες.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Μία ιστοσελίδα που αναπαράγει πώς γράφτηκε το βιβλίο, πλήκτρο προς πλήκτρο, με την αναφορά ενδείξεων, και ελέγχει τον εαυτό της. Ανοίγει σε κάθε πρόγραμμα περιήγησης, χωρίς το NEO. Περιέχει μόνο τις λέξεις των κεφαλαίων που επιλέγετε.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Μία ιστοσελίδα που αναπαράγει πώς γράφτηκε αυτό το βιβλίο και ελέγχει τον εαυτό της, για έναν εκδότη, έναν ατζέντη ή ένα βραβείο",
-  "Only these chapters:": "Μόνο αυτά τα κεφάλαια:",
+  "Only the chapters from {first} to {last}": "Μόνο τα κεφάλαια από {first} έως {last}",
   "Pasted": "Επικολλήθηκε",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Επικολλήθηκαν από έξω από το NEO: {chars} χαρακτήρες, {share} του σημερινού κειμένου.",
   "Text moved within the book: {chars} characters.": "Κείμενο που μετακινήθηκε μέσα στο βιβλίο: {chars} χαρακτήρες.",

@@ -963,7 +963,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Parmi eux, collés dans les dix secondes après être revenu à NEO depuis une autre app : {chars} caractères.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Une page web qui rejoue l’écriture du livre, frappe par frappe, avec le rapport d’indices, et se vérifie elle-même. Elle s’ouvre dans n’importe quel navigateur, sans NEO. Seuls les mots des chapitres que vous choisissez y figurent.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Une page web qui rejoue l’écriture de ce livre et se vérifie elle-même, pour un éditeur, un agent ou un prix",
-  "Only these chapters:": "Seulement ces chapitres :",
+  "Only the chapters from {first} to {last}": "Seulement les chapitres de {first} à {last}",
   "Pasted": "Collé",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Collé depuis l’extérieur de NEO : {chars} caractères, {share} du texte actuel.",
   "Text moved within the book: {chars} characters.": "Texte déplacé dans le livre : {chars} caractères.",

@@ -958,7 +958,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Daarvan geplakt binnen tien seconden na terugkeer naar NEO vanuit een andere app: {chars} tekens.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Eén webpagina die afspeelt hoe het boek geschreven is, toetsaanslag voor toetsaanslag, met het verslag van de aanwijzingen, en zichzelf controleert. Hij opent in elke browser, zonder NEO. Alleen de woorden van de hoofdstukken die je kiest staan erin.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Eén webpagina die afspeelt hoe dit boek geschreven is en zichzelf controleert, voor een uitgever, een agent of een prijs",
-  "Only these chapters:": "Alleen deze hoofdstukken:",
+  "Only the chapters from {first} to {last}": "Alleen de hoofdstukken van {first} tot en met {last}",
   "Pasted": "Geplakt",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Geplakt van buiten NEO: {chars} tekens, {share} van de huidige tekst.",
   "Text moved within the book: {chars} characters.": "Tekst verplaatst binnen het boek: {chars} tekens.",

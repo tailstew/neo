@@ -1017,7 +1017,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Z tego wklejone w ciągu dziesięciu sekund od powrotu do NEO z innej aplikacji: znaki: {chars}.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Jedna strona internetowa, która odtwarza, jak pisano książkę, naciśnięcie po naciśnięciu, z raportem poszlak, i sama się sprawdza. Otwiera się w każdej przeglądarce, bez NEO. Zawiera tylko słowa wybranych rozdziałów.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Jedna strona internetowa, która odtwarza, jak pisano tę książkę, i sama się sprawdza — dla wydawcy, agenta lub jury nagrody",
-  "Only these chapters:": "Tylko te rozdziały:",
+  "Only the chapters from {first} to {last}": "Tylko rozdziały od {first} do {last}",
   "Pasted": "Wklejone",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Wklejone spoza NEO: znaki: {chars}, {share} obecnego tekstu.",
   "Text moved within the book: {chars} characters.": "Tekst przeniesiony w obrębie książki: znaki: {chars}.",

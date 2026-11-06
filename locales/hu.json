@@ -734,7 +734,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Ebből a NEO-ba egy másik alkalmazásból való visszatérés után tíz másodpercen belül beillesztve: {chars} karakter.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Egyetlen weboldal, amely billentyűleütésről billentyűleütésre lejátssza, hogyan íródott a könyv, a bizonyítékjelentéssel együtt, és ellenőrzi önmagát. Bármely böngészőben megnyílik, NEO nélkül. Csak az általad választott fejezetek szavai vannak benne.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Egyetlen weboldal, amely lejátssza, hogyan íródott ez a könyv, és ellenőrzi önmagát – kiadónak, ügynöknek vagy díjbizottságnak",
-  "Only these chapters:": "Csak ezek a fejezetek:",
+  "Only the chapters from {first} to {last}": "Csak a fejezetek {first} és {last} között",
   "Pasted": "Beillesztve",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "A NEO-n kívülről beillesztve: {chars} karakter, a mostani szöveg {share}-a.",
   "Text moved within the book: {chars} characters.": "A könyvön belül áthelyezett szöveg: {chars} karakter.",

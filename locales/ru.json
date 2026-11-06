@@ -1035,7 +1035,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Из них вставлено в течение десяти секунд после возвращения в NEO из другого приложения: символов: {chars}.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "Одна веб-страница, которая воспроизводит, как писалась книга, нажатие за нажатием, с отчётом о свидетельствах, и сама себя проверяет. Она открывается в любом браузере, без NEO. В ней только слова выбранных вами глав.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "Одна веб-страница, которая воспроизводит, как писалась эта книга, и сама себя проверяет, — для издательства, агента или жюри премии",
-  "Only these chapters:": "Только эти главы:",
+  "Only the chapters from {first} to {last}": "Только главы с {first} по {last}",
   "Pasted": "Вставлено",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Вставлено извне NEO: символов: {chars}, {share} нынешнего текста.",
   "Text moved within the book: {chars} characters.": "Текст, перемещённый внутри книги: символов: {chars}.",

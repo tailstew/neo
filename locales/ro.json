@@ -1002,7 +1002,7 @@
   "Of those, pasted within ten seconds of coming back to NEO from another app: {chars} characters.": "Dintre acestea, lipite în zece secunde de la revenirea în NEO din altă aplicație: {chars} caractere.",
   "One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.": "O pagină web care redă cum a fost scrisă cartea, apăsare cu apăsare, cu raportul de indicii, și se verifică singură. Se deschide în orice browser, fără NEO. Conține doar cuvintele capitolelor pe care le alegi.",
   "One web page that plays how this book was written and checks itself, for a publisher, an agent or a prize": "O pagină web care redă cum a fost scrisă această carte și se verifică singură, pentru o editură, un agent sau un premiu",
-  "Only these chapters:": "Doar aceste capitole:",
+  "Only the chapters from {first} to {last}": "Doar capitolele de la {first} la {last}",
   "Pasted": "Lipit",
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Lipit din afara NEO: {chars} caractere, {share} din textul actual.",
   "Text moved within the book: {chars} characters.": "Text mutat în cadrul cărții: {chars} caractere.",
