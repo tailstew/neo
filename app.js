@@ -3807,7 +3807,7 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('h2').textContent = title;
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
-    bd.querySelector('.ex-warn-head').textContent = t('Think before you share this page.');
+    bd.querySelector('.ex-warn-head').textContent = t('Think before you share this export.');
     bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone). Your computers and phones are shown only as Device 1, Device 2 and so on.');
     bd.querySelector('.ex-warn-health').textContent = t('How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.');
     bd.querySelector('.ex-warn-risk').textContent = t('Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.');
