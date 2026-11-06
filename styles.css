@@ -672,9 +672,16 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ev-chapters tr[data-ch]:hover td, .ev-chapters tr[data-ch]:focus-visible td { color: var(--accent); }
 .ex-modal .ex-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
 .ex-modal input[type="radio"], .ex-modal input[type="checkbox"] { display: inline-block; width: auto; margin: 0; }
-.ex-modal .ex-some { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.ex-modal .ex-range { width: auto; max-width: 180px; margin: 0; }
+.ex-modal .ex-some { cursor: pointer; }
+.ex-modal input.ex-range { flex: 1; min-width: 0; margin: 0; }
+.ex-chapters { max-height: 200px; overflow-y: auto; margin: 0 0 12px 26px; }
+.ex-chapters .ex-ch { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
+.ex-chapters .ex-ch:hover, .ex-chapters .ex-ch:focus-visible { background: rgba(201, 168, 106, 0.12); }
+.ex-chapters .ex-ch.on { color: var(--accent); font-weight: 600; }
+.ex-chapters .ex-num { min-width: 2.2em; text-align: right; color: #8f8a80; font-variant-numeric: tabular-nums; }
+.ex-chapters .ex-ch.on .ex-num { color: var(--accent); }
 .ex-note { color: #8f8a80; }
+.ex-note.ex-bad { color: var(--red); }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
   .hs-side { display: none; }

@@ -335,5 +335,6 @@
   "When the text you see here was first timestamped": "Quando o texto que vê aqui recebeu um carimbo de tempo pela primeira vez",
   "Without typing": "Sem escrever no teclado",
   "Changes made with no key pressed: {n}, adding {chars} characters ({kinds}).": "Alterações sem nenhuma tecla premida: {n}, acrescentando {chars} caracteres ({kinds}).",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram escritas. Não pode mostrar de quem eram as ideias."
+  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram escritas. Não pode mostrar de quem eram as ideias.",
+  "Type the chapters’ numbers, or click them.": "Escreva os números dos capítulos ou clique neles."
 }

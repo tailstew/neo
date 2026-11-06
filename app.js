@@ -3737,9 +3737,41 @@ const historyWords = (added, removed) => t('+{added} −{removed} words', { adde
 
 /* ---------- the evidence report (plan, part 2) ---------- */
 
+// Chapters as a print dialog takes pages: "1-3, 7, 10-12", numbered from 1 in
+// the book's order, up to n. The 0-based indices, sorted and once each, or
+// null when the text isn't such a list (empty, a number past n, a range
+// backwards). Any dash, commas, semicolons or spaces between.
+function chapterRanges(text, n) {
+  const parts = String(text).split(/[,;]|\s+(?![-–—])(?<![-–—]\s*)/).map((x) => x.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const out = new Set();
+  for (const part of parts) {
+    const m = /^(\d+)(?:\s*[-–—]\s*(\d+))?$/.exec(part);
+    if (!m) return null;
+    const lo = +m[1];
+    const hi = m[2] === undefined ? lo : +m[2];
+    if (lo < 1 || hi > n || hi < lo) return null;
+    for (let i = lo; i <= hi; i++) out.add(i - 1);
+  }
+  return [...out].sort((x, y) => x - y);
+}
+
+// the same list written back as short as it goes: [0,1,2,6] → "1–3, 7"
+function chapterRangesText(ids) {
+  const out = [];
+  const sorted = [...new Set(ids)].sort((x, y) => x - y);
+  for (let i = 0; i < sorted.length; i++) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    out.push(j > i ? `${sorted[i] + 1}–${sorted[j] + 1}` : `${sorted[i] + 1}`);
+    i = j;
+  }
+  return out.join(', ');
+}
+
 // Export Writing History…: which chapters go. { chapters: null } for the whole book
-// (with its seals, the default), { chapters: [ids] } for a run of chapters in
-// the book's order, null on cancel.
+// (with its seals, the default), { chapters: [ids] } for those typed as a
+// print dialog's pages, null on cancel.
 function exportReplayAsk(meta, name) {
   return new Promise((resolve) => {
     const bd = document.createElement('div');
@@ -3749,7 +3781,8 @@ function exportReplayAsk(meta, name) {
         <h2 style="font-size:16px"></h2>
         <p class="ex-what"></p>
         <label class="ex-pick"><input type="radio" name="ex-scope" value="book" checked> <span class="ex-book"></span></label>
-        <label class="ex-pick"><input type="radio" name="ex-scope" value="some"> <span class="ex-some"></span></label>
+        <div class="ex-pick"><input type="radio" name="ex-scope" value="some" id="ex-some"> <label for="ex-some" class="ex-some"></label> <input type="text" class="ex-range" spellcheck="false" autocomplete="off"></div>
+        <div class="ex-chapters"></div>
         <p class="ex-note" hidden></p>
         <div style="text-align:right;margin-top:16px">
           <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
@@ -3761,43 +3794,61 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('.modal').setAttribute('aria-label', title);
     bd.querySelector('.ex-what').textContent = t('One web page that plays how the book was written, keystroke by keystroke, with the evidence report, and checks itself. It opens in any browser, without NEO. Only the words of the chapters you choose are in it.');
     bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
-    const note = bd.querySelector('.ex-note');
-    note.textContent = t('A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.');
-    // the range is one sentence with two lists in it, where the language puts them
+    bd.querySelector('.ex-some').textContent = t('Chapters:');
     const order = meta.chapterOrder;
-    const list = (at) => {
-      const sel = document.createElement('select');
-      sel.className = 'ex-range';
-      order.forEach((ch, i) => {
-        const o = document.createElement('option');
-        o.value = String(i);
-        o.textContent = `${i + 1}. ${name(ch)}`;
-        sel.append(o);
-      });
-      sel.value = String(at);
-      return sel;
-    };
-    const from = list(0);
-    const to = list(Math.max(0, order.length - 1));
-    const some = bd.querySelector('.ex-some');
-    const words = t('Only the chapters from {first} to {last}', { first: '\u0001', last: '\u0002' });
-    for (const part of words.split(/([\u0001\u0002])/)) {
-      if (part === '\u0001') some.append(from);
-      else if (part === '\u0002') some.append(to);
-      else if (part) some.append(part);
-    }
+    const field = bd.querySelector('.ex-range');
+    field.placeholder = t('e.g. {example}', { example: order.length > 3 ? `1–3, ${order.length}` : '1–2' });
+    field.setAttribute('aria-label', t('Chapters, as numbers and ranges, such as 1–3, 7'));
+    const note = bd.querySelector('.ex-note');
+    // the book's chapters, numbered, so the numbers mean something; a click
+    // takes one in or out of the list
+    const box = bd.querySelector('.ex-chapters');
+    const rows = order.map((ch, i) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'ex-ch';
+      const num = document.createElement('span');
+      num.className = 'ex-num';
+      num.textContent = String(i + 1);
+      row.append(num, name(ch));
+      box.append(row);
+      return row;
+    });
+    const someOn = bd.querySelector('#ex-some');
     const ok = bd.querySelector('.m-ok');
     ok.textContent = t('Export…');
     bd.querySelector('.m-cancel').textContent = t('Cancel');
-    const someOn = bd.querySelector('input[value="some"]');
-    const update = () => { note.hidden = !someOn.checked; };
-    // a list touched is the range chosen; the other end follows so it stays a run
-    from.addEventListener('change', () => { if (+to.value < +from.value) to.value = from.value; someOn.checked = true; update(); });
-    to.addEventListener('change', () => { if (+from.value > +to.value) from.value = to.value; someOn.checked = true; update(); });
+    const chosen = () => chapterRanges(field.value, order.length);
+    const update = () => {
+      const ids = someOn.checked ? chosen() : null;
+      const set = new Set(ids || []);
+      rows.forEach((r, i) => { r.classList.toggle('on', set.has(i)); r.setAttribute('aria-pressed', String(set.has(i))); });
+      note.hidden = !someOn.checked;
+      if (someOn.checked) {
+        note.textContent = !field.value.trim() ? t('Type the chapters’ numbers, or click them.')
+          : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length })
+            : t('A page of some chapters plays them back exactly, but can’t show they belong to the timestamped whole, so nothing on it fixes them in time.');
+        note.classList.toggle('ex-bad', !!field.value.trim() && !ids);
+      }
+      ok.disabled = someOn.checked && !ids;
+    };
+    field.addEventListener('input', () => { someOn.checked = true; update(); });
+    field.addEventListener('focus', () => { if (!someOn.checked) { someOn.checked = true; update(); } });
+    rows.forEach((r, i) => r.addEventListener('click', () => {
+      const ids = new Set(someOn.checked ? chosen() || [] : []);
+      if (ids.has(i)) ids.delete(i); else ids.add(i);
+      someOn.checked = true;
+      field.value = chapterRangesText([...ids]);
+      update();
+    }));
     bd.addEventListener('change', update);
+    field.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ok.click(); } });
     update();
     const done = (v) => { bd.remove(); resolve(v); };
-    ok.onclick = () => done({ chapters: someOn.checked ? order.slice(+from.value, +to.value + 1) : null });
+    ok.onclick = () => {
+      if (ok.disabled) return;
+      done({ chapters: someOn.checked ? chosen().map((i) => order[i]) : null });
+    };
     bd.querySelector('.m-cancel').onclick = () => done(null);
     bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
     bd.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); done(null); } });
