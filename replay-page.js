@@ -244,28 +244,45 @@
   /* ---------- the book, day by day ---------- */
 
   // The sessions as days, and the page as each day began: a day is played
-  // from the nearest day start kept, and a day start is kept every tenth day
+  // from the nearest day start kept, and a day start is kept every tenth day.
+  // `all` is every day, played to reach the next; `days` the ones shown. A
+  // page of some chapters still holds the sessions that changed only others,
+  // since a later session can start from where they left its chapters, but
+  // there's nothing in them to see: it shows only the days that changed its
+  // chapters (changesIn).
   class Book {
-    constructor(sessions) {
+    constructor(sessions, partial = false) {
+      // a page of some chapters: when each session changed them
+      this.changes = null;
+      let shows = null;
+      if (partial) {
+        const at = new Map(sessions.map((s) => [s.device + '/' + s.id, changesIn(s)]));
+        shows = (s) => at.get(s.device + '/' + s.id).length > 0;
+        this.changes = [...at.values()].flat().sort((a, b) => a - b);
+      }
       const by = new Map();
       for (const s of sessions) {
         const k = s.day || '';
         if (!by.has(k)) by.set(k, []);
         by.get(k).push(s);
       }
-      this.days = [...by.keys()].sort().map((day) => ({ day, list: by.get(day).sort(Rec.sessionOrder) }));
+      this.all = [...by.keys()].sort().map((day, at) => ({ day, at, list: by.get(day).sort(Rec.sessionOrder) }));
+      const shown = shows ? this.all.filter((d) => d.list.some(shows)) : this.all;
+      this.days = shown.length ? shown : this.all;
       this.kept = new Map([[0, null]]);
-      // the chapter order each day left, from its last `o` line
+      // the chapter order each shown day began with, from the last `o` line
+      // of the days before it
       let order = null;
-      this.orders = this.days.map((d) => {
-        const before = order;
+      const before = this.all.map((d) => {
+        const was = order;
         for (const s of d.list) {
           let found = null;
           for (const m of s.text.matchAll(/^\[\d+,"o",(\[[^\]]*\])\]$/gm)) found = m[1];
           if (found) try { order = JSON.parse(found); } catch { /* not one */ }
         }
-        return before;
+        return was;
       });
+      this.orders = this.days.map((d) => before[d.at]);
       this.lastOrder = order; // …and the last day's
     }
 
@@ -275,8 +292,9 @@
       return { page: Rec.htmlOf(pg.doc), devices, links: pg.links() };
     }
 
+    // every day's sessions (all[k], shown or not) played onto pg
     playDay(pg, k) {
-      const players = this.days[k].list.map((s) => {
+      const players = this.all[k].list.map((s) => {
         const p = Rec.parseSession(s.text);
         if (!p.known) return { walls: [], play() {} };
         const lp = Rec.linePlayer(p.lines, null, { page: pg, device: s.device });
@@ -285,8 +303,10 @@
       Rec.playInterleaved(players);
     }
 
-    // the page as day k began, a Page to play on
-    async start(k) {
+    // the page as shown day k began, a Page to play on; the days kept are
+    // counted in all of them
+    async start(shown) {
+      const k = this.days[shown].at;
       let j = k;
       while (!this.kept.has(j)) j--;
       const snap = this.kept.get(j);
@@ -308,6 +328,42 @@
   }
 
   /* ---------- the page ---------- */
+
+  // When a session changed the chapters it holds, as wall-clock times: its
+  // splices, typing, deletions, a chapter taken out, and a `b` that brought
+  // a chapter in (not one only saying what was already there)
+  const STATES = new Set(['continue', 'anchor', 'baseline']);
+  function changesIn(s) {
+    const p = Rec.parseSession(s.text);
+    if (!p.known) return [];
+    const { walls } = Rec.lineWalls(p.header, p.lines);
+    const out = [];
+    p.lines.forEach((line, i) => {
+      if (!Array.isArray(line)) return;
+      const k = line[1];
+      const changed = k === 'e' || k === 'rd' || k === 'd' || (k === 'r' && !!line[2]) || (k === 'b' && !STATES.has(line[5]));
+      if (changed && Number.isFinite(walls[i])) out.push(walls[i]);
+    });
+    return out;
+  }
+
+  // The tags a page of some chapters shows: those on a day it shows, with a
+  // change to its chapters since the last one it showed. A snapshot taken
+  // while other chapters were written is the same text again.
+  function tagsShown(tags, book) {
+    if (!book.changes) return tags;
+    const days = new Set(book.days.map((d) => d.day));
+    const ch = book.changes;
+    const out = [];
+    let since = -Infinity;
+    let i = 0;
+    for (const tg of tags) {
+      if (!days.has(tg.day) || !Number.isFinite(tg.when)) continue;
+      while (i < ch.length && ch[i] <= since) i++;
+      if (i < ch.length && ch[i] <= tg.when) { out.push(tg); since = tg.when; }
+    }
+    return out;
+  }
 
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -335,7 +391,7 @@
       return;
     }
     const sessions = await loadSessions(data);
-    const book = new Book(sessions);
+    const book = new Book(sessions, !!data.partial);
     doc.body.classList.add('rx-js');
     const ui = player(doc, data, book, sessions);
     await checks(doc, data, sessions, ui);
@@ -417,7 +473,7 @@
     const names = {};
     for (const s of sessions) names[s.device] = s.name;
     const many = Object.keys(names).length > 1;
-    const tags = tagsIn(sessions);
+    const tags = tagsShown(tagsIn(sessions), book);
 
     let view = 'days';
     let k = -1;        // the day shown
@@ -1331,5 +1387,5 @@
     return box;
   }
 
-  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, tagsIn, stampsOf, Book };
+  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, tagsIn, tagsShown, stampsOf, Book };
 });

@@ -151,6 +151,56 @@ test('the page plays each day from the end of the day before, to where the recor
   }
 });
 
+test('a page of some chapters shows only the days and tags where they changed, and still plays from where they were', async () => {
+  const DEVICE = 'd-1';
+  const html = { a: '<p>A.</p>', b: '<p>B.</p>' };
+  let tagN = 0;
+  const day = (date, steps) => {
+    const id = date + 'T09-00-00Z-aaaa';
+    const w = new R.SessionWriter({ neoRec: 1, session: id, device: DEVICE, book: 'b', day: date, startedAt: date + 'T09:00:00.000Z', tz: 'UTC', prev: null });
+    const seen = new Set();
+    let cur = null;
+    for (const st of steps) {
+      if (st.tag) { w.push([1000, 'tag', 't' + (++tagN), null, null, { snapshot: 'snap-' + tagN }]); continue; }
+      const ch = st.type;
+      if (!seen.has(ch)) { w.push([0, 'b', ch, html[ch], R.digest(html[ch]), date === '2026-10-01' ? 'baseline' : 'continue'].map((v, i) => (i === 3 && date !== '2026-10-01' ? null : v))); seen.add(ch); cur = ch; } else if (cur !== ch) { w.push([0, 'ch', ch]); cur = ch; }
+      const at = html[ch].length - 4;
+      w.push([1000, 'e', at, 0, 'x', 'iT']);
+      html[ch] = R.applyEdit(html[ch], at, 0, 'x');
+    }
+    for (const ch of seen) w.push([0, 'w', R.digest(html[ch]), ch]);
+    return { id, device: DEVICE, text: w.chunk().text };
+  };
+  const whole = [
+    day('2026-10-01', [{ type: 'a' }, { type: 'b' }, { tag: 1 }]),
+    day('2026-10-02', [{ type: 'b' }, { tag: 1 }]),        // only b: nothing of a to see
+    day('2026-10-03', [{ tag: 1 }, { type: 'a' }, { tag: 1 }]) // a snapshot before a changed, then one after
+  ];
+  const sessions = whole.map((s) => {
+    const text = R.keepChapters(s.text, ['a']);
+    const header = R.parseSession(text).header;
+    return { ...s, text, header, day: R.sessionDay(header) };
+  });
+  const book = new Page.Book(sessions, true);
+  assert.deepEqual(book.all.map((d) => d.day), ['2026-10-01', '2026-10-02', '2026-10-03']);
+  assert.deepEqual(book.days.map((d) => d.day), ['2026-10-01', '2026-10-03']);
+  // the last day shown starts where the first ended, and ends as the chapter did
+  const first = await book.day(0);
+  const last = await book.day(1);
+  assert.equal(last.state(0).a, first.state(first.steps.length).a);
+  assert.equal(last.state(last.steps.length).a, html.a);
+  // the tags: day 1's, and day 3's after a changed; not day 2's, nor day 3's
+  // first, which is the same text as day 1's
+  const tags = Page.tagsIn(sessions);
+  assert.equal(tags.length, 4);
+  const shown = Page.tagsShown(tags, book);
+  assert.deepEqual(shown.map((t) => t.id), ['t1', 't4']);
+  // the whole book's page shows every day and every tag
+  const all = new Page.Book(whole.map((s) => ({ ...s, day: R.sessionDay(R.parseSession(s.text).header) })));
+  assert.equal(all.days.length, 3);
+  assert.equal(Page.tagsShown(tags, all).length, 4);
+});
+
 test('a token’s time is its TSTInfo’s genTime', () => {
   const tok = fs.readFileSync(path.join(SEALS, '000001.sectigo.tsr'));
   const digest = crypto.createHash('sha256').update(fs.readFileSync(path.join(SEALS, '000001.json'))).digest();
