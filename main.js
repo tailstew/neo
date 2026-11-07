@@ -3031,8 +3031,9 @@ function buildMenu() {
             { label: 'Word (.docx)', click: () => sendToWindow({ type: 'export', format: 'docx' }) },
             { label: 'EPUB (.epub)', click: () => sendToWindow({ type: 'export', format: 'epub' }) },
             { type: 'separator' },
-            { label: t('Paperback for KDP…'), click: () => sendToWindow({ type: 'export', format: 'paperback' }) },
             { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) },
+            { type: 'separator' },
+            { label: t('Paperback for KDP…'), click: () => sendToWindow({ type: 'export', format: 'paperback' }) },
             { type: 'separator' },
             {
               id: 'export-custom-chapter-titles',

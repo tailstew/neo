@@ -2091,8 +2091,8 @@ function bookTile(meta, opts = {}) {
         { label: t('Text (.txt)'), value: 'txt' }, { label: t('Markdown (.md)'), value: 'md' }, { label: t('HTML (.html)'), value: 'html' },
         { label: 'PDF (.pdf)', value: 'pdf' },
         { label: t('Word (.docx)'), value: 'docx' }, { label: t('EPUB (.epub)'), value: 'epub' },
-        ...(window.Capacitor || isPageMeta(meta) ? [] : [{ label: t('Paperback for KDP…'), value: 'paperback' }]),
-        ...(canExportHistory() && !isPageMeta(meta) ? [{ label: t('Writing History…'), value: 'history' }] : [])
+        ...(canExportHistory() && !isPageMeta(meta) ? [{ label: t('Writing History…'), value: 'history' }] : []),
+        ...(window.Capacitor || isPageMeta(meta) ? [] : [{ label: t('Paperback for KDP…'), value: 'paperback' }])
       ]);
       if (!fmt) return;
       if (fmt === 'history') { await exportWritingHistory(meta.id); return; }
