@@ -2665,6 +2665,10 @@ function createWindow() {
     // menu bar lives in that frame (KDE Plasma showed no menu, and Alt
     // found nothing to show)
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    // Linux takes a window's icon from the window itself (an unpacked build
+    // or a launcher entry that doesn't match it showed Electron's own);
+    // Windows and the Mac have it from the package
+    ...(process.platform === 'linux' ? { icon: path.join(__dirname, 'build', 'icon.png') } : {}),
     backgroundColor: roomColor(libraryPageTheme()),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
