@@ -2,10 +2,7 @@
 
 Found by the end-to-end tests (`npm run test:history`, 2026-11-12), most serious first. Take an issue off this list once its fix is in and its test passes.
 
-## 7. Small things
-
-- `npm run lint` already reports 5 errors in `app.js`, at lines 9433, 11524, 17788, 17791 and 19427: an unused loop condition, a `let` that should be `const`, and unnecessary escapes.
-- Upstream issue hughhowey/neo#479: the portable exe's updater installs NEO when you quit.
+Nothing open. (2026-11-12: `npm test`, `npm run lint` and every end-to-end suite pass.)
 
 ## Done
 
@@ -15,3 +12,5 @@ Found by the end-to-end tests (`npm run test:history`, 2026-11-12), most serious
 - 2026-11-12: **The paragraph buttons never show in words on a 1920-pixel screen.** They step down as the margin narrows: side by side, the left pair stacked, short words (‹ Older, Restore, Newer ›, translated), ‹ ›, ↺ (`renderPart`, `.hs-part-stack`). At 1904 px: short words, stacked. Test in "a paragraph picked: the buttons beside it…".
 - 2026-11-12: **Wrong wording for a deleted chapter.** Played past its going, a chapter says "This chapter isn't in the book at this moment." (`absentSays` in WRITING HISTORY, app.js; the exported page's line, already translated). Test in "a chapter picked at a moment it isn't there…".
 - 2026-11-12: **Other dialogs let Tab out the same way History did.** They did: Tab from a question's text field reached the book. One trap now serves every `.modal-backdrop` (`topDialog`, `tabStops` beside `dialogify` in app.js), History's own taken out. Test: "keyboard only: Tab and Shift+Tab stay inside every dialog…" (fails without the trap).
+- 2026-11-12: **`npm run lint` errors.** There were 27, not 5, across `app.js`, `main.js`, `covers.js` and three test scripts: unused names, `let` for `const`, loop conditions that never change, needless escapes, `void`, a missing brace. All fixed; `npm run lint` is clean.
+- 2026-11-12: **The portable exe's updater installs NEO when you quit** (hughhowey/neo#479). `getUpdater` leaves the updater off where `PORTABLE_EXECUTABLE_FILE` is set, the same line as upstream's fix, so the portable exe falls back to the release page.

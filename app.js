@@ -199,13 +199,13 @@ let chapterHTML = {};        // chapterId -> html (loaded at open)
 let savedHTML = {};          // chapterId -> html as last read from / written to disk
 let savedMetaSig = '';       // book.json as last read/written, minus the volatile bits
 let diskStamps = {};         // chapterId -> file mtime as of the last look at the disk
-let writing = {};            // chapterId -> chapter writes still on their way to disk
+const writing = {};          // chapterId -> chapter writes still on their way to disk
 let stickies = [];           // [{id, chapterId, text, resolved}]
 let darlings = [];           // [{id, html, text, chapterId, chapterLabel, date}]
 let currentTab = 'manuscript';
 let currentChapterId = null; // chapter the caret/scroll is in
 let wordMode = 'book';       // 'book' | 'chapter'
-let saveTimers = {};
+const saveTimers = {};
 
 // Every library.json write from this window goes through here. A look at the
 // disk (refreshFromDisk) can then tell its own writes from another device's:
@@ -814,7 +814,7 @@ async function loadLibrary() {
 function showFirstRun() {
   const fr = $('#firstrun');
   fr.hidden = false;
-  let picked = { body: Object.keys(BODY_FONTS)[0] || 'Georgia', dropcap: 'literary' };
+  const picked = { body: Object.keys(BODY_FONTS)[0] || 'Georgia', dropcap: 'literary' };
 
   // Step 1: who are you, and how do you write?
   $$('.fr-choice').forEach((btn) => {
@@ -2374,15 +2374,17 @@ $('#add-shelf-btn').onclick = async () => {
   if (last) {
     last.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     const label = last.querySelector('.shelf-label');
-    if (label) setTimeout(() => {
-      if (NO_HOVER) { label.click(); return; }
-      label.focus();
-      const r = document.createRange();
-      r.selectNodeContents(label); // selected: typing replaces "New Shelf"
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }, 350);
+    if (label) {
+      setTimeout(() => {
+        if (NO_HOVER) { label.click(); return; }
+        label.focus();
+        const r = document.createRange();
+        r.selectNodeContents(label); // selected: typing replaces "New Shelf"
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }, 350);
+    }
   }
 };
 
@@ -7153,7 +7155,6 @@ async function deleteChapterToDarlings(chId, quiet = false) {
   if (!quiet) snapshotStructure('chapter delete');
   const kind = chapterKind(chId);
   const name = chapterName(chId);
-  const index = book.chapterOrder.indexOf(chId);
   const text = chapterText(chId).trim();
   if (text) {
     const bodyEl = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
@@ -7385,7 +7386,7 @@ function wireChapterBody(body, chId) {
     // a script: its own Enter, Tab and ⌘1–7; no breaks, poetry or chapters
     if (isScript()) {
       if (scriptKey(e, body)) return;
-      if (spaceSafeDelete(e, body, chId)) return;
+      if (spaceSafeDelete(e, body)) return;
       if (emptyChapterBackspace(e, body, chId)) return;
       if (chapterStartBackspace(e, body, chId)) return;
       if (guardMarkerDelete(e, body, chId)) return;
@@ -7396,7 +7397,7 @@ function wireChapterBody(body, chId) {
     if (handleFlush(e, body, chId)) return;
     if (poetryBackspace(e, body, chId)) return;
     if (sceneBreakDelete(e, body, chId)) return;
-    if (spaceSafeDelete(e, body, chId)) return;
+    if (spaceSafeDelete(e, body)) return;
     if (emptyChapterBackspace(e, body, chId)) return;
     if (chapterStartBackspace(e, body, chId)) return;
     if (guardMarkerDelete(e, body, chId)) return;
@@ -7739,7 +7740,7 @@ function chapterStartBackspace(e, body, chId) {
   // …and on its first line. Below an empty line, Backspace takes the empty
   // line away and the paragraph moves up to the top of the chapter; it
   // never reaches past it into the chapter above.
-  let el = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer;
+  const el = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer;
   const block = el && el.closest ? el.closest('p') : null;
   if (block && body.contains(block) && block !== body.firstElementChild) {
     const above = block.previousElementSibling;
@@ -7885,7 +7886,7 @@ function flatPoint(p, off) {
 // whitespace repair, which duplicates a neighboring character. When that exact
 // hazard is about to happen, take the right-hand space along with the deletion,
 // leaving one clean space. All other deletes stay native.
-function spaceSafeDelete(e, body, chId) {
+function spaceSafeDelete(e, body) {
   if (e.key !== 'Backspace' && e.key !== 'Delete') return false;
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   const sel = window.getSelection();
@@ -8919,9 +8920,9 @@ function autoCapKey(e, body) {
   const lang = writingLanguage();
   // a lowercase letter where a sentence starts
   if (e.key !== e.key.toLocaleUpperCase(lang) && /\p{L}/u.test(e.key)) {
-    let starts = /^[\s"'“‘„«»(\[¿¡—–-]*$/.test(before);
-    if (!starts && /(?<!\.)\.\s+["'“‘„«(\[]?$/.test(before)) {
-      const word = (before.replace(/\.\s+["'“‘„«(\[]?$/, '.').match(/([\p{L}.]+)\.$/u) || [])[1] || '';
+    let starts = /^[\s"'“‘„«»([¿¡—–-]*$/.test(before);
+    if (!starts && /(?<!\.)\.\s+["'“‘„«([]?$/.test(before)) {
+      const word = (before.replace(/\.\s+["'“‘„«([]?$/, '.').match(/([\p{L}.]+)\.$/u) || [])[1] || '';
       starts = !CAPS_ABBREV.has(word.toLowerCase()) && !/^\p{L}$/u.test(word);
     }
     if (!starts) return;
@@ -9011,7 +9012,7 @@ function smartKeys(e, body) {
     e.preventDefault();
     const before = prevChars(1);
     const q = e.key === '"' ? bookQuotes(body) : quoteStyle();
-    let opening = before === '' || /[\s\(\[\{‘“«„‚»›‹>]/.test(before);
+    let opening = before === '' || /[\s([{‘“«„‚»›‹>]/.test(before);
     // after a dash, a quote usually closes speech that was cut off ("I was
     // just—"); it opens one only when no quotation is open in the paragraph
     if (before === '—' || before === '–') opening = !quoteIsOpen(range, e.key === '"' ? q : { open: '‘', close: '’' }, e.key === '"' ? '"' : '');
@@ -9035,7 +9036,7 @@ function smartKeys(e, body) {
 
 // Is a quotation open at the caret, in the paragraph so far?
 function quoteIsOpen(range, q, straight) {
-  let el = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
+  const el = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
   const block = el && el.closest ? el.closest('p, div') : null;
   if (!block) return false;
   const pre = document.createRange();
@@ -9325,11 +9326,11 @@ document.addEventListener('keydown', (e) => {
   // Swiss German, so CmdOrCtrl-Plus never fires there).
   if (isLargerTextShortcut(e)) {
     e.preventDefault();
-    void setEditorFontSize(1);
+    setEditorFontSize(1);
   }
   if (isSmallerTextShortcut(e)) {
     e.preventDefault();
-    void setEditorFontSize(-1);
+    setEditorFontSize(-1);
   }
   if (e.key === 'Escape') {
     // an input method's Esc cancels its own composition, nothing more
@@ -9463,7 +9464,7 @@ function vimWord(key) {
   let n = 0;
   if (key === 'w') {
     const start = vimClass(chars[0]);
-    while (n < chars.length && start && vimClass(chars[n]) === start) n++;
+    if (start) while (n < chars.length && vimClass(chars[n]) === start) n++;
     while (n < chars.length && vimClass(chars[n]) === 0) n++;
     if (n >= chars.length) { vimMove('forward', 'paragraphboundary'); vimMove('forward', 'character'); return; }
   } else if (key === 'e') {
@@ -9476,7 +9477,7 @@ function vimWord(key) {
     chars.reverse();
     while (n < chars.length && vimClass(chars[n]) === 0) n++;
     const cls = vimClass(chars[n]);
-    while (n < chars.length && cls && vimClass(chars[n]) === cls) n++;
+    if (cls) while (n < chars.length && vimClass(chars[n]) === cls) n++;
     if (!chars.length) { vimMove('backward', 'character'); vimMove('backward', 'paragraphboundary'); return; }
   }
   vimMove(key === 'b' ? 'backward' : 'forward', 'character', n);
@@ -11567,7 +11568,7 @@ function reconcileMarks() {
   const seen = new Set();
   let changed = false;
   for (const m of document.querySelectorAll('.chapter-body .ph-mark')) {
-    let sid = m.dataset.sid;
+    const sid = m.dataset.sid;
     if (!sid) continue;
     const chEl = m.closest('.chapter');
     const chId = chEl ? chEl.dataset.id : null;
@@ -17831,10 +17832,10 @@ function capitalSlips(el) {
       } catch { /* changed underneath us */ }
     };
     // the paragraph's first letter, past opening quotes, brackets and dashes
-    const lead = text.match(/^[\s"'“‘„«»(\[¿¡—–-]*/)[0].length;
+    const lead = text.match(/^[\s"'“‘„«»([¿¡—–-]*/)[0].length;
     if (/\p{Ll}/u.test(text[lead] || '') && !/^\p{Ll}\./u.test(text.slice(lead, lead + 2))) mark(lead);
     // a letter after a full stop (not an ellipsis or an abbreviation)
-    const stop = /(?<!\.)\.\s+["'“‘„«(\[]?(\p{Ll})/gu;
+    const stop = /(?<!\.)\.\s+["'“‘„«([]?(\p{Ll})/gu;
     let m;
     while ((m = stop.exec(text))) {
       const before = text.slice(0, m.index).match(/([\p{L}.]+)$/u);
@@ -19470,7 +19471,7 @@ function buildTxt(data) {
 function buildMd(data) {
   const d = data || bookExportData();
   // a title like "Wool *Omnibus*" must not turn into markup (idea: nejcc, #70)
-  const mdMeta = (s) => String(s || '').replace(/([\\`*_\[\]#<>])/g, '\\$1');
+  const mdMeta = (s) => String(s || '').replace(/([\\`*_[\]#<>])/g, '\\$1');
   // wrap a run in emphasis markers, keeping boundary spaces outside them
   // Markdown has strikethrough; underline goes as HTML, which it allows
   const mdMarks = [{ key: 'b', open: '**', close: '**' }, { key: 'i', open: '*', close: '*' },

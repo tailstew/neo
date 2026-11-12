@@ -36,7 +36,7 @@ let wc;
 let bookId;
 let chId;
 const js = (code) => wc.executeJavaScript(code, true);
-const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+const tick = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 const chapters = () => path.join(tmp, 'NEO Library', bookId, 'chapters');
 const order = () => js('book.chapterOrder');
 const html = (id) => js(`chapterHTML[${JSON.stringify(id)}]`);
