@@ -28,6 +28,8 @@ pocket/www/jszip.min.js
 pocket/www/locales/
 pocket/www/hunspell/
 pocket/www/dict/
+pocket/android/app/capacitor.build.gradle
+pocket/android/capacitor.settings.gradle
 
 # working files beside the repo, never part of it
 Claude outputs/
