@@ -5473,6 +5473,19 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     return true;
   }
 
+  // What the sheet says with nothing on it: a chapter not there yet, or
+  // one that has gone (deleted, joined to another, set on a card): gone
+  // once this day had it, or when the day never had it and nor does the
+  // book now
+  let absentBy = { h: null, by: null };
+  function absentSays() {
+    if (mode === 'book') return t('Nothing written yet at this moment.');
+    if (absentBy.h !== h) absentBy = { h, by: new Map(h.chapters().map((c) => [c.ch, c])) };
+    const c = absentBy.by.get(mode);
+    const gone = c ? nAt(pos) > c.firstStep : !meta.chapterOrder.includes(mode);
+    return gone ? t('This chapter isn’t in the book at this moment.') : t('This chapter doesn’t exist yet at this moment.');
+  }
+
   function draw(now = performance.now()) {
     if (!h) return;
     syncPart();
@@ -5482,9 +5495,12 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const order = h.order(nAt(pos)) || dayOrder();
     const empty = paper.querySelector('.hs-empty');
     if (showing.length && empty) empty.remove();
-    if (!showing.length && !empty) {
-      paper.innerHTML = `<p class="hs-empty">${escHtml(mode === 'book' ? t('Nothing written yet at this moment.') : t('This chapter doesn’t exist yet at this moment.'))}</p>`;
-      shown = {};
+    if (!showing.length) {
+      const say = absentSays();
+      if (!empty) {
+        paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
+        shown = {};
+      } else if (empty.textContent !== say) empty.textContent = say;
     }
     // sheets for the chapters shown, in order; others go
     const secs = {};

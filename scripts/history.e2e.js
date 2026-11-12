@@ -378,6 +378,9 @@ test('a chapter picked at a moment it isn’t there stays listed, dimmed, and th
   assert.equal(listed.filter((x) => x.absent).length, 1, JSON.stringify(listed));
   assert.match(listed.find((x) => x.absent).name, /\bTen\b/);
   assert.ok(!listed.some((x) => !x.absent && /\b(Six|Eight|Nine)\b/.test(x.name)), 'the others listed are those there then');
+  assert.equal(await js('(document.querySelector(".hs-paper .hs-empty") || {}).textContent'), 'This chapter isn’t in the book at this moment.', 'gone, not yet to come');
+  // the chapter the second day split off, on the first day: not there yet
+  await atDayEnd(0, SPLIT);
   assert.equal(await js('(document.querySelector(".hs-paper .hs-empty") || {}).textContent'), 'This chapter doesn’t exist yet at this moment.');
   await neo.closeHistory();
 });
