@@ -5738,8 +5738,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // (the cache's day states, in the worker: Rec.partDays), and to the
   // chapter as it is. Where that loses them (taken out, moved, or their
   // chapter deleted), they're looked for by their words in every chapter
-  // (Rec.findParagraphs), which costs milliseconds. Returns { ch, a, b,
-  // now, moved } where they are, or { gone, day, chapter, elsewhere }.
+  // (Rec.findParagraphs), which costs milliseconds; so are they where
+  // another paragraph took their place (Rec.partDoubt), and only kept
+  // there when their words are nowhere. Returns { ch, a, b, now, moved }
+  // where they are, or { gone, day, chapter, elsewhere }.
   async function trackToNow(ch, a, b, now) {
     const q = { ch, a, b };
     let last = '';
@@ -5771,9 +5773,15 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         last = html.slice(q.a, q.b);
       } else {
         const w = { a: q.a, b: q.b };
-        Rec.partSplices(q, Rec.splices(html, cur), 1);
+        if (Rec.partSplices(q, Rec.splices(html, cur), 1)) Rec.partDoubt(q, w, html, cur);
         if (q.gone) last = html.slice(w.a, w.b);
         else {
+          // a paragraph moved, with another where it was (Rec.partDoubt): where its words went, if anywhere
+          if (q.doubt) {
+            const found = Rec.findParagraphs(q.was, now) || Rec.findParagraphs(chapters[ch].toString().slice(a, b), now);
+            if (found && found.ch === ch) return { ch, a: found.a, b: found.b, now: cur, moved: true };
+            if (found) return { gone: true, day, chapter: false, elsewhere: found };
+          }
           // whole paragraphs, as they stand now
           const c = Rec.ChapterText.of(Rec.paragraphs(cur));
           const i = c.find(q.a);

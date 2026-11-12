@@ -99,3 +99,35 @@ test('words nowhere in the book are not found, and a few words alike are not eno
 test('notes and other streams are never searched', () => {
   assert.equal(R.findParagraphs(P(B), { [R.STREAMS.notes]: P(B) }), null);
 });
+
+test('a paragraph moved, with another in its old place, is in doubt, and found by its words where it went', () => {
+  const d1 = P(A, B, C);
+  // C cut from the end and put at the top; later a new paragraph at the end
+  const d2 = P(C, A, B, 'Gulls wheeled over the harbour wall at dawn.');
+  const { entries, readDay } = days([d1, d2]);
+  const r = R.partDays(entries, 1, readDay, { ch: 'c1', ...para(d1, 2) }, d1);
+  assert.equal(r.gone, false);
+  assert.equal(r.part.doubt, true, 'what stands where it was has few of its words');
+  assert.equal(r.part.was, `<p>${C}</p>`);
+  const f = R.findParagraphs(r.part.was, { c1: d2 });
+  assert.equal(d2.slice(f.a, f.b), `<p>${C}</p>`);
+});
+
+test('a paragraph rewritten in place keeps enough of its words not to be in doubt', () => {
+  const d1 = P(A, B, C);
+  const d2 = P(A, 'Martha kept the old lamp lit all night long, waiting for the boat.', C);
+  const { entries, readDay } = days([d1, d2]);
+  const r = R.partDays(entries, 1, readDay, { ch: 'c1', ...para(d1, 1) }, d1);
+  assert.ok(!r.part.doubt);
+  assert.equal(d2.slice(r.part.a, r.part.b), '<p>Martha kept the old lamp lit all night long, waiting for the boat.</p>');
+});
+
+test('short paragraphs are found by their words: a line of dialogue, a heading', () => {
+  const now = { c1: P(A, 'Three begins.', B), c2: P(C, 'Yes.', 'Three ends. Edited.') };
+  let f = R.findParagraphs(P('Yes.'), now);
+  assert.equal(f.ch, 'c2');
+  assert.equal(now.c2.slice(f.a, f.b), '<p>Yes.</p>');
+  f = R.findParagraphs(P('Three ends.'), now);
+  assert.equal(now.c2.slice(f.a, f.b), '<p>Three ends. Edited.</p>');
+  assert.equal(R.findParagraphs(P('Three finishes.'), now), null, 'one word in two alike is not enough');
+});

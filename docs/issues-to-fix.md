@@ -2,20 +2,6 @@
 
 Found by the end-to-end tests (`npm run test:history`, 2026-11-12), most serious first. Take an issue off this list once its fix is in and its test passes.
 
-## 1. Restoring a paragraph can overwrite a different one
-
-The words written over are recoverable (⌘Z, and the "Before restoring to …" tag), but nothing warns the writer.
-
-- **What happens:** a paragraph is cut from the end of its chapter and pasted at the top. Later that day, a new paragraph is added at the end. A History restore of the old paragraph then replaces the new end paragraph instead.
-- **Cause:** History carries a paragraph across days by comparing each day's end with the next (`Rec.partDays` in `recording.js`). That comparison can't see a move, so it takes the replaced paragraph for the one picked. Within a day, one change that moves a paragraph both ways (an Outline move in a chapter) does the same, in `partThrough`.
-- **Fix:** where a paragraph is replaced by one with few words in common (`likeness`), treat it as gone, so the search by words (`findParagraphs`) finds where it went.
-- **Test:** "a paragraph edited and moved within its chapter since is found by its words, and restored in its new place" (`npm run test:history`), failing now. Item 93 in `docs/manual-tests.md`.
-
-## 2. Short paragraphs can't be found by their words
-
-- **What happens:** the search behind restore (`findParagraphs`, `shingles` in `recording.js`) matches runs of three words. A paragraph of one or two words has none, so a dialogue line ("Yes.") or a short heading is never found once it moves, and History says it "can't find them anywhere else."
-- **Fix:** for very short paragraphs, compare the exact text.
-
 ## 3. Chapters not edited yet don't appear on History's earlier days
 
 - **What happens:** a chapter enters the history at its first edit (its `b` line). On earlier days it's missing from History's side pane and whole-book sheet, though it was in the book. If such a chapter is then deleted or joined, History never shows it before that day.
@@ -40,3 +26,8 @@ The words written over are recoverable (⌘Z, and the "Before restoring to …" 
 
 - `npm run lint` already reports 5 errors in `app.js`, at lines 9433, 11524, 17788, 17791 and 19427: an unused loop condition, a `let` that should be `const`, and unnecessary escapes.
 - Upstream issue hughhowey/neo#479: the portable exe's updater installs NEO when you quit.
+
+## Done
+
+- 2026-11-12: **Restoring a paragraph can overwrite a different one.** A paragraph replaced by one with few of its words leaves the part in doubt (`Rec.partDoubt`, in `partDays`, `partStep` and `trackToNow`), and restore looks for it by its words first. The test "…is found by its words, and restored in its new place" passes.
+- 2026-11-12: **Short paragraphs can't be found by their words.** A paragraph of one or two words is compared by its words (`wordsOf`, `wordsLike` in `recording.js`), needing two in three alike. Tests in `scripts/recording-restore.test.js`.

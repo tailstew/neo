@@ -2638,7 +2638,7 @@
       const texts = [];
       let html = was;
       for (const s of list) { html = applyEdit(html, s.at, s.del, s.ins); texts.push(html); }
-      memo.set(i, { list, texts });
+      memo.set(i, { list, texts, was });
       if (memo.size > 200) memo.delete(memo.keys().next().value);
     }
     return memo.get(i);
@@ -2659,7 +2659,10 @@
     // first change to the last, is a splice per run of paragraphs it changed)
     if (s.k === 'e' && s.sync === undefined && !(s.del && s.ins.includes('</p>'))) return partSplices(part, [s], dir, () => stepText(h, part.ch, i + 1));
     const w = wholeSplices(h, i);
-    return partSplices(part, w.list, dir, (k) => w.texts[k]);
+    const at = { a: part.a, b: part.b };
+    const hit = partSplices(part, w.list, dir, (k) => w.texts[k]);
+    if (hit && dir > 0 && w.list.length) partDoubt(part, at, w.was, w.texts[w.texts.length - 1]);
+    return hit;
   }
 
   // The part, once n steps were played, carried to where it is once `to`
@@ -2731,7 +2734,9 @@
   // taken out. For a restore: where those paragraphs are as the cache's
   // last day ends. Returns { part, html (the chapter then), gone, last
   // (the part's HTML just before it went), day (the day it went), chapter
-  // (true when the chapter itself went) }.
+  // (true when the chapter itself went) }. A paragraph replaced by one
+  // with few of its words leaves the part in doubt (partDoubt: part.doubt,
+  // part.was), carried on where it stood.
   function partDays(entries, n, readDay, part, from) {
     const ch = part.ch;
     const out = { part: { ch, a: part.a, b: part.b }, html: from, gone: false, last: null, day: null, chapter: false };
@@ -2741,7 +2746,7 @@
         Object.assign(out, { gone: true, last: out.html.slice(was.a, was.b), day, chapter: true });
         return;
       }
-      partSplices(out.part, splices(out.html, next), 1);
+      if (partSplices(out.part, splices(out.html, next), 1)) partDoubt(out.part, was, out.html, next);
       if (out.part.gone) Object.assign(out, { gone: true, last: out.html.slice(was.a, was.b), day });
       out.html = next;
     };
@@ -2760,10 +2765,11 @@
     return out;
   }
 
-  // The words of some HTML as shingles: each run of three words, folded
-  // (each word, when there are fewer than three)
+  // The words of some HTML, folded
+  const foldedWords = (html) => textOf(html).toLocaleLowerCase().match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) || [];
+  // …as shingles: each run of three words (each word, when there are fewer than three)
   function shingles(html) {
-    const w = textOf(html).toLocaleLowerCase().match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) || [];
+    const w = foldedWords(html);
     if (w.length < 3) return new Set(w);
     const s = new Set();
     for (let i = 0; i + 2 < w.length; i++) s.add(w[i] + ' ' + w[i + 1] + ' ' + w[i + 2]);
@@ -2775,6 +2781,32 @@
     for (const v of x) if (y.has(v)) both++;
     return (2 * both) / (x.size + y.size);
   };
+  // Words as findParagraphs and partDoubt compare them: { s: shingles, w:
+  // the words themselves, short: fewer than three }. A short paragraph (a
+  // line of dialogue, a heading) has no shingle, so it's compared by its
+  // words, and with anything by theirs.
+  function wordsOf(html) {
+    const w = foldedWords(html);
+    return { s: shingles(html), w: new Set(w), short: w.length < 3 };
+  }
+  const wordsLike = (x, y) => (x.short || y.short ? likeness(x.w, y.w) : likeness(x.s, y.s));
+  // how alike two such need to be: a short one, more so ("Three begins." isn't "Three ends.")
+  const SHORT_MIN = 2 / 3;
+
+  // A part carried through a change that rewrote its paragraphs (a diff of
+  // two texts, not typing in it): a diff can't see a move, so a paragraph
+  // moved, with another put where it was, reads as that one rewritten.
+  // Where what stands in the part's place has few of its words, the part
+  // is in doubt (part.doubt, and part.was, its HTML just before), and
+  // whoever restores it looks for it by its words first (findParagraphs).
+  function partDoubt(part, at, before, after) {
+    if (part.gone || part.doubt) return;
+    const was = before.slice(at.a, at.b);
+    const x = wordsOf(was);
+    if (!x.w.size) return;
+    const y = wordsOf(after.slice(part.a, part.b));
+    if (wordsLike(x, y) < (x.short || y.short ? SHORT_MIN : 0.5)) { part.doubt = true; part.was = was; }
+  }
 
   // Where some paragraphs (`html`, as they were) are in a book now
   // (`chapters`: id -> HTML), by their words: each paragraph matched to the
@@ -2783,14 +2815,14 @@
   // whole paragraphs, first matched to last), or null. Cheap: a novel is a
   // few thousand paragraphs, each made shingles once.
   function findParagraphs(html, chapters, { min = 0.5 } = {}) {
-    const want = paragraphs(html).map((p) => ({ s: shingles(p), words: countWords(p) })).filter((p) => p.s.size);
+    const want = paragraphs(html).map((p) => ({ ...wordsOf(p), words: countWords(p) })).filter((p) => p.w.size);
     if (!want.length) return null;
     const total = want.reduce((n, p) => n + p.words, 0);
     let best = null;
     for (const [ch, chHtml] of Object.entries(chapters)) {
       if (isStream(ch) || !chHtml) continue;
       const ps = paragraphs(String(chHtml));
-      const sh = ps.map(shingles);
+      const sh = ps.map(wordsOf);
       let words = 0;
       let score = 0;
       let lo = Infinity;
@@ -2798,8 +2830,8 @@
       for (const p of want) {
         let top = 0;
         let at = -1;
-        sh.forEach((s, i) => { const l = likeness(p.s, s); if (l > top) { top = l; at = i; } });
-        if (top < min) continue;
+        sh.forEach((s, i) => { const l = wordsLike(p, s); if (l > top) { top = l; at = i; } });
+        if (top < (p.short || (at >= 0 && sh[at].short) ? Math.max(min, SHORT_MIN) : min)) continue;
         words += p.words;
         score += top * p.words;
         lo = Math.min(lo, at);
@@ -3445,7 +3477,7 @@
     sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
     textOffset, compileSession, History, leadSteps, playFrom,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
-    partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
+    partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, partDoubt, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
     EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, lineChapter, keepChapters, causeChapters, CHAPTER_HASH, chapterLines, ChapterChains, chapterSeals, movedIn, sealsOver
   };
