@@ -1033,5 +1033,7 @@
   "Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Kime verirseniz başkalarına iletebilir ve geri alınamaz. Riski size ait olmak üzere paylaşırsınız.",
   "How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.": "Nasıl yazdığınız, tıpkı bir parmak izi gibi sizi tanımlayabilir ve sağlığınız hakkında ipucu verebilir. Kiminle paylaşacağınıza karar verirken bunu kişisel ve hassas bir bilgi olarak düşünün.",
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Taşıdığı bölümlerdeki her tuş vuruşunu içerir: tuttuğunuz kelimeler kadar sildikleriniz de, her duraklama, ve ne zaman yazdığınız (tarihler, saatler ve saat diliminiz).",
-  "Device {n}": "Cihaz {n}"
+  "Device {n}": "Cihaz {n}",
+  "Older": "Önceki",
+  "Newer": "Sonraki"
 }

@@ -6388,14 +6388,27 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const top = box.top - sr.top + scroller.scrollTop;
     const y = Math.max(top, Math.min(scroller.scrollTop + 10, top + box.height - partL.offsetHeight));
     partL.style.top = partR.style.top = y + 'px';
-    // in words where the margins have room; else ‹ and ›, then ↺ too
+    // in words where the margins have room: side by side, else the left
+    // pair one above the other, then in short words, then ‹ and ›, then ↺
+    // too (both margins in the same words)
     const room = text.left - sr.left - 12;
     const roomR = scroller.clientWidth - (text.right - sr.left + 12) - 2;
-    partRestore.textContent = label;
-    partPrev.textContent = '‹ ' + t('Earlier version');
-    partNext.textContent = t('Later version') + ' ›';
-    if (partL.offsetWidth > room || partR.offsetWidth > roomR) { partPrev.textContent = '‹'; partNext.textContent = '›'; }
-    if (partL.offsetWidth > room) partRestore.textContent = '↺';
+    const words = [
+      ['‹ ' + t('Earlier version'), label, t('Later version') + ' ›'],
+      ['‹ ' + t('Older'), t('Restore'), t('Newer') + ' ›'],
+      ['‹', t('Restore'), '›'],
+      ['‹', '↺', '›']
+    ];
+    const fits = () => partL.offsetWidth <= room && partR.offsetWidth <= roomR;
+    partL.classList.remove('hs-part-stack');
+    for (let k = 0; k < words.length; k++) {
+      [partPrev.textContent, partRestore.textContent, partNext.textContent] = words[k];
+      if (fits()) break;
+      if (k === 0) {
+        partL.classList.add('hs-part-stack');
+        if (fits()) break;
+      }
+    }
     partL.style.left = Math.max(2, room - partL.offsetWidth) + 'px';
     partR.style.left = Math.min(text.right - sr.left + 12, scroller.clientWidth - partR.offsetWidth - 2) + 'px';
   }

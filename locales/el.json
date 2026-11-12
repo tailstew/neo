@@ -1056,5 +1056,7 @@
   "Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Όποιος τη λάβει μπορεί να τη δώσει παρακάτω, και δεν παίρνεται πίσω. Τη μοιράζεστε με δική σας ευθύνη.",
   "How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.": "Ο τρόπος που πληκτρολογείτε μπορεί να σας ταυτοποιήσει, όπως περίπου ένα δακτυλικό αποτύπωμα, και να δώσει ενδείξεις για την υγεία σας. Θεωρήστε το προσωπική και ευαίσθητη πληροφορία όταν αποφασίζετε με ποιον θα τη μοιραστείτε.",
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Περιέχει κάθε πάτημα πλήκτρου στα κεφάλαια που φέρει: τις λέξεις που σβήσατε όπως και αυτές που κρατήσατε, κάθε παύση, και πότε γράψατε (τις ημερομηνίες, τις ώρες και τη ζώνη ώρας σας).",
-  "Device {n}": "Συσκευή {n}"
+  "Device {n}": "Συσκευή {n}",
+  "Older": "Προηγούμενη",
+  "Newer": "Επόμενη"
 }

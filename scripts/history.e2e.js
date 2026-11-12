@@ -254,6 +254,19 @@ test('a paragraph picked: the buttons beside it, their tooltips, hidden while pl
   await js('historyShown.player.setPlaying(false)');
   const [w, h] = neo.win.getSize();
   try {
+    // a 1920-pixel screen: the margins hold words, the left pair one above the other
+    neo.win.setSize(1904, h);
+    await tick(600);
+    await js('historyShown.player.seek(historyShown.player.pos())');
+    await waitFor('!document.querySelector(".hs-part").hidden');
+    const shown = await js(`(() => {
+      const l = document.querySelector('.hs-part'), r = document.querySelector('.hs-part-r');
+      const body = document.querySelector('.hs-paper .rp-body').getBoundingClientRect();
+      return { prev: l.querySelector('.hs-part-prev').textContent, restore: l.querySelector('.hs-part-restore').textContent, next: r.textContent,
+        stacked: l.classList.contains('hs-part-stack'), inMargins: l.getBoundingClientRect().right <= body.left && r.getBoundingClientRect().left >= body.right };
+    })()`);
+    assert.ok(/\p{L}/u.test(shown.prev) && /\p{L}/u.test(shown.restore) && /\p{L}/u.test(shown.next), 'in words: ' + JSON.stringify(shown));
+    assert.ok(shown.inMargins, 'beside the text, not over it: ' + JSON.stringify(shown));
     neo.win.setSize(700, h);
     await tick(600);
     await js('historyShown.player.seek(historyShown.player.pos())');

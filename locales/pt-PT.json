@@ -340,5 +340,7 @@
   "How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.": "A forma como escreve ao teclado pode identificá-lo, tal como uma impressão digital, e dar indícios sobre a sua saúde. Considere-a uma informação pessoal e sensível ao decidir com quem a partilha.",
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Contém cada tecla premida nos capítulos que leva: as palavras que apagou e as que manteve, cada pausa, e quando escreveu (as datas, as horas e o seu fuso horário).",
   "Chapter {to} holds text moved in from a chapter no longer in the book. Only the whole book’s export shows it being written.": "O capítulo {to} tem texto trazido de um capítulo que já não está no livro. Só a exportação do livro inteiro mostra como foi escrito.",
-  "A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.": "A impressão digital de um selo é o SHA-256 do seu ficheiro. A exportação do livro inteiro, e o verify-recording executado no livro, mostram os mesmos selos com as mesmas impressões digitais."
+  "A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.": "A impressão digital de um selo é o SHA-256 do seu ficheiro. A exportação do livro inteiro, e o verify-recording executado no livro, mostram os mesmos selos com as mesmas impressões digitais.",
+  "Older": "Anterior",
+  "Newer": "Posterior"
 }

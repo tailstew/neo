@@ -1198,5 +1198,7 @@
   "Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.": "Кто её получит, может передать её дальше, и вернуть её нельзя. Вы делитесь ею на свой страх и риск.",
   "How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.": "По тому, как вы печатаете, вас можно узнать, почти как по отпечатку пальца, и можно догадаться кое о чём в вашем здоровье. Считайте это личной и чувствительной информацией, решая, с кем ею поделиться.",
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "В ней каждое нажатие клавиши в главах, которые она несёт: и удалённые слова, и оставленные, каждая пауза, а также когда вы писали (даты, часы и ваш часовой пояс).",
-  "Device {n}": "Устройство {n}"
+  "Device {n}": "Устройство {n}",
+  "Older": "Раньше",
+  "Newer": "Позже"
 }
