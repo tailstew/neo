@@ -1129,6 +1129,10 @@ const recChapters = (chapters) => (Array.isArray(chapters) ? chapters.slice(0, 5
 ipcMain.handle('rec:evidence', (_e, bookId, chapters) =>
   historyRequest({ type: 'evidence', chapters: recChapters(chapters), ...historyTarget(bookId) }));
 
+// Where chapters' text came from in other chapters (Rec.movedIn), for the
+// export of some chapters to say what it leaves out
+ipcMain.handle('rec:moves', (_e, bookId) => historyRequest({ type: 'moves', ...historyTarget(bookId) }));
+
 // How far each of a day's sessions was timestamped, for the player's
 // footer and its timestamps' track
 ipcMain.handle('rec:stamps', (_e, bookId, sessions) =>

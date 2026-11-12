@@ -11,8 +11,8 @@
 //     after: [{ beacon: 'drand-quicknet', round, randomness, signature }],  (when it answered)
 //     heads: { <session>: <its last h line's hash> },     (those changed since the last seal)
 //     others: { <device>: { <session>: <its last h> } },  (when there are any)
-//     chapters: { <device>: { <session>: { <chapter>: [n, hash] } } },
-//                                                         (each chapter's own lines in the sessions above)
+//     chapters: { <device>: { <session>: { <chapter>: [n, hash] } } }, chapterHash: 2,
+//                                                         (each chapter's lines in the sessions above)
 //     tokens: { <file in seals/>: <sha256 hex> },         (stamps written since the last seal)
 //     prev: <sha256 hex of the previous seal's bytes>, sig }
 //
@@ -23,12 +23,15 @@
 // device names yet: fixed in time by when they arrived, not when they were
 // written. A NEO from before `others` checks the seal whole and ignores it. `after` is a value nobody knew before it was
 // published, so the seal was made after it; its stamps say it existed by
-// then. `chapters` is each chapter's own lines in the sessions in `heads`
-// and `others`, up to the head sealed (Rec.chapterSeals): how many, and a
-// chain over them, so an export of some chapters, which leaves the other
+// then. `chapters` is each chapter's lines in the sessions in `heads` and
+// `others`, up to the head sealed (Rec.chapterSeals): how many of its own,
+// and a chain over them and, with `chapterHash` 2, the lines it shares
+// that an export of some chapters keeps (the clock, focus, the layout, the
+// causes of its changes), so such an export, which leaves the other
 // chapters' lines out and with them the session's chain, can still check
-// its timestamps. A chapter is there when its lines changed since the last
-// seal and hold a write. A NEO from before `chapters` ignores it. `tokens` puts each earlier stamp under the next seal's stamps, so a
+// its timestamps; without `chapterHash`, its own lines alone (1). A
+// chapter is there when its own lines changed since the last seal and hold
+// a write. A NEO from before `chapters` ignores it. `tokens` puts each earlier stamp under the next seal's stamps, so a
 // stamp whose authority's certificate expires stays covered by a newer one
 // (RFC 4998's archive timestamps, in one field). Beside each seal:
 //
@@ -642,7 +645,7 @@ class Sealer {
     const add = async (device, dir, heads) => {
       for (const [s, h] of Object.entries(heads)) {
         const text = await this.sessionText(dir, s);
-        const at = text && R.chapterSeals(text).get(h);
+        const at = text && R.chapterSeals(text, R.CHAPTER_HASH).get(h);
         if (!at) continue;
         const mine = {};
         for (const [ch, v] of Object.entries(at)) if (said.get(chapterKey(device, s, ch)) !== v[0]) mine[ch] = v;
@@ -761,6 +764,7 @@ class Sealer {
       heads: changed,
       others: anyOthers ? others : undefined,
       chapters: Object.keys(chapters).length ? chapters : undefined,
+      chapterHash: Object.keys(chapters).length ? R.CHAPTER_HASH : undefined,
       tokens: Object.keys(tokens).length ? tokens : undefined,
       prev: prev ? prev.hash : null
     };
@@ -862,9 +866,9 @@ class Sealer {
 // its stamps, its `after`, and the stamps it says it covers. `sessions`
 // maps a session to the `h` hashes its chain holds (chainHashes), to check
 // the heads; `others` maps each other device to its sessions' the same way,
-// to check the heads the seal holds for them; `chapters` maps each device
-// to its sessions, and each to what Rec.chapterSeals makes of it, to check
-// the seal's `chapters`; `online` asks drand too.
+// to check the heads the seal holds for them; `chapters(device, session,
+// chapterHash)` gives what Rec.chapterSeals makes of a session (or null),
+// to check the seal's `chapters`; `online` asks drand too.
 // { device, publicKey, seals: [{ seq, at, ok, by, after, heads, others, chapters, stamps, problems }], problems }
 async function verifyDevice(dir, { sessions = null, others = null, chapters = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
   const sealsDir = path.join(dir, 'seals');
@@ -895,6 +899,7 @@ async function verifyDevice(dir, { sessions = null, others = null, chapters = nu
     s.heads = body.heads || {};
     s.others = body.others || {};
     s.chapters = body.chapters || {};
+    s.fingerprint = sha256hex(bytes);
     if (body.neoSeal !== 1) bad('it is in a format this NEO doesn’t know');
     if (body.seq !== s.seq) bad('its number isn’t its file’s');
     if (body.seq !== out.seals.length) bad('seals before it are missing');
@@ -932,7 +937,8 @@ async function verifyDevice(dir, { sessions = null, others = null, chapters = nu
         const h = named[session];
         if (!h) { bad('it seals chapters of session ' + session + ' without sealing the session'); continue; }
         if (!chapters) continue;
-        const at = chapters.get(device) && chapters.get(device).get(session) && chapters.get(device).get(session).get(h);
+        const table = chapters(device, session, body.chapterHash || 1);
+        const at = table && table.get(h);
         for (const [ch, v] of Object.entries(chs || {})) {
           const want = at && at[ch];
           if (!want || !Array.isArray(v) || want[0] !== v[0] || want[1] !== v[1]) bad('chapter ' + ch + ' of session ' + session + ' isn’t what it seals');

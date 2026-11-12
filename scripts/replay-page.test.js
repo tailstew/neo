@@ -141,6 +141,14 @@ test('a page of some chapters checks the seals over their own lines, and places 
   const checked = res.seals[DEV].seals[0];
   assert.equal(checked.ok, true, checked.problems.join('; '));
   assert.ok(checked.kept >= 1);
+  // its fingerprint is the seal file's, as verify-recording shows it; the
+  // seals also cover the book's other chapters, as hashes
+  const sealFile = fs.readFileSync(path.join(root, DEV, 'seals', '000001.json'));
+  assert.equal(checked.fingerprint, crypto.createHash('sha256').update(sealFile).digest('hex'));
+  assert.equal(v.devices[0].seals.seals[0].fingerprint, checked.fingerprint);
+  const others = new Set(Object.values(seal.chapters[DEV]).flatMap((chs) => Object.keys(chs)).filter((ch) => ch !== pick[0]));
+  assert.equal(res.otherChapters, others.size);
+  assert.ok(!sessions.some((s) => /"tag"/.test(s.text)));
   // the timestamps fall on the last line of the chapter each seal reached
   checked.by = Date.parse('2026-11-01T10:00:05Z');
   const map = Page.stampsOf(sessions, res.seals);
@@ -247,14 +255,20 @@ test('a page of some chapters shows only the days and tags where they changed, a
   const last = await book.day(1);
   assert.equal(last.state(0).a, first.state(first.steps.length).a);
   assert.equal(last.state(last.steps.length).a, html.a);
-  // the tags: day 1's, and day 3's after a changed; not day 2's, nor day 3's
-  // first, which is the same text as day 1's
-  const tags = Page.tagsIn(sessions);
+  // an export of some chapters carries no tags: a writer's names for
+  // moments aren't for sharing a chapter in public
+  assert.deepEqual(Page.tagsIn(sessions), []);
+  assert.ok(sessions.every((s) => !/"tag"/.test(s.text)));
+  // where tags are there, only those with a change since the last: day 1's,
+  // and day 3's after a changed; not day 2's, nor day 3's first, which is
+  // the same text as day 1's
+  const withDays = whole.map((s) => ({ ...s, day: R.sessionDay(R.parseSession(s.text).header) }));
+  const tags = Page.tagsIn(withDays);
   assert.equal(tags.length, 4);
   const shown = Page.tagsShown(tags, book);
   assert.deepEqual(shown.map((t) => t.id), ['t1', 't4']);
   // the whole book's page shows every day and every tag
-  const all = new Page.Book(whole.map((s) => ({ ...s, day: R.sessionDay(R.parseSession(s.text).header) })));
+  const all = new Page.Book(withDays);
   assert.equal(all.days.length, 3);
   assert.equal(Page.tagsShown(tags, all).length, 4);
 });

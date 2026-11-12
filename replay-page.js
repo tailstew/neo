@@ -153,21 +153,26 @@
     return out;
   }
 
-  // An export of some chapters: each chapter's own lines in each session
-  // (Rec.chapterLines), as the seals' `chapters` count them: { 'device/id':
-  // { <chapter>: { nos: [its line numbers], hashes: [the chain after each] } } }.
-  // With `hash` false, the line numbers alone (to place the timestamps).
-  function chapterChains(sessions, hash = true) {
+  // An export of some chapters: each chapter's own lines in each session,
+  // and its chain after each as the seals' `chapters` count them
+  // (Rec.ChapterChains, by their chapterHash `v`): { 'device/id': {
+  // <chapter>: { nos: [its own lines' numbers], hashes: [the chain after
+  // each] } } }. With `hash` false, the line numbers alone (to place the
+  // timestamps).
+  function chapterChains(sessions, hash = true, v = Rec.CHAPTER_HASH) {
     const out = {};
     for (const s of sessions) {
-      const { lines } = Rec.parseSession(s.text);
-      const per = Rec.chapterLines(lines);
+      const { header, lines } = Rec.parseSession(s.text);
+      const per = Rec.chapterLines(lines, hash ? v : 1);
+      const cc = hash ? new Rec.ChapterChains(header, v) : null;
       const mine = out[s.device + '/' + s.id] = {};
       per.forEach((c, i) => {
-        if (!c) return;
+        if (!c || (!hash && !c.ch)) return;
+        const st = cc ? cc.add(c) : c;
+        if (!st) return;
         const x = mine[c.ch] || (mine[c.ch] = { nos: [], hashes: [] });
         x.nos.push(i + 2);
-        if (hash) x.hashes.push(Rec.chainHash(x.hashes.length ? x.hashes[x.hashes.length - 1] : '', c.text));
+        if (cc) x.hashes.push(st.h);
       });
     }
     return out;
@@ -189,9 +194,10 @@
   // same way), the stamps it covers, its drand round, and its timestamp
   // tokens: that each stamps this seal's SHA-256, and when. A token's own
   // signature isn't checked here: openssl does that (below). In an export
-  // of some chapters (`kept`, with `chains` from chapterChains) the
-  // sessions' chains aren't there, so the heads can't be checked: what it
-  // seals of those chapters' own lines is, and `kept` counts them.
+  // of some chapters (`kept`, with `chains(chapterHash)` from
+  // chapterChains) the sessions' chains aren't there, so the heads can't be
+  // checked: what it seals of those chapters' lines is, and `kept` counts
+  // them. `fingerprint`: the SHA-256 of its file.
   async function checkSeals(files, sessions, others = new Map(), { kept = null, chains = null } = {}) {
     const byName = new Map(files.map((f) => [f.name, fromB64(f.b64)]));
     const out = { key: null, seals: [], ed25519: true };
@@ -211,6 +217,7 @@
       s.heads = body.heads || {};
       s.others = body.others || {};
       s.chapters = body.chapters || {};
+      s.chapterHash = body.chapterHash || 1;
       if (body.seq !== seq || seq !== out.seals.length) bad(T('seals before it are missing'));
       const { sig, ...signed } = body;
       if (out.key === null) out.key = body.publicKey;
@@ -225,6 +232,7 @@
       if ((body.prev || null) !== (out.seals.length > 1 ? prev : null)) bad(T('it doesn’t name the seal before it'));
       const digest = await sha256(bytes);
       prev = hex(digest);
+      s.fingerprint = prev;
       const sealed = [[sessions, body.heads], ...Object.entries(body.others || {}).map(([d, hs]) => [others.get(d) || new Map(), hs])];
       if (!kept) {
         for (const [mine, hs] of sealed) {
@@ -239,7 +247,7 @@
           for (const [id, chs] of Object.entries(ss || {})) {
             for (const [ch, v] of Object.entries(chs || {})) {
               if (!kept.has(ch)) continue;
-              const held = chains[d + '/' + id];
+              const held = chains(s.chapterHash)[d + '/' + id];
               if (!held) { bad(T('a session it seals isn’t in this export')); continue; }
               const c = held[ch];
               const n = Array.isArray(v) ? v[0] : 0;
@@ -1303,9 +1311,10 @@
         out.seals[d] = await checkSeals(files, byDevice.get(d) || new Map(), byDevice);
       }
     } else if (seals) {
-      // some chapters: the seals over their own lines
+      // some chapters: the seals over their lines
       const kept = keptOf(sessions) || new Set();
-      const chains = chapterChains(sessions);
+      const byV = new Map();
+      const chains = (v) => byV.get(v) || byV.set(v, chapterChains(sessions, true, v)).get(v);
       for (const [d, files] of Object.entries(seals)) {
         if (!files.length) continue;
         out.seals[d] = await checkSeals(files, new Map(), new Map(), { kept, chains });
@@ -1313,6 +1322,14 @@
       // no seal reaches these chapters (all made before seals held
       // chapters): nothing here fixes them in time
       if (!Object.values(out.seals).some((r) => r.seals.some((s) => s.kept))) out.seals = {};
+      // the book's other chapters the seals cover, as hashes only
+      const others = new Set();
+      for (const r of Object.values(out.seals)) {
+        for (const s of r.seals) {
+          for (const ss of Object.values(s.chapters || {})) for (const chs of Object.values(ss || {})) for (const ch of Object.keys(chs || {})) if (!kept.has(ch)) others.add(ch);
+        }
+      }
+      out.otherChapters = others.size;
     }
     done = sessions.length * 2;
     out.evidence = checkEvidence(sessions, evidence);
@@ -1394,6 +1411,12 @@
       line(null, chapterSealed
         ? T('This export holds only some chapters, so the sessions’ hash chains, which cover every chapter, can’t be checked here. The seals are checked against these chapters’ own lines.')
         : T('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
+      if (chapterSealed && res.otherChapters) {
+        line(null, res.otherChapters === 1
+          ? T('These seals also cover the writing of one other chapter of the book, which this export doesn’t hold.')
+          : T('These seals also cover the writing of {n} other chapters of the book, which this export doesn’t hold.', { n: fmtNum(res.otherChapters) }));
+      }
+      if (chapterSealed) line(null, T('A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.'));
     }
 
     // seals
@@ -1443,13 +1466,15 @@
     det.append(el('summary', '', label ? T('Seals of {device}', { device: label }) : T('Every seal')));
     const tbl = el('table');
     const head = el('tr');
-    for (const c of [T('Seal'), T('Made'), T('After (drand)'), T('Timestamped'), T('Files')]) head.append(el('th', '', c));
+    for (const c of [T('Seal'), T('Fingerprint'), T('Made'), T('After (drand)'), T('Timestamped'), T('Files')]) head.append(el('th', '', c));
     tbl.append(head);
     const byName = new Map(files.map((f) => [f.name, f]));
     for (const s of r.seals) {
       const tr = el('tr', s.ok ? '' : 'bad');
       const pad = String(s.seq).padStart(6, '0');
-      tr.append(el('td', '', pad), el('td', '', fmtTime(s.at)), el('td', '', fmtTime(s.after)));
+      const fp = el('td', 'rx-fp', (s.fingerprint || '').slice(0, 16).replace(/(.{4})(?!$)/g, '$1 '));
+      fp.title = s.fingerprint || '';
+      tr.append(el('td', '', pad), fp, el('td', '', fmtTime(s.at)), el('td', '', fmtTime(s.after)));
       const by = s.stamps.filter((x) => x.stamped && x.at !== null).map((x) => (TSA_NAMES[x.tsa] || x.tsa) + ' ' + fmtTime(x.at)).join(', ');
       tr.append(el('td', '', by || (s.byLater ? T('by {when} (a later seal)', { when: fmtTime(s.byLater) }) : T('not stamped'))));
       const td = el('td');

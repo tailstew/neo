@@ -3150,13 +3150,18 @@
     return n;
   }
 
-  // A session with only some chapters' lines in it, for a replay page that
-  // shows only those (Export replay…): every line about another chapter or
-  // a stream goes, its time carried on to the next line kept, and so do the
-  // `h` lines, since the chain covered lines that are gone. The header says
-  // which chapters it keeps (`kept`). It still replays: every `w` of a
-  // chapter kept hashes as it did, and each chapter's own lines hash as its
-  // seals say (chapterLines).
+  // A session with only some chapters' lines in it, for an export of some
+  // chapters (Export ▸ Writing History…), which a writer may share in
+  // public: every line about another chapter or a stream goes, its time
+  // carried on to the next line kept, and so do the `h` lines, since the
+  // chain covered lines that are gone; so do the tags (the writer's own
+  // names for moments, and NEO's for its snapshots and restores), the
+  // causes of changes to other chapters alone (causeChapters), and the
+  // session's totals in its `end`. What stays besides the chapters' own
+  // lines is the clock, focus, the keyboard's layout and the causes of
+  // their own changes, which their seals cover too (chapterLines). The
+  // header says which chapters it keeps (`kept`). It still replays: every
+  // `w` of a chapter kept hashes as it did.
   function keepChapters(text, ids) {
     const keep = new Set(ids);
     const { header, known, lines } = parseSession(text);
@@ -3167,76 +3172,211 @@
     const { platform: _platform, tz: _tz, ...rest } = header;
     const day = sessionDay(header);
     const out = [JSON.stringify({ ...rest, ...(day ? { day } : {}), kept: [...keep] })];
+    const causes = causeChapters(lines);
     let cur = null;
     let carry = 0;
-    for (const line of lines) {
-      if (!Array.isArray(line)) continue;
+    lines.forEach((line, i) => {
+      if (!Array.isArray(line)) return;
       const kind = line[1];
       if (kind === 'b' || kind === 'ch') cur = line[2];
       const about = lineChapter(line, cur);
-      const ok = kind !== 'h' && (about === false || keep.has(about));
-      if (!ok) { carry += lineSpan(line); continue; }
+      let ok = kind !== 'h' && kind !== 'tag' && (about === false || keep.has(about));
+      if (ok && kind === 'x') ok = [...causes.get(i)].some((ch) => keep.has(ch));
+      if (!ok) { carry += lineSpan(line); return; }
       let l = line;
       if (kind === 'o') l = [line[0], 'o', line[2].filter((ch) => keep.has(ch))];
+      else if (kind === 'end') l = [line[0], 'end', line[2] && line[2].crashed ? { crashed: true } : {}];
       if (carry && !DESCRIBES.has(kind)) {
         l = l.slice();
         l[0] = (l[0] || 0) + carry;
         carry = 0;
       }
       out.push(JSON.stringify(l));
-    }
+    });
     return out.join('\n') + '\n';
   }
 
-  // Each chapter's own lines in a session (lineChapter), as a seal hashes
-  // them (Proof of when I wrote, `chapters`), so a page of some chapters
-  // (keepChapters) can check its timestamps without the rest of the book:
-  // the line with its moment in the session (milliseconds since its start)
-  // in place of its dt, since such a page carries the time of the lines it
-  // leaves out on the next one it keeps; K, ch and o describe and have no
-  // moment. Streams aren't chapters and have none. `lines` parsed
-  // (parseSession); returns, by line, { ch, text, writes } or null.
-  // `writes`: a `w` or a `b`, each holding a hash of the whole chapter, so
-  // a chain with one in it can't be guessed back from its lines.
-  function chapterLines(lines) {
+  // The chapters each `x` line explains (Map: its index -> Set): those it
+  // changed before the next `x` by a splice with no input code (a change
+  // NEO made belongs to the last cause), and the one the line just after it
+  // is about when that's a `b` or `d` with the cause, or, for a spelling
+  // suggestion picked (`spell`), the splice the engine typed. Read the same
+  // in a whole session and in an export of some chapters, as far as those
+  // chapters go: an `x` the export leaves out explains none of them, so
+  // their splices after it aren't the earlier one's either; and between a
+  // line and the next of another chapter there's always that one's `ch` or
+  // `b`, so what's just after an `x` is the same line in both.
+  function causeChapters(lines) {
+    const out = new Map();
+    let cur = null;
+    let open = -1;
+    let cause = null;
+    lines.forEach((line, i) => {
+      if (!Array.isArray(line)) return;
+      const kind = line[1];
+      if (kind === 'b' || kind === 'ch') cur = line[2];
+      if (kind === 'x') { open = i; cause = line[2]; out.set(i, new Set()); return; }
+      if (open < 0) return;
+      const ch = lineChapter(line, cur);
+      const next = open === i - 1;
+      const counts = (kind === 'e' && (!line[5] || (next && cause === 'spell'))) || (next && ((kind === 'b' && line[5] === cause) || (kind === 'd' && line[3] === cause)));
+      if (counts && typeof ch === 'string' && !isStream(ch)) out.get(open).add(ch);
+    });
+    return out;
+  }
+
+  // How a seal hashes a chapter's lines (its `chapterHash`): 1, its own
+  // lines alone; 2, also the lines an export of some chapters keeps that
+  // are about no chapter (the clock, focus, the layout; and the causes of
+  // its own changes), so their dates, pauses and causes are fixed in time
+  // with it, and the session's start.
+  const CHAPTER_HASH = 2;
+
+  // Each chapter's own lines in a session (lineChapter), and with
+  // chapterHash 2 the lines it shares, as a seal hashes them (Proof of when
+  // I wrote, `chapters`), so an export of some chapters (keepChapters) can
+  // check its timestamps without the rest of the book: the line with its
+  // moment in the session (milliseconds since its start) in place of its
+  // dt, since such an export carries the time of the lines it leaves out
+  // on the next one it keeps; K, ch and o describe and have no moment.
+  // Streams aren't chapters and have none. `lines` parsed (parseSession);
+  // returns, by line, { ch, text, writes } for a chapter's own, { shared:
+  // null (every chapter's) | Set (those chapters'), text } for one it
+  // shares, or null. `writes`: a `w` or a `b`, each holding a hash of the
+  // whole chapter, so a chain with one in it can't be guessed back.
+  const SHARED = new Set(['T', 'f', 'K']);
+  function chapterLines(lines, v = CHAPTER_HASH) {
     let cur = null;
     let t = 0;
-    return lines.map((line) => {
+    const causes = v >= 2 ? causeChapters(lines) : null;
+    return lines.map((line, i) => {
       if (!Array.isArray(line)) return null;
       const kind = line[1];
       const at = t + (line[0] || 0);
       t += lineSpan(line);
       if (kind === 'b' || kind === 'ch') cur = line[2];
+      const text = () => JSON.stringify([DESCRIBES.has(kind) ? null : at, ...line.slice(1)]);
+      if (causes) {
+        if (SHARED.has(kind)) return { shared: null, text: text() };
+        if (kind === 'x') return causes.get(i).size ? { shared: causes.get(i), text: text() } : null;
+      }
       const ch = lineChapter(line, cur);
       if (typeof ch !== 'string' || isStream(ch)) return null;
-      return { ch, text: JSON.stringify([DESCRIBES.has(kind) ? null : at, ...line.slice(1)]), writes: kind === 'w' || kind === 'b' };
+      return { ch, text: text(), writes: kind === 'w' || kind === 'b' };
     });
   }
 
+  // Each chapter's chain over a session's lines (chapterLines), a line at a
+  // time (chainHash, from nothing): the lines it shares come in just before
+  // its next own line, and with chapterHash 2 the session's start before
+  // anything. add(line) returns the chapter's state after its own line, {
+  // ch, n (its own lines so far), h, writes }, or null.
+  class ChapterChains {
+    constructor(header, v = CHAPTER_HASH) {
+      this.shared = [];
+      this.by = new Map();
+      if (v >= 2) this.shared.push({ shared: null, text: JSON.stringify([0, 'start', (header && header.startedAt) || null]) });
+    }
+
+    add(c) {
+      if (!c) return null;
+      if (!c.ch) { this.shared.push(c); return null; }
+      let x = this.by.get(c.ch);
+      if (!x) this.by.set(c.ch, x = { ch: c.ch, n: 0, h: '', g: 0, writes: false });
+      for (; x.g < this.shared.length; x.g++) {
+        const s = this.shared[x.g];
+        if (!s.shared || s.shared.has(c.ch)) x.h = chainHash(x.h, s.text);
+      }
+      x.n++;
+      x.h = chainHash(x.h, c.text);
+      if (c.writes) x.writes = true;
+      return x;
+    }
+  }
+
   // What a seal says of each chapter at each `h` of a session: Map h ->
-  // { <chapter>: [n, hash] }, n the chapter's lines so far and hash the
-  // chain over them a line at a time (chainHash, from nothing), for each
-  // chapter whose lines so far hold a write (chapterLines).
-  function chapterSeals(text) {
-    const { lines } = parseSession(text);
+  // { <chapter>: [n, hash] }, for each chapter whose lines so far hold a
+  // write (ChapterChains); `v` the seal's chapterHash.
+  function chapterSeals(text, v = CHAPTER_HASH) {
+    const { header, lines } = parseSession(text);
     const out = new Map();
-    const by = new Map(); // ch -> { n, h, writes }
-    const per = chapterLines(lines);
+    const per = chapterLines(lines, v);
+    const cc = new ChapterChains(header, v);
     lines.forEach((line, i) => {
-      const c = per[i];
-      if (c) {
-        let x = by.get(c.ch);
-        if (!x) by.set(c.ch, x = { n: 0, h: '', writes: false });
-        x.n++;
-        x.h = chainHash(x.h, c.text);
-        if (c.writes) x.writes = true;
-      } else if (Array.isArray(line) && line[1] === 'h' && !out.has(line[3])) {
+      if (per[i]) cc.add(per[i]);
+      else if (Array.isArray(line) && line[1] === 'h' && !out.has(line[3])) {
         const at = {};
-        for (const [ch, x] of by) if (x.writes) at[ch] = [x.n, x.h];
+        for (const [ch, x] of cc.by) if (x.writes) at[ch] = [x.n, x.h];
         out.set(line[3], at);
       }
     });
     return out;
+  }
+
+  // Where chapters' text came from in other chapters, so an export of some
+  // chapters can say what it leaves out (Export ▸ Writing History…). In a
+  // run of NEO's own changes (from an `x` until the next key, caret or
+  // copy), those made with a cause that moves text: a splice that took
+  // out as many characters as one in another chapter put in (an outline
+  // move takes a section out whole and puts the same HTML back), a chapter
+  // a split made, from the chapter it split, and a chapter joined to
+  // another, to the one that took its text (a merge, or the outline's join,
+  // in this run or the last). Not an undo, which puts text back where it was
+  // typed. And a paste of text cut or copied in another chapter. `texts`
+  // every session, oldest first. Returns [[to, from], …].
+  const MOVES = new Set(['outline', 'split', 'merge']);
+  function movedIn(texts) {
+    const pairs = new Set();
+    const pair = (to, from) => { if (to !== from) pairs.add(to + '\n' + from); };
+    const copied = new Map(); // a cut or copy's hash -> its chapter
+    for (const text of texts) {
+      const { lines, known } = parseSession(text);
+      if (!known) continue;
+      let cur = null;
+      let run = null;
+      let joined = new Set(); // the chapters the last run put joined text into
+      const close = () => {
+        if (!run) return;
+        for (const a of run.ins) for (const d of run.dels) if (a.n === d.n) pair(a.ch, d.ch);
+        for (const ch of run.made) for (const d of run.dels) if (d.cause === 'split') pair(ch, d.ch);
+        if (run.into.size) joined = run.into;
+        run = null;
+      };
+      for (const line of lines) {
+        if (!Array.isArray(line)) continue;
+        const kind = line[1];
+        if (kind === 'b' || kind === 'ch') cur = line[2];
+        if (kind === 'x') {
+          if (!run) run = { cause: null, ins: [], dels: [], made: new Set(), into: new Set() };
+          run.cause = line[2];
+          continue;
+        }
+        if (kind === 'k' || kind === 'r' || kind === 'rd' || kind === 'n' || kind === 's' || kind === 'c' || kind === 'tag' || (kind === 'e' && line[5])) close();
+        const about = lineChapter(line, cur);
+        const ch = typeof about === 'string' && !isStream(about) ? about : null;
+        if (!ch) continue;
+        if (kind === 'c') {
+          if (line[2] === 'paste') {
+            const from = copied.get(line[5]);
+            if (line[6] === true && from) pair(ch, from);
+          } else copied.set(line[5], ch);
+          continue;
+        }
+        if (kind === 'd' && line[3] === 'merge') for (const to of (run && run.into.size ? run.into : joined)) pair(to, ch);
+        // only what a cause that moves text changed (another device's
+        // changes adopted in the same breath aren't a move)
+        if (!run || !MOVES.has(run.cause)) continue;
+        if (kind === 'e') {
+          const ins = (line[4] || '').length;
+          if (ins > line[3]) {
+            run.ins.push({ ch, n: ins - line[3] });
+            if (run.cause !== 'split') run.into.add(ch);
+          } else if (line[3] > ins) run.dels.push({ ch, n: line[3] - ins, cause: run.cause });
+        } else if (kind === 'b' && typeof line[3] === 'string' && !QUIET.has(line[5])) run.made.add(ch);
+      }
+      close();
+    }
+    return [...pairs].map((p) => p.split('\n'));
   }
 
   // The seals over one device's sessions, from every device's seals checked
@@ -3307,6 +3447,6 @@
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
-    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, lineChapter, keepChapters, chapterLines, chapterSeals, sealsOver
+    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, lineChapter, keepChapters, causeChapters, CHAPTER_HASH, chapterLines, ChapterChains, chapterSeals, movedIn, sealsOver
   };
 });

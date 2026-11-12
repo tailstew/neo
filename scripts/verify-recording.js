@@ -46,8 +46,18 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
   // each device's sessions' h hashes, for the seals of every device: a
   // computer's seal can hold another device's sessions (others)
   const allHashes = new Map();
-  // and what each session's chapters' lines come to at each h (the seals' `chapters`)
-  const allChapters = new Map();
+  // and each session, for what its chapters' lines come to at each h (the
+  // seals' `chapters`, by their chapterHash)
+  const allTexts = new Map();
+  const tables = new Map();
+  const chapterTable = (device, session, v) => {
+    const key = device + ' ' + session + ' ' + v;
+    if (!tables.has(key)) {
+      const text = allTexts.get(device) && allTexts.get(device).get(session);
+      tables.set(key, text ? P.chapterSeals(text, v) : null);
+    }
+    return tables.get(key);
+  };
   for (const dev of await Files.list(io, root, null, mirror)) {
     const dir = path.join(root, dev.device);
     const d = { device: dev.device, name: dev.name, sessions: [], replay: null, seals: null, cover: [], problems: [] };
@@ -55,8 +65,8 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
     const texts = [];
     const hashes = new Map();
     allHashes.set(dev.device, hashes);
-    const chapters = new Map();
-    allChapters.set(dev.device, chapters);
+    const byId = new Map();
+    allTexts.set(dev.device, byId);
     let prevLast;
     for (const s of dev.sessions) {
       const r = await Files.read(io, dir, s.id, mirror && path.join(mirror, dev.device));
@@ -71,7 +81,7 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
       d.sessions.push(one);
       texts.push(r.text);
       hashes.set(s.id, P.chainHashes(r.text));
-      chapters.set(s.id, P.chapterSeals(r.text));
+      byId.set(s.id, r.text);
     }
     // a session whose `prev` isn't the last before it: one is missing between
     for (const s of d.sessions) if (s.unchained) d.problems.push(`session ${s.id} doesn’t follow the one before it: a session between them is missing`);
@@ -86,7 +96,7 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
   for (const d of report.devices) {
     const dir = path.join(root, d.device);
     if (!fs.existsSync(path.join(dir, 'seals'))) continue;
-    d.seals = await P.verifyDevice(dir, { sessions: allHashes.get(d.device), others: allHashes, chapters: allChapters, online });
+    d.seals = await P.verifyDevice(dir, { sessions: allHashes.get(d.device), others: allHashes, chapters: chapterTable, online });
     for (const s of d.seals.seals) if (!s.ok) d.problems.push(`seal ${s.seq}: ${s.problems.join('; ')}`);
     checked[d.device] = d.seals;
   }
@@ -116,7 +126,7 @@ function print(r) {
       out.push(`  ${ss.length} seals, signed by key ${d.seals.publicKey}; ${stamped} stamped, ${ss.filter((s) => s.by === null && s.byLater).length} fixed in time by a later seal`);
       for (const s of ss) {
         const who = s.stamps.filter((x) => x.ok).map((x) => `${x.tsa} ${iso(x.genTime)}${x.trusted ? '' : x.added ? ' (root added by the writer, in no public list)' : ' (untrusted)'}`).join(', ');
-        out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}`);
+        out.push(`   ${String(s.seq).padStart(6, '0')} ${s.ok ? 'ok ' : 'BAD'} fingerprint ${s.fingerprint.slice(0, 16)}; made ${iso(s.at)}; after ${iso(s.after)}; ${who || (s.byLater ? 'by ' + iso(s.byLater) + ' (a later seal)' : 'not stamped')}`);
       }
     } else if (!d.sealedBy || !d.sealedBy.length) {
       out.push('  No seals: proof was never turned on here, so nothing fixes this recording in time.');

@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('neo', {
   recDelete: (bookId) => ipcRenderer.invoke('rec:delete', bookId),
   recTrack: (bookId, day, part, from) => ipcRenderer.invoke('rec:track', bookId, day, part, from),
   recEvidence: (bookId, chapters) => ipcRenderer.invoke('rec:evidence', bookId, chapters),
+  recMoves: (bookId) => ipcRenderer.invoke('rec:moves', bookId),
   recStamps: (bookId, sessions) => ipcRenderer.invoke('rec:stamps', bookId, sessions),
   recExport: (bookId, opts) => ipcRenderer.invoke('rec:export', bookId, opts),
   onRecProgress: (cb) => ipcRenderer.on('rec:progress', (_e, msg) => cb(msg)),

@@ -266,52 +266,147 @@ test('a seal says what it sealed of each chapter’s own lines, and an export of
     assert.notEqual(v[0], (first.chapters[DEV][path.basename(open)][ch] || [0])[0]);
   }
 
+  assert.equal(first.chapterHash, R.CHAPTER_HASH);
+
   // verifyDevice checks them against the sessions
-  const table = (fix) => new Map([[DEV, new Map(fs.readdirSync(dir).filter((f) => f !== 'seals').map((f) => {
-    const id = f.replace(/\.jsonl\.gz$/, '');
-    return [id, fix(id, R.chapterSeals(textOf(id)))];
-  }))]]);
-  let v = await P.verifyDevice(dir, { sessions: hashesOf(dir), chapters: table((id, m) => m) });
+  const table = (fix) => (device, id, v) => (device === DEV ? fix(R.chapterSeals(textOf(id), v)) : null);
+  let v = await P.verifyDevice(dir, { sessions: hashesOf(dir), chapters: table((m) => m) });
   for (const seal of v.seals) assert.deepEqual(seal.problems.filter((p) => /chapter/.test(p)), []);
+  assert.match(v.seals[0].fingerprint, /^[0-9a-f]{64}$/);
   v = await P.verifyDevice(dir, {
-    chapters: table((id, m) => new Map([...m].map(([h, at]) => [h, Object.fromEntries(Object.entries(at).map(([ch, x]) => [ch, [x[0], 'AAAAAAAAAAAAAAAAAAAAAA']]))])))
+    chapters: table((m) => new Map([...m].map(([h, at]) => [h, Object.fromEntries(Object.entries(at).map(([ch, x]) => [ch, [x[0], 'AAAAAAAAAAAAAAAAAAAAAA']]))])))
   });
   assert.ok(v.seals[0].problems.some((p) => /^chapter .* isn’t what it seals$/.test(p)));
   assert.equal(v.seals[0].ok, false);
+  // a seal from before chapterHash 2 is read as 1: its chapters' own lines alone
+  const one = R.chapterSeals(textOf(path.basename(open)), 1);
+  const two = R.chapterSeals(textOf(path.basename(open)), 2);
+  const h = second.heads[path.basename(open)];
+  assert.deepEqual(Object.keys(one.get(h)), Object.keys(two.get(h)));
+  assert.notDeepEqual(one.get(h), two.get(h));
 
   // an export of one chapter: its lines alone give the seal's chain
   const [id] = Object.keys(first.chapters[DEV]).filter((x) => x !== path.basename(open));
   const [ch, [count, hash]] = Object.entries(first.chapters[DEV][id])[0];
-  const only = R.keepChapters(textOf(id), [ch]);
-  let chain = '';
-  let k = 0;
-  for (const c of R.chapterLines(R.parseSession(only).lines)) {
-    if (!c || c.ch !== ch || k === count) continue;
-    chain = R.chainHash(chain, c.text);
-    k++;
+  const only = R.parseSession(R.keepChapters(textOf(id), [ch]));
+  const cc = new R.ChapterChains(only.header);
+  let got = null;
+  for (const c of R.chapterLines(only.lines)) {
+    const x = cc.add(c);
+    if (x && x.ch === ch && x.n === count) got = x.h;
   }
-  assert.equal(k, count);
-  assert.equal(chain, hash);
+  assert.equal(got, hash);
 });
 
-test('a chapter’s lines are the same in a session and in an export of some chapters, their moments too', () => {
+// each chapter's chain after each of its own lines, as a seal counts it
+const chainsOf = (text, v = R.CHAPTER_HASH) => {
+  const { header, lines } = R.parseSession(text);
+  const cc = new R.ChapterChains(header, v);
+  const out = {};
+  for (const c of R.chapterLines(lines, v)) {
+    const x = cc.add(c);
+    if (x) (out[x.ch] || (out[x.ch] = [])).push(x.n + ' ' + x.h);
+  }
+  return out;
+};
+
+test('a chapter’s chain is the same in a session and in an export of some chapters, their moments too', () => {
   const src = path.join(__dirname, 'fixtures', 'recording-v1');
   for (const f of fs.readdirSync(src)) {
     const text = fs.readFileSync(path.join(src, f), 'utf8');
-    const all = R.chapterLines(R.parseSession(text).lines).filter(Boolean);
-    const chapters = [...new Set(all.map((c) => c.ch))];
-    for (const keep of [...chapters.map((c) => [c]), chapters]) {
-      const part = R.chapterLines(R.parseSession(R.keepChapters(text, keep)).lines).filter(Boolean);
-      for (const ch of keep) assert.deepEqual(part.filter((c) => c.ch === ch), all.filter((c) => c.ch === ch), f + ' ' + ch);
+    for (const v of [1, 2]) {
+      const all = chainsOf(text, v);
+      const chapters = Object.keys(all);
+      for (const keep of [...chapters.map((c) => [c]), chapters]) {
+        const part = chainsOf(R.keepChapters(text, keep), v);
+        for (const ch of keep) assert.deepEqual(part[ch], all[ch], f + ' ' + ch + ' v' + v);
+      }
     }
     // a line's moment is in what's hashed: move one and the chain changes
     const raw = R.splitLines(text).lines;
     const i = raw.findIndex((l, j) => j > 0 && /^\[\d+,"e"/.test(l));
     if (i < 0) continue;
     const moved = raw.map((l, j) => (j === i ? l.replace(/^\[(\d+)/, (m, d) => '[' + (+d + 1)) : l)).map((l) => l + '\n').join('');
-    const at = R.chapterLines(R.parseSession(moved).lines);
-    assert.notDeepEqual(at.filter(Boolean), all, f);
+    assert.notDeepEqual(chainsOf(moved), chainsOf(text), f);
   }
+});
+
+test('an export of some chapters leaves out tags, the session’s totals and the causes of other chapters’ changes, and its chains cover what stays', () => {
+  const w = new R.SessionWriter({ neoRec: 1, session: '2026-11-01T09-00-00Z-aaaa', device: 'd-1', book: 'b', day: '2026-11-01', startedAt: '2026-11-01T09:00:00.000Z', tz: 'Europe/London', prev: null });
+  const a = '<p>A.</p>';
+  const b = '<p>B.</p>';
+  w.push([0, 'b', 'a', a, R.digest(a), 'baseline']);
+  w.push([0, 'b', 'b', b, R.digest(b), 'baseline']);
+  w.push([0, 'T', '2026-11-01T09:00:00.000Z']);
+  w.push([0, 'ch', 'a']);
+  w.push([500, 'e', 4, 0, 'x', 'iT']);
+  w.push([10, 'tag', 't1', 'my private note', null]);
+  w.push([20, 'f', 'blur']);
+  w.push([30, 'x', 'outline']);                 // a change to b alone
+  w.push([0, 'ch', 'b']);
+  w.push([0, 'e', 3, 2, '']);
+  w.push([40, 'ch', 'a']);
+  w.push([0, 'x', 'spell']);                    // a's spelling suggestion, typed by the engine
+  w.push([0, 'e', 4, 1, 'y', 'iT']);
+  w.push([0, 'w', R.digest('<p>Ay.</p>'), 'a']);
+  w.push([0, 'w', R.digest('<p></p>'), 'b']);
+  w.push([5, 'end', { keys: 12, edits: 3 }]);
+  const text = w.chunk().text;
+  const only = R.keepChapters(text, ['a']);
+  const kinds = R.parseSession(only).lines.map((l) => l[1] + (l[1] === 'x' ? ':' + l[2] : ''));
+  assert.ok(!kinds.includes('tag'));
+  assert.ok(!kinds.includes('x:outline'));
+  assert.ok(kinds.includes('x:spell') && kinds.includes('f') && kinds.includes('T'));
+  assert.ok(!only.includes('my private note') && !only.includes('"keys"') && !only.includes('Europe/London'));
+  assert.deepEqual(chainsOf(only).a, chainsOf(text).a);
+  // the clock, focus and a's cause are in its chain: change one and it differs
+  for (const [from, to] of [['"blur"', '"focus"'], ['"spell"', '"edit"'], ['T09:00:00.000Z"]', 'T08:00:00.000Z"]']]) {
+    const changed = only.split('\n').map((l, i) => (i > 0 ? l.replace(from, to) : l)).join('\n');
+    assert.notDeepEqual(chainsOf(changed).a, chainsOf(only).a, from);
+  }
+  // the session's start too
+  assert.notDeepEqual(chainsOf(only.replace('"startedAt":"2026-11-01T09:00:00.000Z"', '"startedAt":"2026-10-01T09:00:00.000Z"')).a, chainsOf(only).a);
+});
+
+test('text moved between chapters is found: an outline move, a split, chapters joined, and a paste of a cut', () => {
+  const w = new R.SessionWriter({ neoRec: 1, session: '2026-11-01T09-00-00Z-bbbb', device: 'd-1', book: 'b', startedAt: '2026-11-01T09:00:00.000Z', prev: null });
+  const html = { a: '<p>One.</p><p>Two.</p>', b: '<p>Three.</p>', c: '<p>Four.</p>', d: '<p>Five.</p>', e: '<p>Six.</p>' };
+  for (const ch of Object.keys(html)) w.push([0, 'b', ch, html[ch], R.digest(html[ch]), 'baseline']);
+  // a section of a moved to b: as many characters out of one as into the other
+  w.push([0, 'x', 'outline']);
+  w.push([0, 'ch', 'a']);
+  w.push([0, 'e', 11, 11, '']);
+  w.push([0, 'x', 'outline']);
+  w.push([0, 'ch', 'b']);
+  w.push([0, 'e', 13, 0, '<p>Two.</p>']);
+  // another device's change adopted at once, and an undo: neither is a move
+  w.push([0, 'x', 'disk-adopt']);
+  w.push([0, 'ch', 'c']);
+  w.push([0, 'e', 0, 0, '<p>New.</p>']);
+  w.push([0, 'x', 'undo-structural']);
+  w.push([0, 'ch', 'd']);
+  w.push([0, 'e', 0, 0, '<p>Back.</p>']);
+  w.push([0, 'ch', 'e']);
+  w.push([0, 'e', 0, 4, '']);
+  w.push([100, 'k', 'KeyA', 0]);
+  // c split: the new chapter f
+  w.push([0, 'x', 'split']);
+  w.push([0, 'ch', 'c']);
+  w.push([0, 'e', 0, 11, '']);
+  w.push([0, 'b', 'f', '<p><br></p>', R.digest('<p><br></p>'), 'new']);
+  w.push([100, 'k', 'KeyA', 0]);
+  // e joined to d
+  w.push([0, 'x', 'merge']);
+  w.push([0, 'ch', 'd']);
+  w.push([0, 'e', 11, 0, '<p>Six.</p>']);
+  w.push([0, 'd', 'e', 'merge']);
+  // a cut in b, pasted in a
+  w.push([100, 'ch', 'b']);
+  w.push([0, 'c', 'cut', 4, 'text', 'HASH', null]);
+  w.push([100, 'ch', 'a']);
+  w.push([0, 'c', 'paste', 4, 'text', 'HASH', true]);
+  const pairs = R.movedIn([w.chunk().text]).map(([to, from]) => to + '<' + from).sort();
+  assert.deepEqual(pairs, ['a<b', 'b<a', 'd<e', 'f<c']);
 });
 
 test('no drand, no `after`, and the seal is made anyway; a round that doesn’t add up is left out', async () => {

@@ -594,6 +594,7 @@
       return d.track(msg.day, msg.part, msg.from);
     }
     if (msg.type === 'stamps') return d.stamps((Array.isArray(msg.sessions) ? msg.sessions : []).map((s) => ({ id: String(s.id), device: String(s.device), open: !!s.open })));
+    if (msg.type === 'moves') return R.movedIn((await d.allTexts()).map((s) => s.text));
     if (msg.type === 'evidence') return d.evidence({ chapters: Array.isArray(msg.chapters) ? msg.chapters.map(String) : null, texts: !!msg.texts });
     if (msg.type === 'dayStart') {
       // a day can start once every day before it is built

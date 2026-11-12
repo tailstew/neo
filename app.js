@@ -3776,7 +3776,7 @@ function chapterRangesText(ids) {
 // Export Writing History…: which chapters go. { chapters: null } for the whole book
 // (with its seals, the default), { chapters: [ids] } for those typed as a
 // print dialog's pages, null on cancel.
-function exportReplayAsk(meta, name) {
+function exportReplayAsk(meta, name, moves = Promise.resolve([])) {
   return new Promise((resolve) => {
     const bd = document.createElement('div');
     bd.className = 'modal-backdrop confirm-modal';
@@ -3850,14 +3850,38 @@ function exportReplayAsk(meta, name) {
       ok.focus();
     };
     const chosen = () => chapterRanges(field.value, order.length);
+    // [[to, from], …]: text moved into a chapter from another (Rec.movedIn)
+    let moved = [];
+    moves.then((m) => { moved = Array.isArray(m) ? m : []; update(); });
+    // what the chapters chosen (indexes) hold that was written in chapters
+    // left out, so its writing isn't in the export
+    const movedNote = (ids) => {
+      const chosenIds = new Set(ids.map((i) => order[i]));
+      const by = new Map();
+      for (const [to, from] of moved) {
+        if (!chosenIds.has(to) || chosenIds.has(from)) continue;
+        if (!by.has(to)) by.set(to, new Set());
+        by.get(to).add(from);
+      }
+      const out = [];
+      for (const to of order.filter((ch) => by.has(ch)).slice(0, 3)) {
+        const n = order.indexOf(to) + 1;
+        const here = [...by.get(to)].map((ch) => order.indexOf(ch)).filter((i) => i >= 0).sort((a, b) => a - b);
+        if (here.length === 1) out.push(t('Chapter {to} holds text moved in from chapter {from}. Add chapter {from} to show it being written.', { to: n, from: here[0] + 1 }));
+        else if (here.length > 1) out.push(t('Chapter {to} holds text moved in from chapters {list}. Add them to show it being written.', { to: n, list: chapterRangesText(here) }));
+        else out.push(t('Chapter {to} holds text moved in from a chapter no longer in the book. Only the whole book’s export shows it being written.', { to: n }));
+      }
+      return out.join(' ');
+    };
     const update = () => {
       const ids = someOn.checked ? chosen() : null;
       const set = new Set(ids || []);
       rows.forEach((r, i) => { r.classList.toggle('on', set.has(i)); r.setAttribute('aria-pressed', String(set.has(i))); });
-      note.hidden = !someOn.checked || !!ids;
+      const warn = ids ? movedNote(ids) : '';
+      note.hidden = !someOn.checked || (!!ids && !warn);
       if (someOn.checked) {
         note.textContent = !field.value.trim() ? t('Type the chapters’ numbers, or click them.')
-          : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length }) : '';
+          : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length }) : warn;
         note.classList.toggle('ex-bad', !!field.value.trim() && !ids);
       }
       ok.disabled = someOn.checked && !ids;
@@ -3943,7 +3967,10 @@ async function exportWritingHistory(bookId = book && book.id) {
     };
     const name = (ch) => (meta.chapterOrder.includes(ch) ? historyChapterLabel(meta, ch, meta.chapterOrder) : (goneOf(ch) || {}).lead || t('Untitled'));
     const gone = (ch) => (goneOf(ch) || {}).gone || 'delete';
-    const picked = await exportReplayAsk(meta, name);
+    // text the chapters took from others (an outline move, a split, a join,
+    // a cut pasted): the dialog says when an export would leave its writing out
+    const moves = window.neo.recMoves ? window.neo.recMoves(bookId).catch((err) => { window.neo.logError('export replay moves: ' + (err && err.stack || err)); return []; }) : Promise.resolve([]);
+    const picked = await exportReplayAsk(meta, name, moves);
     if (!picked) return;
     toast(t('Making the export…'));
     const res = await window.neo.recEvidence(bookId, picked.chapters);
@@ -4004,6 +4031,10 @@ const REPLAY_PAGE_WORDS = [
   tk('Played back: all {n} chapter writes come out exactly as recorded.'),
   tk('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
   tk('This export holds only some chapters, so the sessions’ hash chains, which cover every chapter, can’t be checked here. The seals are checked against these chapters’ own lines.'),
+  tk('These seals also cover the writing of one other chapter of the book, which this export doesn’t hold.'),
+  tk('These seals also cover the writing of {n} other chapters of the book, which this export doesn’t hold.'),
+  tk('A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.'),
+  tk('Fingerprint'),
   tk('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'),
   tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
   tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),

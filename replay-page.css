@@ -150,6 +150,7 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-seals table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; display: block; overflow-x: auto; }
 .rx-seals th, .rx-seals td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
 .rx-seals tr.bad td { color: var(--bad); }
+.rx-seals .rx-fp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
 .rx-file { color: var(--accent); word-break: break-all; }
 .rx-howto pre { background: var(--sheet); border: 1px solid var(--rule); padding: 8px 10px; overflow-x: auto; font-size: 13px; }
 .rx-small { font-size: 14px; color: var(--soft); }
