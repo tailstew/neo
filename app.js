@@ -6042,21 +6042,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
 
   bd.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    // Tab goes round the dialog's controls and never out of it: behind it is
-    // the book, which keys must not reach while History is open
-    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const all = [...bd.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])')]
-        .filter((x) => !x.disabled && x.offsetParent !== null && getComputedStyle(x).visibility !== 'hidden');
-      const at = document.activeElement;
-      const i = all.indexOf(at);
-      // (the browser also stops on the sheet's scrolling box: from there it goes on as usual)
-      const inside = at && at !== bd && bd.contains(at);
-      if (!all.length || (i < 0 && !inside) || (i >= 0 && (e.shiftKey ? i === 0 : i === all.length - 1))) {
-        e.preventDefault();
-        if (all.length) all[e.shiftKey ? all.length - 1 : 0].focus();
-        return;
-      }
-    }
+    // (Tab stays inside it: the trap every dialog has, topDialog)
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.code === 'KeyS' || e.key === 's')) { e.preventDefault(); tagHere(); return; }
     if (e.target === qIn) {
       if (e.key === 'Enter') { e.preventDefault(); runFind(qIn.value); } else if (e.key === 'Escape') { e.preventDefault(); if (qIn.value || find) clearFind(); else bd.focus(); }
@@ -21038,6 +21024,32 @@ new MutationObserver((muts) => {
   }
 }).observe(document.body, { childList: true });
 $$('.modal-backdrop').forEach(dialogify);
+
+// Tab goes round the topmost dialog's controls and never out of it: behind
+// a dialog is the book (or the dialog it opened from), which keys must not
+// reach while it's open. One trap for every dialog (.modal-backdrop).
+function topDialog() {
+  const open = [...document.querySelectorAll('.modal-backdrop')].filter((b) => !b.hidden && b.getClientRects().length);
+  return open[open.length - 1] || null;
+}
+function tabStops(root) {
+  return [...root.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [contenteditable="true"], [tabindex]')]
+    .filter((x) => !x.disabled && x.tabIndex >= 0 && x.getClientRects().length && getComputedStyle(x).visibility !== 'hidden' && !x.closest('[hidden], [inert]'));
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+  const bd = topDialog();
+  const at = document.activeElement;
+  if (!bd || (at && at.closest('[role="menu"]'))) return; // (a menu keeps its own keys)
+  const all = tabStops(bd);
+  const i = all.indexOf(at);
+  // (the browser also stops on a scrolling box inside: from there it goes on as usual)
+  const inside = at && at !== bd && bd.contains(at);
+  if (!all.length || (i < 0 && !inside) || (i >= 0 && (e.shiftKey ? i === 0 : i === all.length - 1))) {
+    e.preventDefault();
+    if (all.length) all[e.shiftKey ? all.length - 1 : 0].focus();
+  }
+}, true);
 
 // F6 walks the regions a mouse finds by hovering: the page, the chapters
 // pane, the notes pane, the bottom bar. ⇧F6 walks back; Esc returns to

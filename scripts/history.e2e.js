@@ -412,6 +412,42 @@ test('keyboard only: Tab reaches every control in the days and in the player, ea
   assert.equal(await js('!!historyShown'), false, 'Esc always gets out');
 });
 
+test('keyboard only: Tab and Shift+Tab stay inside every dialog, History’s and the book’s', async () => {
+  const count = () => js('document.querySelectorAll(".modal-backdrop").length');
+  // a dialog opened by `open`: Tab, then Shift+Tab, round and round it, never out; then Esc
+  const walk = async (name, open) => {
+    const was = await count();
+    await js(`(() => { ${open} })(); undefined`);
+    await waitFor(`document.querySelectorAll(".modal-backdrop").length > ${was}`);
+    await tick(150);
+    let stops = 0;
+    for (const mods of [[], ['shift']]) {
+      for (let i = 0; i < 25; i++) {
+        key('Tab', mods);
+        await tick(20);
+        const at = await js('(() => { const d = topDialog(); const e = document.activeElement; return !d ? "no dialog" : e && d.contains(e) ? "" : (e ? (e.tagName + "." + e.className).slice(0, 60) : "nothing"); })()');
+        assert.equal(at, '', `${name}: Tab${mods.length ? ' with Shift' : ''} left the dialog`);
+        stops++;
+      }
+    }
+    assert.ok(stops, name);
+    for (let i = 0; i < 4 && (await count()) > was; i++) { key('Escape'); await tick(250); }
+    assert.equal(await count(), was, name + ': Esc closes it');
+  };
+  await walk('a question with a text field', `askInput('Name it', 'a name')`);
+  await walk('a confirmation', `confirmModal({ title: 'Sure?', points: ['One thing.', 'Another.'], ok: 'Yes' })`);
+  await walk('a confirmation with a phrase to type', `confirmModal({ title: 'Sure?', points: ['Gone.'], ok: 'Delete', danger: true, phrase: 'delete it' })`);
+  await walk('a choice', `optionModal('Which?', 'Pick one.', [{ label: 'This', value: 1 }, { label: 'That', value: 2 }])`);
+  await walk('the keyboard shortcuts', `showHelp()`);
+  await walk('Timestamp services…', `openTsaServices()`);
+  // over History: its own dialogs, each the top one
+  await neo.openHistory();
+  await walk('How It Was Written…', `document.querySelector('.hs-evidence').click()`);
+  await walk('Delete this book’s history… (over History)', `document.querySelector('.hs-delete').click()`);
+  assert.equal(await js('!!historyShown'), true, 'History is still open beneath');
+  await neo.closeHistory();
+});
+
 /* ---------- restore ---------- */
 
 test('a chapter restored: History then shows the “Before restoring to …” tag in its list, on the day’s tile and on the timeline, with a Restored marker', async () => {

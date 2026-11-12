@@ -231,6 +231,7 @@ These were items here. `npm run test:history` (scripts/history.e2e.js) and `npm 
 - Chapters joined, made a section, set on a card or deleted leave the side pane's list at the moment they went, and are listed on the day before. `test:history`
 - A chapter picked at a moment it isn't there stays listed, dimmed, and the sheet says so: "This chapter isn't in the book at this moment." once it has gone (deleted, joined, on a card), "…doesn't exist yet…" before it was made. `test:history`
 - Keyboard only: Tab reaches every control in the days and the player, each visible with focus, never leaves the dialog, and Esc gets out. `test:history`
+- Keyboard only: Tab and Shift+Tab stay inside every dialog (a question, a confirmation, a choice, the shortcuts, Timestamp services…, and How It Was Written… and Delete history over History), and Esc closes each. `test:history`
 - Restore This Chapter: at once, no confirmation, the toast, the "Before restoring to …" tag first, no snapshot or Darlings. `test:recording`
 - After a restore, the "Before restoring to …" tag is in Tags, on the day's tile and on the timeline, and shows the chapter as it was. `test:history`
 - Ctrl+Z undoes a restore. `test:recording`
