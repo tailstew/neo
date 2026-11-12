@@ -96,13 +96,13 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 <header class="rx-top">
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
+  <div id="rx-actions" class="rx-actions" hidden></div>
   <p class="rx-lede">${esc(T('This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.'))}</p>
   ${partial && !seals ? `<p class="rx-note">${esc(T('This export holds only some chapters, so its timestamps can’t be verified. Export the whole book for that.'))}</p>` : ''}
   <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>
 <nav id="rx-side" class="rx-side" hidden></nav>
 <main id="rx-player" class="rx-player" hidden></main>
-<footer id="rx-foot" class="rx-foot" hidden></footer>
 </div>
 <section id="rx-report" class="rx-report">${report}</section>
 <section id="rx-checks" class="rx-checks" hidden></section>

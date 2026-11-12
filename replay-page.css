@@ -1,7 +1,7 @@
 /* The exported replay page (replay-export.js): a book's Writing History in
    any browser, laid out as NEO's own Writing History: the chapters and the
-   tags down the left, the sheet, the day's timeline or the days under it,
-   and a footer with the controls. Light or dark as the reader's system is.
+   tags down the left, the sheet, the day's timeline or the days under it
+   with the controls above them, and the pop-ups' buttons in the header. Light or dark as the reader's system is.
    Without JavaScript it's a page with the report on it. */
 :root {
   --paper: #fbfaf7;
@@ -46,12 +46,14 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
   position: fixed; inset: 0;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas: "top top" "side main" "foot foot";
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top" "side main";
 }
 .rx-js .rx-top { grid-area: top; max-width: none; margin: 0; padding: 12px 18px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .rx-js .rx-top h1 { font-size: 22px; margin: 0; }
 .rx-js .rx-by { margin: 0; }
+.rx-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
+.rx-actions[hidden] { display: none; }
 .rx-js .rx-lede { flex-basis: 100%; font-size: 13px; color: var(--soft); margin: 0; }
 .rx-js .rx-note { flex-basis: 100%; font-size: 13px; margin: 4px 0 0; }
 .rx-js .rx-made { padding: 16px 0 0; margin: 0; max-width: none; }
@@ -112,19 +114,17 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-tile canvas { display: block; width: 46px; height: 46px; }
 .rx-tiledate { white-space: nowrap; }
 
-/* the footer: always on screen */
-.rx-foot { grid-area: foot; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-top: 1px solid var(--rule); background: var(--pane); }
-.rx-foot[hidden] { display: none; }
-.rx-foot button { flex: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
-.rx-foot button:hover { border-color: var(--accent); color: var(--accent); }
-.rx-foot button[hidden] { display: none; }
+/* the controls, over the timeline; the header's buttons */
+.rx-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; }
+.rx-controls button, .rx-actions button { flex: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.rx-controls button:hover, .rx-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.rx-controls button[hidden] { display: none; }
 .rx-play, .rx-fast { min-width: 44px; }
 .rx-fast { letter-spacing: -3px; padding-right: 15px !important; }
 .rx-fast[aria-pressed="true"] { border-color: var(--accent) !important; color: var(--accent); }
 .rx-when { font-size: 12px; color: var(--soft); white-space: nowrap; }
 .rx-stamped { font-size: 12px; color: var(--stamp); white-space: nowrap; }
 .rx-stamped[hidden] { display: none; }
-.rx-gap { flex: 1; }
 .rx-ckbtn.ok::before { content: "✓ "; color: var(--ok); }
 .rx-ckbtn.bad::before { content: "✗ "; color: var(--bad); }
 
@@ -171,11 +171,10 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 
 @media (max-width: 700px) {
   .rx-top h1 { font-size: 26px; }
-  .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main" "foot"; }
+  .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }
   .rx-js .rx-side { display: none; }
   .rx-js .rx-lede { display: none; }
   .rx-sheet { font-size: 17px; width: calc(100% - 24px); padding: 28px 16px 40px; }
-  .rx-foot { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
-  .rx-gap { flex-basis: 100%; height: 0; }
+  .rx-bottom { padding: 8px 12px; }
   .rx-prev, .rx-next { min-width: 0; }
 }

@@ -536,16 +536,17 @@
 
   // The player, laid out as NEO's Writing History: the chapters and the
   // tags down the left, the sheet, the days as tiles or a day's timeline
-  // under it, and a footer with the controls, the moment shown, when it
-  // was timestamped, and the evidence and the checks, each in a pop-up.
+  // under it, with the controls, the moment shown and when it was
+  // timestamped above them, and in the header the evidence and the
+  // checks, each in a pop-up.
   // Returns { stamps(map), checked(state) } for the checks to call.
   function player(doc, data, book, sessions) {
     const box = doc.getElementById('rx-player');
     const side = doc.getElementById('rx-side');
-    const foot = doc.getElementById('rx-foot');
+    const actions = doc.getElementById('rx-actions');
     box.hidden = false;
     side.hidden = false;
-    foot.hidden = false;
+    actions.hidden = false;
     const titles = new Map((data.chapters || []).map((c) => [c.id, c.title]));
     const typed = new Map();
     for (const s of (data.evidence && data.evidence.sessions) || []) typed.set(s.device + '/' + s.id, s.typed);
@@ -578,7 +579,8 @@
     let loading = 0;
 
 
-    // the footer: the controls, the moment, its timestamp, the pop-ups
+    // the controls, the moment and its timestamp, over the timeline; the
+    // pop-ups' buttons in the header
     const backBtn = el('button', 'rx-back', '← ' + T('Days'));
     backBtn.title = T('Back to the days') + ' (Esc)';
     const playBtn = el('button', 'rx-play', '▶');
@@ -592,7 +594,9 @@
     stamped.title = T('When the text you see here was first timestamped');
     const evBtn = el('button', 'rx-evbtn', T('How it was written'));
     const ckBtn = el('button', 'rx-ckbtn', T('Checking…'));
-    foot.append(backBtn, playBtn, fastBtn, when, stamped, el('span', 'rx-gap'), evBtn, ckBtn);
+    const controls = el('div', 'rx-controls');
+    controls.append(backBtn, playBtn, fastBtn, when, stamped);
+    actions.append(evBtn, ckBtn);
 
     // the side: the chapters, then the tags
     const chList = el('div', 'rx-chlist');
@@ -655,7 +659,7 @@
     const strip = el('div', 'rx-strip');
     strip.setAttribute('role', 'listbox');
     strip.setAttribute('aria-label', T('Days'));
-    bottom.append(dayline, strip);
+    bottom.append(controls, dayline, strip);
     // a long pause, as NEO's own player says it: how long it really was
     const badge = el('div', 'rx-badge');
     badge.hidden = true;

@@ -1843,8 +1843,8 @@ test('the evidence report shows how the book was written; Export replay… write
     assert.ok(checks.length >= 2, checks.join('\n'));
     assert.ok(checks.every((c) => !c.startsWith('bad')), checks.join('\n'));
     assert.equal(await page('document.querySelector(".rx-same").className'), 'rx-same ok');
-    // laid out as History: the footer's controls, and the evidence and the checks in pop-ups
-    assert.deepEqual(await page('[".rx-play", ".rx-fast", ".rx-evbtn", ".rx-ckbtn"].map((q) => !!document.querySelector("#rx-foot " + q))'), [true, true, true, true]);
+    // laid out as History: the controls over the timeline, and the evidence and the checks in pop-ups from the header
+    assert.deepEqual(await page('[".rx-bottom .rx-play", ".rx-bottom .rx-fast", ".rx-top .rx-evbtn", ".rx-top .rx-ckbtn"].map((q) => !!document.querySelector(q))'), [true, true, true, true]);
     assert.equal(await page('document.querySelector("#rx-report").closest("dialog") !== null && document.querySelector("#rx-checks").closest("dialog") !== null'), true);
     assert.match(await page('document.querySelector(".rx-ckbtn").className'), /\bok\b/);
     // (the book's opening words: an earlier test dates a session the next
