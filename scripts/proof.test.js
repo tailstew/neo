@@ -241,6 +241,79 @@ test('nothing changed, no seal; the open session goes on, a seal of it alone, ch
   assert.equal(await sealer(dir, network()).seal(), null);
 });
 
+test('a seal says what it sealed of each chapter’s own lines, and an export of one chapter can check it', async () => {
+  const { dir, open, rest } = deviceFolder();
+  const textOf = (s) => (s === path.basename(open)
+    ? R.joinParts(fs.readdirSync(open).map((name) => ({ name, text: fs.readFileSync(path.join(open, name), 'utf8') }))).text
+    : zlib.gunzipSync(fs.readFileSync(path.join(dir, s + '.jsonl.gz'))).toString());
+  const s = sealer(dir, network());
+  const first = await s.seal();
+  assert.deepEqual(Object.keys(first.chapters), [DEV]);
+  for (const [id, h] of Object.entries(first.heads)) {
+    const want = R.chapterSeals(textOf(id)).get(h);
+    assert.ok(Object.keys(want).length, id);
+    assert.deepEqual(first.chapters[DEV][id], want, id);
+  }
+  // the open session goes on: only its chapters whose lines changed
+  const n = R.splitLines(fs.readFileSync(path.join(open, 'c-000001.jsonl'), 'utf8')).lines.length;
+  put(path.join(open, `c-${String(n + 1).padStart(6, '0')}.jsonl`), rest.map((l) => l + '\n').join(''));
+  s.tick(3600e3);
+  const second = await s.seal();
+  assert.deepEqual(Object.keys(second.chapters[DEV]), [path.basename(open)]);
+  const now = R.chapterSeals(textOf(path.basename(open))).get(second.heads[path.basename(open)]);
+  for (const [ch, v] of Object.entries(second.chapters[DEV][path.basename(open)])) {
+    assert.deepEqual(v, now[ch]);
+    assert.notEqual(v[0], (first.chapters[DEV][path.basename(open)][ch] || [0])[0]);
+  }
+
+  // verifyDevice checks them against the sessions
+  const table = (fix) => new Map([[DEV, new Map(fs.readdirSync(dir).filter((f) => f !== 'seals').map((f) => {
+    const id = f.replace(/\.jsonl\.gz$/, '');
+    return [id, fix(id, R.chapterSeals(textOf(id)))];
+  }))]]);
+  let v = await P.verifyDevice(dir, { sessions: hashesOf(dir), chapters: table((id, m) => m) });
+  for (const seal of v.seals) assert.deepEqual(seal.problems.filter((p) => /chapter/.test(p)), []);
+  v = await P.verifyDevice(dir, {
+    chapters: table((id, m) => new Map([...m].map(([h, at]) => [h, Object.fromEntries(Object.entries(at).map(([ch, x]) => [ch, [x[0], 'AAAAAAAAAAAAAAAAAAAAAA']]))])))
+  });
+  assert.ok(v.seals[0].problems.some((p) => /^chapter .* isn’t what it seals$/.test(p)));
+  assert.equal(v.seals[0].ok, false);
+
+  // an export of one chapter: its lines alone give the seal's chain
+  const [id] = Object.keys(first.chapters[DEV]).filter((x) => x !== path.basename(open));
+  const [ch, [count, hash]] = Object.entries(first.chapters[DEV][id])[0];
+  const only = R.keepChapters(textOf(id), [ch]);
+  let chain = '';
+  let k = 0;
+  for (const c of R.chapterLines(R.parseSession(only).lines)) {
+    if (!c || c.ch !== ch || k === count) continue;
+    chain = R.chainHash(chain, c.text);
+    k++;
+  }
+  assert.equal(k, count);
+  assert.equal(chain, hash);
+});
+
+test('a chapter’s lines are the same in a session and in an export of some chapters, their moments too', () => {
+  const src = path.join(__dirname, 'fixtures', 'recording-v1');
+  for (const f of fs.readdirSync(src)) {
+    const text = fs.readFileSync(path.join(src, f), 'utf8');
+    const all = R.chapterLines(R.parseSession(text).lines).filter(Boolean);
+    const chapters = [...new Set(all.map((c) => c.ch))];
+    for (const keep of [...chapters.map((c) => [c]), chapters]) {
+      const part = R.chapterLines(R.parseSession(R.keepChapters(text, keep)).lines).filter(Boolean);
+      for (const ch of keep) assert.deepEqual(part.filter((c) => c.ch === ch), all.filter((c) => c.ch === ch), f + ' ' + ch);
+    }
+    // a line's moment is in what's hashed: move one and the chain changes
+    const raw = R.splitLines(text).lines;
+    const i = raw.findIndex((l, j) => j > 0 && /^\[\d+,"e"/.test(l));
+    if (i < 0) continue;
+    const moved = raw.map((l, j) => (j === i ? l.replace(/^\[(\d+)/, (m, d) => '[' + (+d + 1)) : l)).map((l) => l + '\n').join('');
+    const at = R.chapterLines(R.parseSession(moved).lines);
+    assert.notDeepEqual(at.filter(Boolean), all, f);
+  }
+});
+
 test('no drand, no `after`, and the seal is made anyway; a round that doesn’t add up is left out', async () => {
   for (const drand of [false, 'liar']) {
     const { dir } = deviceFolder();

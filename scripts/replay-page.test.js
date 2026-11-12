@@ -109,7 +109,65 @@ test('the page’s seal check catches a changed seal, a swapped token, and a ses
   assert.ok(v.seals.every((s) => !s.ok && s.problems.some((p) => /isn’t what it sealed/.test(p))));
 });
 
-test('a page of some chapters holds only their lines, no seals, and still replays exactly', async () => {
+test('a page of some chapters checks the seals over their own lines, and places its timestamps by them', async () => {
+  const { verifyBook } = require('./verify-recording.js');
+  const book = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-chapters-'));
+  const root = path.join(book, 'recording');
+  fs.cpSync(path.join(FIX, 'recording'), root, { recursive: true });
+  // sealed again by a NEO whose seals hold chapters
+  fs.rmSync(path.join(root, DEV, 'seals'), { recursive: true });
+  const round = { round: 33000000, signature: 'ab'.repeat(48) };
+  round.randomness = crypto.createHash('sha256').update(Buffer.from(round.signature, 'hex')).digest('hex');
+  const seal = await new P.Sealer({
+    dir: path.join(root, DEV), book: 'book-x', device: DEV, key: P.keyOf(P.newKey()), now: () => new Date('2026-11-01T10:00:00Z'),
+    fetch: async () => ({ ok: true, status: 200, json: async () => round }), tsas: [],
+    write: (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data); }
+  }).seal();
+  assert.ok(Object.keys(seal.chapters[DEV]).length);
+  const v = await verifyBook(book);
+  assert.equal(v.ok, true, JSON.stringify(v.devices.map((d) => d.problems)));
+
+  const opts = { root, cache: fs.mkdtempSync(path.join(os.tmpdir(), 'neo-replay-')) };
+  const whole = await handle({ ...opts, key: 'ch-' + Math.random(), type: 'evidence', texts: true }, () => {});
+  const pick = [Object.keys(whole.evidence.words)[0]];
+  const r = await handle({ ...opts, key: 'ch-' + Math.random(), type: 'evidence', texts: true, chapters: pick }, () => {});
+  const html = Export.build({ title: 'B', evidence: r.evidence, sessions: r.texts, seals: { [DEV]: Export.sealFiles(path.join(root, DEV, 'seals')) }, partial: true, kept: pick });
+  assert.ok(!html.includes('its timestamps can’t be verified'));
+  const data = dataOf(html);
+  assert.equal(data.seals[DEV].length, 1);
+  assert.ok(data.roots.includes('BEGIN CERTIFICATE'));
+  const sessions = await Page.loadSessions(data);
+  const res = await Page.runChecks({ sessions, partial: true, seals: data.seals, evidence: data.evidence });
+  const checked = res.seals[DEV].seals[0];
+  assert.equal(checked.ok, true, checked.problems.join('; '));
+  assert.ok(checked.kept >= 1);
+  // the timestamps fall on the last line of the chapter each seal reached
+  checked.by = Date.parse('2026-11-01T10:00:05Z');
+  const map = Page.stampsOf(sessions, res.seals);
+  const chains = Page.chapterChains(sessions, false);
+  const placed = Object.entries(map).filter(([, list]) => list.length);
+  assert.ok(placed.length >= 1);
+  for (const [k, list] of placed) {
+    for (const e of list) {
+      assert.equal(e.ch, pick[0]);
+      assert.equal(e.by, checked.by);
+      assert.equal(e.n, chains[k][pick[0]].nos[seal.chapters[DEV][k.split('/')[1]][pick[0]][0] - 1]);
+    }
+  }
+
+  // a moment of the chapter moved: the seal no longer holds it
+  const at = sessions.findIndex((s) => R.chapterLines(R.parseSession(s.text).lines).some((c) => c && c.ch === pick[0] && !/^\[null/.test(c.text)));
+  const lines = R.splitLines(sessions[at].text).lines;
+  const per = R.chapterLines(R.parseSession(sessions[at].text).lines);
+  const i = per.findIndex((c) => c && c.ch === pick[0] && !/^\[null/.test(c.text)) + 1;
+  lines[i] = lines[i].replace(/^\[(\d+)/, (m, d) => '[' + (+d + 1));
+  const moved = sessions.map((s, j) => (j === at ? { ...s, text: lines.map((l) => l + '\n').join('') } : s));
+  const bad = await Page.runChecks({ sessions: moved, partial: true, seals: data.seals, evidence: null });
+  assert.equal(bad.seals[DEV].seals[0].ok, false);
+  assert.ok(bad.seals[DEV].seals[0].problems.includes('a chapter it seals isn’t what it sealed'));
+});
+
+test('a page of some chapters holds only their lines, no seals made before seals held chapters, and still replays exactly', async () => {
   const whole = await ask({ type: 'evidence', texts: true });
   const chs = Object.keys(whole.evidence.words);
   assert.ok(chs.length >= 1);

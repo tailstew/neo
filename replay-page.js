@@ -153,6 +153,33 @@
     return out;
   }
 
+  // An export of some chapters: each chapter's own lines in each session
+  // (Rec.chapterLines), as the seals' `chapters` count them: { 'device/id':
+  // { <chapter>: { nos: [its line numbers], hashes: [the chain after each] } } }.
+  // With `hash` false, the line numbers alone (to place the timestamps).
+  function chapterChains(sessions, hash = true) {
+    const out = {};
+    for (const s of sessions) {
+      const { lines } = Rec.parseSession(s.text);
+      const per = Rec.chapterLines(lines);
+      const mine = out[s.device + '/' + s.id] = {};
+      per.forEach((c, i) => {
+        if (!c) return;
+        const x = mine[c.ch] || (mine[c.ch] = { nos: [], hashes: [] });
+        x.nos.push(i + 2);
+        if (hash) x.hashes.push(Rec.chainHash(x.hashes.length ? x.hashes[x.hashes.length - 1] : '', c.text));
+      });
+    }
+    return out;
+  }
+
+  // the chapters an export of some chapters holds, or null for the whole book
+  function keptOf(sessions) {
+    let kept = null;
+    for (const s of sessions) if (s.header && Array.isArray(s.header.kept)) for (const ch of s.header.kept) (kept || (kept = new Set())).add(ch);
+    return kept;
+  }
+
   const DRAND = { genesis: 1692803367, period: 3 };
   const TSA_NAMES = { digicert: 'DigiCert', sectigo: 'Sectigo', globalsign: 'GlobalSign' };
 
@@ -161,8 +188,11 @@
   // id -> its h hashes, and `others`, each other device -> its sessions the
   // same way), the stamps it covers, its drand round, and its timestamp
   // tokens: that each stamps this seal's SHA-256, and when. A token's own
-  // signature isn't checked here: openssl does that (below).
-  async function checkSeals(files, sessions, others = new Map()) {
+  // signature isn't checked here: openssl does that (below). In an export
+  // of some chapters (`kept`, with `chains` from chapterChains) the
+  // sessions' chains aren't there, so the heads can't be checked: what it
+  // seals of those chapters' own lines is, and `kept` counts them.
+  async function checkSeals(files, sessions, others = new Map(), { kept = null, chains = null } = {}) {
     const byName = new Map(files.map((f) => [f.name, fromB64(f.b64)]));
     const out = { key: null, seals: [], ed25519: true };
     let prev = null;
@@ -172,7 +202,7 @@
       if (!m) continue;
       const seq = +m[1];
       const bytes = byName.get(f.name);
-      const s = { seq, at: null, ok: true, problems: [], stamps: [], after: null, by: null };
+      const s = { seq, at: null, ok: true, problems: [], stamps: [], after: null, by: null, kept: 0 };
       out.seals.push(s);
       const bad = (why) => { s.ok = false; s.problems.push(why); };
       let body;
@@ -180,6 +210,7 @@
       s.at = Date.parse(body.at);
       s.heads = body.heads || {};
       s.others = body.others || {};
+      s.chapters = body.chapters || {};
       if (body.seq !== seq || seq !== out.seals.length) bad(T('seals before it are missing'));
       const { sig, ...signed } = body;
       if (out.key === null) out.key = body.publicKey;
@@ -195,11 +226,27 @@
       const digest = await sha256(bytes);
       prev = hex(digest);
       const sealed = [[sessions, body.heads], ...Object.entries(body.others || {}).map(([d, hs]) => [others.get(d) || new Map(), hs])];
-      for (const [mine, hs] of sealed) {
-        for (const [id, h] of Object.entries(hs || {})) {
-          const held = mine.get(id);
-          if (!held) bad(T('a session it seals isn’t in this export'));
-          else if (!held.has(h)) bad(T('a session it seals isn’t what it sealed'));
+      if (!kept) {
+        for (const [mine, hs] of sealed) {
+          for (const [id, h] of Object.entries(hs || {})) {
+            const held = mine.get(id);
+            if (!held) bad(T('a session it seals isn’t in this export'));
+            else if (!held.has(h)) bad(T('a session it seals isn’t what it sealed'));
+          }
+        }
+      } else {
+        for (const [d, ss] of Object.entries(body.chapters || {})) {
+          for (const [id, chs] of Object.entries(ss || {})) {
+            for (const [ch, v] of Object.entries(chs || {})) {
+              if (!kept.has(ch)) continue;
+              const held = chains[d + '/' + id];
+              if (!held) { bad(T('a session it seals isn’t in this export')); continue; }
+              const c = held[ch];
+              const n = Array.isArray(v) ? v[0] : 0;
+              if (!c || !(n >= 1) || c.hashes.length < n || c.hashes[n - 1] !== v[1]) bad(T('a chapter it seals isn’t what it sealed'));
+              else s.kept++;
+            }
+          }
         }
       }
       for (const [name, want] of Object.entries(body.tokens || {})) {
@@ -416,11 +463,35 @@
   // The lines each session's timestamps reach (as NEO's own player has
   // them): { 'device/id': [{ n, by }] }, from the seals checked here, its
   // device's and another's that sealed it (Rec.sealsOver); null when nothing
-  // was sealed
+  // was sealed. In an export of some chapters, the last line of each of its
+  // chapters that each seal reaches, by the seals' `chapters`: [{ n, by, ch }].
   function stampsOf(sessions, sealsChecked) {
     const devices = Object.keys(sealsChecked || {});
     if (!devices.length) return null;
     const out = {};
+    const kept = keptOf(sessions);
+    if (kept) {
+      const chains = chapterChains(sessions, false);
+      for (const s of sessions) out[s.device + '/' + s.id] = [];
+      for (const r of Object.values(sealsChecked)) {
+        for (const seal of (r && r.seals) || []) {
+          const by = seal.ok ? (seal.by !== null ? seal.by : seal.byLater || null) : null;
+          for (const [d, ss] of Object.entries(seal.chapters || {})) {
+            for (const [id, chs] of Object.entries(ss || {})) {
+              const list = out[d + '/' + id];
+              const held = chains[d + '/' + id];
+              if (!list || !held) continue;
+              for (const [ch, v] of Object.entries(chs || {})) {
+                const c = kept.has(ch) && held[ch];
+                if (c && Array.isArray(v) && v[0] >= 1 && v[0] <= c.nos.length) list.push({ n: c.nos[v[0] - 1], by, ch });
+              }
+            }
+          }
+        }
+      }
+      for (const list of Object.values(out)) list.sort((a, b) => a.n - b.n);
+      return out;
+    }
     for (const s of sessions) {
       const seals = Rec.sealsOver(s.device, sealsChecked);
       if (!seals.length && !sealsChecked[s.device]) continue;
@@ -893,11 +964,15 @@
       lists.forEach((l, si) => { while (next[si] < l.length) place(si); });
     }
 
-    // when the lines up to step s were first timestamped, or null
+    // when the lines up to step s were first timestamped, or null (in an
+    // export of some chapters, by a seal over the step's own chapter)
     function stampedBy(s) {
       const x = h.sessions[s.session];
       let by = null;
-      for (const e of (x && stampMap[x.device + '/' + x.id]) || []) if (e.n >= s.line && e.by !== null && (by === null || e.by < by)) by = e.by;
+      for (const e of (x && stampMap[x.device + '/' + x.id]) || []) {
+        if (e.ch !== undefined && s.ch !== undefined && e.ch !== s.ch) continue;
+        if (e.n >= s.line && e.by !== null && (by === null || e.by < by)) by = e.by;
+      }
       return by;
     }
 
@@ -1227,6 +1302,17 @@
         if (!files.length) continue;
         out.seals[d] = await checkSeals(files, byDevice.get(d) || new Map(), byDevice);
       }
+    } else if (seals) {
+      // some chapters: the seals over their own lines
+      const kept = keptOf(sessions) || new Set();
+      const chains = chapterChains(sessions);
+      for (const [d, files] of Object.entries(seals)) {
+        if (!files.length) continue;
+        out.seals[d] = await checkSeals(files, new Map(), new Map(), { kept, chains });
+      }
+      // no seal reaches these chapters (all made before seals held
+      // chapters): nothing here fixes them in time
+      if (!Object.values(out.seals).some((r) => r.seals.some((s) => s.kept))) out.seals = {};
     }
     done = sessions.length * 2;
     out.evidence = checkEvidence(sessions, evidence);
@@ -1303,10 +1389,15 @@
         ? T('Played back: {bad} of {n} chapter writes don’t come out as recorded.', { bad: fmtNum(r.bad + r.problems), n: fmtNum(r.writes) })
         : T('Played back: all {n} chapter writes come out exactly as recorded.', { n: fmtNum(r.writes) })));
     }
-    if (data.partial) line(null, T('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
+    const chapterSealed = data.partial && Object.keys(res.seals).length > 0;
+    if (data.partial) {
+      line(null, chapterSealed
+        ? T('This export holds only some chapters, so the sessions’ hash chains, which cover every chapter, can’t be checked here. The seals are checked against these chapters’ own lines.')
+        : T('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'));
+    }
 
     // seals
-    if (!data.partial) {
+    if (!data.partial || chapterSealed) {
       const devices = Object.keys(res.seals);
       if (!devices.length) line(null, T('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'));
       for (const d of devices) {
@@ -1387,5 +1478,5 @@
     return box;
   }
 
-  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, tagsIn, tagsShown, stampsOf, Book };
+  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, chapterChains, keptOf, tagsIn, tagsShown, stampsOf, Book };
 });

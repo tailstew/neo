@@ -11,6 +11,8 @@
 //     after: [{ beacon: 'drand-quicknet', round, randomness, signature }],  (when it answered)
 //     heads: { <session>: <its last h line's hash> },     (those changed since the last seal)
 //     others: { <device>: { <session>: <its last h> } },  (when there are any)
+//     chapters: { <device>: { <session>: { <chapter>: [n, hash] } } },
+//                                                         (each chapter's own lines in the sessions above)
 //     tokens: { <file in seals/>: <sha256 hex> },         (stamps written since the last seal)
 //     prev: <sha256 hex of the previous seal's bytes>, sig }
 //
@@ -21,7 +23,12 @@
 // device names yet: fixed in time by when they arrived, not when they were
 // written. A NEO from before `others` checks the seal whole and ignores it. `after` is a value nobody knew before it was
 // published, so the seal was made after it; its stamps say it existed by
-// then. `tokens` puts each earlier stamp under the next seal's stamps, so a
+// then. `chapters` is each chapter's own lines in the sessions in `heads`
+// and `others`, up to the head sealed (Rec.chapterSeals): how many, and a
+// chain over them, so an export of some chapters, which leaves the other
+// chapters' lines out and with them the session's chain, can still check
+// its timestamps. A chapter is there when its lines changed since the last
+// seal and hold a write. A NEO from before `chapters` ignores it. `tokens` puts each earlier stamp under the next seal's stamps, so a
 // stamp whose authority's certificate expires stays covered by a newer one
 // (RFC 4998's archive timestamps, in one field). Beside each seal:
 //
@@ -511,6 +518,17 @@ function chainHashes(text) {
 
 /* ---------- the sealer ---------- */
 
+const chapterKey = (device, session, ch) => device + ' ' + session + ' ' + ch;
+// how many of each chapter's lines the seals' `chapters` say they sealed
+function noteChapters(st, chapters) {
+  if (!st.chapterN) st.chapterN = new Map();
+  for (const [d, sessions] of Object.entries(chapters || {})) {
+    for (const [s, chs] of Object.entries(sessions || {})) {
+      for (const [ch, v] of Object.entries(chs || {})) if (Array.isArray(v)) st.chapterN.set(chapterKey(d, s, ch), v[0]);
+    }
+  }
+}
+
 // When each authority was last asked, for Sectigo’s 15 s between requests
 const asked = new Map();
 
@@ -538,7 +556,7 @@ class Sealer {
   // stamps already under a seal, and the newest seal
   load() {
     if (this.state) return this.state;
-    const st = { seals: [], sealed: new Map(), covered: new Set() };
+    const st = { seals: [], sealed: new Map(), covered: new Set(), chapterN: new Map() };
     for (const f of this.files()) {
       if (!SEAL.test(f)) continue;
       try {
@@ -547,6 +565,7 @@ class Sealer {
         st.seals.push({ file: f, seq: body.seq, at: body.at, hash: sha256hex(bytes) });
         for (const [s, h] of Object.entries(body.heads || {})) st.sealed.set(s, h);
         for (const t of Object.keys(body.tokens || {})) st.covered.add(t);
+        noteChapters(st, body.chapters);
       } catch (err) { this.log('proof', new Error(f + ': ' + err.message)); }
     }
     this.state = st;
@@ -606,15 +625,40 @@ class Sealer {
     return learnt;
   }
 
+  // A session's text: closed, or the open one's parts; null if it won't read
+  async sessionText(dir, s) {
+    try {
+      const gz = path.join(dir, s + '.jsonl.gz');
+      return fs.existsSync(gz) ? this.io.readGz(gz) : R.joinParts(await Files.readParts(this.io, path.join(dir, s))).text || null;
+    } catch (err) { this.log('proof', err); return null; }
+  }
+
+  // What the seal says of each chapter in the sessions it seals (`chapters`
+  // in the format above): for each session, its chapters' lines up to the
+  // head sealed, those not as this device's seals last said
+  async chapters(changed, others, st) {
+    const out = {};
+    const said = st.chapterN || (st.chapterN = new Map());
+    const add = async (device, dir, heads) => {
+      for (const [s, h] of Object.entries(heads)) {
+        const text = await this.sessionText(dir, s);
+        const at = text && R.chapterSeals(text).get(h);
+        if (!at) continue;
+        const mine = {};
+        for (const [ch, v] of Object.entries(at)) if (said.get(chapterKey(device, s, ch)) !== v[0]) mine[ch] = v;
+        if (Object.keys(mine).length) (out[device] || (out[device] = {}))[s] = mine;
+      }
+    };
+    await add(this.device, this.dir, changed);
+    for (const [d, heads] of Object.entries(others)) await add(d, path.join(this.root, d), heads);
+    return out;
+  }
+
   // Whether any of these sessions (changed since the last seal) wrote after
   // the last head sealed: past it, more than the caret, focus and the clock
   async wordsUnsealed(changed, st) {
     for (const s of Object.keys(changed)) {
-      let text = null;
-      try {
-        const gz = path.join(this.dir, s + '.jsonl.gz');
-        text = fs.existsSync(gz) ? this.io.readGz(gz) : R.joinParts(await Files.readParts(this.io, path.join(this.dir, s))).text;
-      } catch (err) { this.log('proof', err); }
+      const text = await this.sessionText(this.dir, s);
       if (!text) continue;
       const v = R.verifyChain(text);
       if (v.wrote && !v.settled.includes(st.sealed.get(s))) return true;
@@ -697,6 +741,7 @@ class Sealer {
     const anyOthers = Object.keys(others).length > 0;
     if (!force && !anyOthers && ifOthers && ifWords && await this.wordsUnsealed(changed, st)) ifOthers = false;
     if (!force && !anyOthers && (ifOthers || !Object.keys(changed).length)) return null;
+    const chapters = await this.chapters(changed, others, st);
     const tokens = {};
     for (const f of this.files()) {
       if (TOKEN.test(f) && !st.covered.has(f)) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
@@ -715,6 +760,7 @@ class Sealer {
       after: after.length ? after : undefined,
       heads: changed,
       others: anyOthers ? others : undefined,
+      chapters: Object.keys(chapters).length ? chapters : undefined,
       tokens: Object.keys(tokens).length ? tokens : undefined,
       prev: prev ? prev.hash : null
     };
@@ -726,6 +772,7 @@ class Sealer {
     st.seals.push({ file: path.basename(file), seq: body.seq, at: body.at, hash: sha256hex(bytes) });
     for (const [s, h] of Object.entries(changed)) st.sealed.set(s, h);
     for (const t of Object.keys(tokens)) st.covered.add(t);
+    noteChapters(st, chapters);
     return body;
   }
 
@@ -815,9 +862,11 @@ class Sealer {
 // its stamps, its `after`, and the stamps it says it covers. `sessions`
 // maps a session to the `h` hashes its chain holds (chainHashes), to check
 // the heads; `others` maps each other device to its sessions' the same way,
-// to check the heads the seal holds for them; `online` asks drand too.
-// { device, publicKey, seals: [{ seq, at, ok, by, after, heads, others, stamps, problems }], problems }
-async function verifyDevice(dir, { sessions = null, others = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
+// to check the heads the seal holds for them; `chapters` maps each device
+// to its sessions, and each to what Rec.chapterSeals makes of it, to check
+// the seal's `chapters`; `online` asks drand too.
+// { device, publicKey, seals: [{ seq, at, ok, by, after, heads, others, chapters, stamps, problems }], problems }
+async function verifyDevice(dir, { sessions = null, others = null, chapters = null, online = false, fetch: fetchFn = globalThis.fetch, anchors = roots() } = {}) {
   const sealsDir = path.join(dir, 'seals');
   let files = [];
   try { files = fs.readdirSync(sealsDir).sort(); } catch { /* none */ }
@@ -845,6 +894,7 @@ async function verifyDevice(dir, { sessions = null, others = null, online = fals
     s.at = Date.parse(body.at);
     s.heads = body.heads || {};
     s.others = body.others || {};
+    s.chapters = body.chapters || {};
     if (body.neoSeal !== 1) bad('it is in a format this NEO doesn’t know');
     if (body.seq !== s.seq) bad('its number isn’t its file’s');
     if (body.seq !== out.seals.length) bad('seals before it are missing');
@@ -871,6 +921,21 @@ async function verifyDevice(dir, { sessions = null, others = null, online = fals
           const known = held && held.get(session);
           if (!known) bad('session ' + session + ' of ' + device + ' isn’t in the recording');
           else if (!known.has(h)) bad('session ' + session + ' of ' + device + ' doesn’t hold what it seals');
+        }
+      }
+    }
+    // each chapter's lines it seals: in a session it seals, and, where the
+    // sessions are known, as many and the same
+    for (const [device, ss] of Object.entries(body.chapters || {})) {
+      const named = device === out.device ? body.heads || {} : (body.others || {})[device] || {};
+      for (const [session, chs] of Object.entries(ss || {})) {
+        const h = named[session];
+        if (!h) { bad('it seals chapters of session ' + session + ' without sealing the session'); continue; }
+        if (!chapters) continue;
+        const at = chapters.get(device) && chapters.get(device).get(session) && chapters.get(device).get(session).get(h);
+        for (const [ch, v] of Object.entries(chs || {})) {
+          const want = at && at[ch];
+          if (!want || !Array.isArray(v) || want[0] !== v[0] || want[1] !== v[1]) bad('chapter ' + ch + ' of session ' + session + ' isn’t what it seals');
         }
       }
     }
@@ -962,6 +1027,6 @@ module.exports = {
   der, kids, oidOf, tsaRequest, checkToken, roots, mozilla, isPublic, pemOf, certsIn, rootFileName,
   findRoot, tryService, serviceId,
   newKey, keyOf, canonical, sign, verifySignature,
-  drandRound, roundTime, chainHashes,
+  drandRound, roundTime, chainHashes, chapterSeals: R.chapterSeals,
   Sealer, verifyDevice, sha256hex
 };

@@ -3131,43 +3131,54 @@
     return out;
   }
 
+  // The chapter a line is about: `b`, `ch` and `d` by their own id, `w` by
+  // its chapter or the one the lines apply to (`cur`), and the lines of the
+  // caret's chapter (keys, splices, the caret, copies) by `cur`, which may
+  // be null before any; false for a line about no chapter (focus, the
+  // clock, the order, tags, causes, layout, the chain, the end).
+  const CARET_LINES = new Set(['r', 'rd', 'n', 'e', 's', 'c', 'k']);
+  function lineChapter(line, cur) {
+    const kind = line[1];
+    if (kind === 'b' || kind === 'ch' || kind === 'd') return line[2];
+    if (kind === 'w') return line.length > 3 ? line[3] : cur;
+    return CARET_LINES.has(kind) ? cur : false;
+  }
+  // how long a line takes: its dt, and a run's keys after its first
+  function lineSpan(line) {
+    let n = line[0] || 0;
+    if (line[1] === 'r' || line[1] === 'rd' || line[1] === 'n') for (const dt of line[3] || []) n += dt || 0;
+    return n;
+  }
+
   // A session with only some chapters' lines in it, for a replay page that
   // shows only those (Export replay…): every line about another chapter or
   // a stream goes, its time carried on to the next line kept, and so do the
   // `h` lines, since the chain covered lines that are gone. The header says
   // which chapters it keeps (`kept`). It still replays: every `w` of a
-  // chapter kept hashes as it did.
+  // chapter kept hashes as it did, and each chapter's own lines hash as its
+  // seals say (chapterLines).
   function keepChapters(text, ids) {
     const keep = new Set(ids);
     const { header, known, lines } = parseSession(text);
     if (!header || !known) return '';
-    // a page of some chapters carries no hash lines and no seals, so nothing
-    // on it checks the header's bytes: the computer's platform and time zone
-    // stay out (an older session's, too), its day written in first
+    // a page of some chapters carries no hash lines, so nothing on it
+    // checks the header's bytes: the computer's platform and time zone stay
+    // out (an older session's, too), its day written in first
     const { platform: _platform, tz: _tz, ...rest } = header;
     const day = sessionDay(header);
     const out = [JSON.stringify({ ...rest, ...(day ? { day } : {}), kept: [...keep] })];
-    const spanOf = (line) => {
-      let n = line[0] || 0;
-      if (line[1] === 'r' || line[1] === 'rd' || line[1] === 'n') for (const dt of line[3] || []) n += dt || 0;
-      return n;
-    };
-    const PER = new Set(['r', 'rd', 'n', 'e', 's', 'c', 'k']); // lines about the chapter the caret is in
     let cur = null;
     let carry = 0;
     for (const line of lines) {
       if (!Array.isArray(line)) continue;
       const kind = line[1];
       if (kind === 'b' || kind === 'ch') cur = line[2];
-      let ok;
-      if (kind === 'h') ok = false;
-      else if (kind === 'b' || kind === 'ch' || kind === 'd') ok = keep.has(line[2]);
-      else if (kind === 'w') ok = keep.has(line.length > 3 ? line[3] : cur);
-      else ok = !PER.has(kind) || keep.has(cur);
-      if (!ok) { carry += spanOf(line); continue; }
+      const about = lineChapter(line, cur);
+      const ok = kind !== 'h' && (about === false || keep.has(about));
+      if (!ok) { carry += lineSpan(line); continue; }
       let l = line;
       if (kind === 'o') l = [line[0], 'o', line[2].filter((ch) => keep.has(ch))];
-      if (carry && !(kind === 'K' || kind === 'ch' || kind === 'o')) {
+      if (carry && !DESCRIBES.has(kind)) {
         l = l.slice();
         l[0] = (l[0] || 0) + carry;
         carry = 0;
@@ -3175,6 +3186,57 @@
       out.push(JSON.stringify(l));
     }
     return out.join('\n') + '\n';
+  }
+
+  // Each chapter's own lines in a session (lineChapter), as a seal hashes
+  // them (Proof of when I wrote, `chapters`), so a page of some chapters
+  // (keepChapters) can check its timestamps without the rest of the book:
+  // the line with its moment in the session (milliseconds since its start)
+  // in place of its dt, since such a page carries the time of the lines it
+  // leaves out on the next one it keeps; K, ch and o describe and have no
+  // moment. Streams aren't chapters and have none. `lines` parsed
+  // (parseSession); returns, by line, { ch, text, writes } or null.
+  // `writes`: a `w` or a `b`, each holding a hash of the whole chapter, so
+  // a chain with one in it can't be guessed back from its lines.
+  function chapterLines(lines) {
+    let cur = null;
+    let t = 0;
+    return lines.map((line) => {
+      if (!Array.isArray(line)) return null;
+      const kind = line[1];
+      const at = t + (line[0] || 0);
+      t += lineSpan(line);
+      if (kind === 'b' || kind === 'ch') cur = line[2];
+      const ch = lineChapter(line, cur);
+      if (typeof ch !== 'string' || isStream(ch)) return null;
+      return { ch, text: JSON.stringify([DESCRIBES.has(kind) ? null : at, ...line.slice(1)]), writes: kind === 'w' || kind === 'b' };
+    });
+  }
+
+  // What a seal says of each chapter at each `h` of a session: Map h ->
+  // { <chapter>: [n, hash] }, n the chapter's lines so far and hash the
+  // chain over them a line at a time (chainHash, from nothing), for each
+  // chapter whose lines so far hold a write (chapterLines).
+  function chapterSeals(text) {
+    const { lines } = parseSession(text);
+    const out = new Map();
+    const by = new Map(); // ch -> { n, h, writes }
+    const per = chapterLines(lines);
+    lines.forEach((line, i) => {
+      const c = per[i];
+      if (c) {
+        let x = by.get(c.ch);
+        if (!x) by.set(c.ch, x = { n: 0, h: '', writes: false });
+        x.n++;
+        x.h = chainHash(x.h, c.text);
+        if (c.writes) x.writes = true;
+      } else if (Array.isArray(line) && line[1] === 'h' && !out.has(line[3])) {
+        const at = {};
+        for (const [ch, x] of by) if (x.writes) at[ch] = [x.n, x.h];
+        out.set(line[3], at);
+      }
+    });
+    return out;
   }
 
   // The seals over one device's sessions, from every device's seals checked
@@ -3245,6 +3307,6 @@
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
-    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, keepChapters, sealsOver
+    EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, lineChapter, keepChapters, chapterLines, chapterSeals, sealsOver
   };
 });

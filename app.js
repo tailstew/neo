@@ -3811,7 +3811,7 @@ function exportReplayAsk(meta, name) {
     bd.querySelector('.ex-warn-body').textContent = t('It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).');
     bd.querySelector('.ex-warn-health').textContent = t('How you type can identify you, much as a fingerprint can, and can hint at your health. Consider this personal and sensitive information when deciding who to share it with.');
     bd.querySelector('.ex-warn-risk').textContent = t('Anyone you give it to can pass it on, and it can’t be taken back. You share it at your own risk.');
-    bd.querySelector('.ex-book').textContent = t('The whole book, with its timestamps, so they can be checked');
+    bd.querySelector('.ex-book').textContent = t('The whole book');
     bd.querySelector('.ex-some').textContent = t('Chapters:');
     const order = meta.chapterOrder;
     const field = bd.querySelector('.ex-range');
@@ -3854,11 +3854,10 @@ function exportReplayAsk(meta, name) {
       const ids = someOn.checked ? chosen() : null;
       const set = new Set(ids || []);
       rows.forEach((r, i) => { r.classList.toggle('on', set.has(i)); r.setAttribute('aria-pressed', String(set.has(i))); });
-      note.hidden = !someOn.checked;
+      note.hidden = !someOn.checked || !!ids;
       if (someOn.checked) {
         note.textContent = !field.value.trim() ? t('Type the chapters’ numbers, or click them.')
-          : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length })
-            : t('Timestamps can only be verified when you export the whole book.');
+          : !ids ? t('Chapters go as numbers from 1 to {n}, and ranges such as 1–3, with commas between.', { n: order.length }) : '';
         note.classList.toggle('ex-bad', !!field.value.trim() && !ids);
       }
       ok.disabled = someOn.checked && !ids;
@@ -3976,6 +3975,7 @@ const REPLAY_PAGE_WORDS = [
   tk('it doesn’t name the seal before it'),
   tk('a session it seals isn’t in this export'),
   tk('a session it seals isn’t what it sealed'),
+  tk('a chapter it seals isn’t what it sealed'),
   tk('a stamp it covers isn’t what it covered'),
   tk('its drand round isn’t drand’s'),
   tk('its drand round is later than the seal says it was made'),
@@ -4003,6 +4003,7 @@ const REPLAY_PAGE_WORDS = [
   tk('Played back: {bad} of {n} chapter writes don’t come out as recorded.'),
   tk('Played back: all {n} chapter writes come out exactly as recorded.'),
   tk('This export holds only some chapters, so the hash chains and seals, which cover every chapter, can’t be checked here.'),
+  tk('This export holds only some chapters, so the sessions’ hash chains, which cover every chapter, can’t be checked here. The seals are checked against these chapters’ own lines.'),
   tk('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'),
   tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
   tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),
@@ -4172,7 +4173,7 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
       ? t('Sessions not timestamped within a day of ending: {n} of {all}.', { n: n(late.length), all: n(all.length) })
       : t('Every session was timestamped within a day of ending.'));
     if (cover.some((d) => d.bad)) text += ' ' + t('Some timestamps don’t check: run verify-recording on the book to see why.');
-    if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this export. It holds only some chapters, so it can’t check them itself.');
+    if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this export. It holds only some chapters, so it can itself check only the timestamps over their own lines.');
     row(t('Timestamps'), text);
   }
   let html = `<h2 class="ev-h">${e(title)}</h2>

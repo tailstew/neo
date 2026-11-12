@@ -8,7 +8,8 @@
 // For each device: every session's hash chain, and the sessions chained to
 // each other; that replaying them hashes to every chapter write they record
 // (replayCheck); each seal's signature, its place in the seals' chain, the
-// sessions it seals (another device's too, for one that seals nothing), its stamps (RFC 3161 tokens checked against the roots
+// sessions it seals (another device's too, for one that seals nothing) and
+// each chapter's lines in them, its stamps (RFC 3161 tokens checked against the roots
 // in proof-roots.pem, and the roots of services the writer added that are
 // in Mozilla's list) and its `after`; then the time cover: when each
 // session was sealed, and every one that went more than a day unsealed.
@@ -45,6 +46,8 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
   // each device's sessions' h hashes, for the seals of every device: a
   // computer's seal can hold another device's sessions (others)
   const allHashes = new Map();
+  // and what each session's chapters' lines come to at each h (the seals' `chapters`)
+  const allChapters = new Map();
   for (const dev of await Files.list(io, root, null, mirror)) {
     const dir = path.join(root, dev.device);
     const d = { device: dev.device, name: dev.name, sessions: [], replay: null, seals: null, cover: [], problems: [] };
@@ -52,6 +55,8 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
     const texts = [];
     const hashes = new Map();
     allHashes.set(dev.device, hashes);
+    const chapters = new Map();
+    allChapters.set(dev.device, chapters);
     let prevLast;
     for (const s of dev.sessions) {
       const r = await Files.read(io, dir, s.id, mirror && path.join(mirror, dev.device));
@@ -66,6 +71,7 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
       d.sessions.push(one);
       texts.push(r.text);
       hashes.set(s.id, P.chainHashes(r.text));
+      chapters.set(s.id, P.chapterSeals(r.text));
     }
     // a session whose `prev` isn't the last before it: one is missing between
     for (const s of d.sessions) if (s.unchained) d.problems.push(`session ${s.id} doesn’t follow the one before it: a session between them is missing`);
@@ -80,7 +86,7 @@ async function verifyBook(bookDir, { online = false, mirror = null } = {}) {
   for (const d of report.devices) {
     const dir = path.join(root, d.device);
     if (!fs.existsSync(path.join(dir, 'seals'))) continue;
-    d.seals = await P.verifyDevice(dir, { sessions: allHashes.get(d.device), others: allHashes, online });
+    d.seals = await P.verifyDevice(dir, { sessions: allHashes.get(d.device), others: allHashes, chapters: allChapters, online });
     for (const s of d.seals.seals) if (!s.ok) d.problems.push(`seal ${s.seq}: ${s.problems.join('; ')}`);
     checked[d.device] = d.seals;
   }

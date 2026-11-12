@@ -1143,11 +1143,10 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
   const chapters = recChapters(opts.chapters);
   const r = await historyRequest({ type: 'evidence', chapters, texts: true, ...historyTarget(bookId) });
   if (!r.texts.length) throw new Error('Nothing recorded');
-  let seals = null;
-  if (!chapters) {
-    seals = {};
-    for (const d of new Set(r.texts.map((s) => s.device))) seals[d] = ReplayExport.sealFiles(path.join(recRoot(bookId), libName(d), 'seals'));
-  }
+  // every device's seals; an export of some chapters keeps them when they
+  // say what they sealed of those chapters' own lines (replay-export.js)
+  const seals = {};
+  for (const d of new Set(r.texts.map((s) => s.device))) seals[d] = ReplayExport.sealFiles(path.join(recRoot(bookId), libName(d), 'seals'));
   // the page never carries a device's own name (device.json's, the computer's
   // hostname): each is Device 1, 2, … in the order it first wrote
   const shown = new Map();
@@ -1158,7 +1157,7 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
   for (const [k, v] of Object.entries(opts.strings || {})) if (typeof v === 'string') strings[k.slice(0, 2000)] = v.slice(0, 2000);
   const html = ReplayExport.build({
     title: str(opts.title, 500), author: str(opts.author, 500), lang: str(opts.lang, 20) || 'en', strings,
-    report: str(opts.report, 2000000), evidence: r.evidence, sessions: r.texts, seals,
+    report: str(opts.report, 2000000), evidence: r.evidence, sessions: r.texts, seals, kept: chapters,
     chapters: (Array.isArray(opts.order) ? opts.order : []).slice(0, 5000).map((c) => ({ id: str(c && c.id, 200), title: str(c && c.title, 500) })),
     partial: !!chapters, version: app.getVersion()
   });

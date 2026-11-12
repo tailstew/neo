@@ -4,10 +4,13 @@
 // no NEO and no network. It holds the sessions (gzip, base64), the player
 // (replay-page.js over recording.js), the evidence report as NEO wrote it,
 // and, when the whole book goes, each device's seals and timestamp tokens,
-// which the page checks itself. A page of chosen chapters holds only their
-// lines (Rec.keepChapters): it still replays to every write of them, but
-// its chains and seals covered lines that aren't there, so it says that
-// nothing in it fixes it in time.
+// which the page checks itself. An export of chosen chapters holds only
+// their lines (Rec.keepChapters): it still replays to every write of them,
+// and its sessions' chains covered lines that aren't there, so it can't
+// check them; the seals also say what they seal of each chapter's own
+// lines (`chapters`), and it carries and checks the seals that reach the
+// chapters it holds. With none (seals made before they held chapters), it
+// says nothing in it fixes it in time.
 //
 // Main process, no Electron: main.js hands in what it read.
 
@@ -32,6 +35,22 @@ function rootsPem(read, seals) {
   return pem;
 }
 
+// Whether any seal says what it sealed of one of these chapters
+function sealsReach(seals, kept) {
+  const want = new Set(kept || []);
+  for (const files of Object.values(seals || {})) {
+    for (const f of files) {
+      if (!/^\d{6}\.json$/.test(f.name)) continue;
+      let body;
+      try { body = JSON.parse(Buffer.from(f.b64, 'base64').toString('utf8')); } catch { continue; }
+      for (const ss of Object.values((body && body.chapters) || {})) {
+        for (const chs of Object.values(ss || {})) if (Object.keys(chs || {}).some((ch) => want.has(ch))) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // One device's seals folder as the page carries it: [{ name, b64 }], in order
 function sealFiles(dir) {
   let names = [];
@@ -44,19 +63,21 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const inline = (s) => String(s).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 // The page. `sessions`: [{ id, device, name, open, text }], oldest first;
-// `seals`: { device: [{ name, b64 }] } (whole book only); `chapters`: [{ id,
-// title }] in the book's order; `strings`: the page's words in the
+// `seals`: { device: [{ name, b64 }] }; `kept`: the chapters an export of
+// some chapters (`partial`) holds; `chapters`: [{ id, title }] in the book's order; `strings`: the page's words in the
 // writer's language (English is the key); `report`: the evidence report's
 // HTML, as NEO showed it; `evidence`: its figures (Rec.evidence), which the
 // page works out again from the sessions and compares.
-function build({ title, author = '', lang = 'en', strings = {}, report = '', evidence = null, sessions, seals = null, chapters = [], partial = false, made = new Date().toISOString(), version = '', dir = __dirname }) {
+function build({ title, author = '', lang = 'en', strings = {}, report = '', evidence = null, sessions, seals = null, kept = null, chapters = [], partial = false, made = new Date().toISOString(), version = '', dir = __dirname }) {
   const read = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
+  // some chapters: their seals only if one reaches them
+  if (partial && !sealsReach(seals, kept)) seals = null;
   const nonce = crypto.randomBytes(16).toString('base64');
   const data = {
     neoReplay: 1, title, author, made, version, partial, lang, chapters, strings, evidence,
     sessions: sessions.map((s) => ({ id: s.id, device: s.device, name: s.name || s.device, open: !!s.open, gz: zlib.gzipSync(Buffer.from(s.text, 'utf8')).toString('base64') })),
-    seals: partial ? null : seals,
-    roots: partial || !seals ? null : rootsPem(read, seals)
+    seals,
+    roots: seals ? rootsPem(read, seals) : null
   };
   const T = (s, vars = {}) => String(strings[s] || s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
   const head = T('Writing History');
@@ -76,7 +97,7 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
   <h1>${esc(title)}</h1>
   ${author ? `<p class="rx-by">${esc(author)}</p>` : ''}
   <p class="rx-lede">${esc(T('This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.'))}</p>
-  ${partial ? `<p class="rx-note">${esc(T('This export holds only some chapters, so its timestamps can’t be verified. Export the whole book for that.'))}</p>` : ''}
+  ${partial && !seals ? `<p class="rx-note">${esc(T('This export holds only some chapters, so its timestamps can’t be verified. Export the whole book for that.'))}</p>` : ''}
   <noscript><p class="rx-note">${esc(T('Turn on JavaScript to play the history and check it. The report below is as NEO wrote it.'))}</p></noscript>
 </header>
 <nav id="rx-side" class="rx-side" hidden></nav>
@@ -94,4 +115,4 @@ function build({ title, author = '', lang = 'en', strings = {}, report = '', evi
 `;
 }
 
-module.exports = { build, sealFiles, rootsPem, SEAL_FILE };
+module.exports = { build, sealFiles, sealsReach, rootsPem, SEAL_FILE };
