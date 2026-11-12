@@ -1658,13 +1658,17 @@ test('a .docx imported as a new book starts from its text, not typed out', async
   await tick(500);
   assert.notEqual(id, BOOK);
   assert.match(await js('book.chapterOrder.map((c) => chapterHTML[c]).join("")'), /The tide went out\.[\s\S]*It came back\./);
+  assert.equal(await js('rec.live'), false, 'opening the book records nothing yet');
   await caretAt(0, 0, -1);
   await type(' Written after.');
   await flush();
   const lines = R.parseSession(await js('rec.w.lines.join("\\n") + "\\n"')).lines;
-  const first = await js('book.chapterOrder[0]');
+  const [first, second] = await js('book.chapterOrder');
   const b = lines.find((l) => l[1] === 'b' && l[2] === first);
   assert.ok(b && b[3] !== null && /The tide went out/.test(b[3]) && b[5] === 'baseline', 'a baseline: ' + JSON.stringify(b));
+  // the chapter not touched has its baseline too, so History shows it on this day
+  const b2 = lines.find((l) => l[1] === 'b' && l[2] === second);
+  assert.ok(b2 && /It came back/.test(b2[3]) && b2[5] === 'baseline', 'the other chapter’s baseline: ' + JSON.stringify(b2));
   assert.ok(!lines.some((l) => l[1] === 'e' && /tide went out/.test(l[4] || '')), 'never typed out');
   assert.ok(lines.some((l) => l[1] === 'r' && /Written/.test(l[2])), 'what was written after it is typing');
 });

@@ -2,11 +2,6 @@
 
 Found by the end-to-end tests (`npm run test:history`, 2026-11-12), most serious first. Take an issue off this list once its fix is in and its test passes.
 
-## 3. Chapters not edited yet don't appear on History's earlier days
-
-- **What happens:** a chapter enters the history at its first edit (its `b` line). On earlier days it's missing from History's side pane and whole-book sheet, though it was in the book. If such a chapter is then deleted or joined, History never shows it before that day.
-- **Fix:** when a book starts recording, give every chapter its starting record (a `baseline`), not only those being changed.
-
 ## 4. The paragraph buttons never show in words on a 1920-pixel screen
 
 - **What happens:** at 1904 px wide the sheet leaves 170 px margins. "‹ Earlier version" and "Restore This Paragraph" need more room (`renderPart` in app.js), so they always show as ‹ and ›. The words are only in the tooltips.
@@ -31,3 +26,4 @@ Found by the end-to-end tests (`npm run test:history`, 2026-11-12), most serious
 
 - 2026-11-12: **Restoring a paragraph can overwrite a different one.** A paragraph replaced by one with few of its words leaves the part in doubt (`Rec.partDoubt`, in `partDays`, `partStep` and `trackToNow`), and restore looks for it by its words first. The test "…is found by its words, and restored in its new place" passes.
 - 2026-11-12: **Short paragraphs can't be found by their words.** A paragraph of one or two words is compared by its words (`wordsOf`, `wordsLike` in `recording.js`), needing two in three alike. Tests in `scripts/recording-restore.test.js`.
+- 2026-11-12: **Chapters not edited yet don't appear on History's earlier days.** A chapter this device never recorded gets its `baseline` with the session's first line, all at one moment (`rec.unseen`, `baseUnseen` in app.js); opening a book alone still records nothing. Tests: Nine, never edited, listed on day one (`npm run test:history`); the imported book's second chapter (`npm run test:recording`).

@@ -67,8 +67,9 @@ test('day one: typing with a pause, text moved within the book, a paste from els
   await paste({ text: ' From the web.' });
   await caretAt(await idx('Three'), 1, -1);
   await type(' Later on.');
-  // (a chapter enters the history when first changed: each is, today)
-  for (const t of ['Two', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten']) {
+  // (Nine is never edited: it's in the history from its baseline, written
+  // with the session's first change, and set on a card on day three)
+  for (const t of ['Two', 'Five', 'Six', 'Seven', 'Eight', 'Ten']) {
     await caretAt(await idx(t), 0, -1);
     await type(' Yes.');
   }
@@ -346,10 +347,12 @@ test('the side pane lists the chapters there at the moment shown: joined, made a
     await js(`historyShown.player.seek(${j + 1})`);
     assert.equal((await neo.listed()).length, before - 1, ch + ' leaves the list when it goes');
   }
-  // the day before: all of them there
-  await atDayEnd(1);
-  names = await listedNames();
-  for (const t of gone) assert.ok(has(names, t), t + ' is listed the day before: ' + names);
+  // the days before: all of them there, Nine too, though never edited
+  for (const di of [1, 0]) {
+    await atDayEnd(di);
+    names = await listedNames();
+    for (const t of gone) assert.ok(has(names, t), t + ` is listed on day ${di + 1}: ` + names);
+  }
   await neo.closeHistory();
 });
 

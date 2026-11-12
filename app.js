@@ -2643,6 +2643,7 @@ const rec = {
   model: {},         // chapterId -> HTML as the recorder last saw it (and each stream's text)
   wrote: {},         // stream -> its text at its last `w`
   known: {},         // chapterId -> HTML where this device's recordings left it
+  unseen: new Set(), // chapters in the book as it opened that this device never recorded (baseUnseen)
   startKnown: {},    // known, as this session began
   edited: {},        // chapterId -> characters inserted and deleted since its last full `b` (anchors)
   inSession: new Set(), // chapters with a `b` line this session
@@ -2670,6 +2671,7 @@ const rec = {
     this.bookId = bookId;
     this.model = {};
     this.wrote = {};
+    this.unseen = new Set();
     if (!recordingWanted()) return;
     let info;
     try { info = await window.neo.recStart(bookId, proofFlags()); } catch (err) {
@@ -2776,20 +2778,36 @@ const rec = {
     this.meta(['o', [...book.chapterOrder]]);
   },
 
+  // Chapters in the book as it opened that this device never recorded
+  // (unseen) get their baseline once the session first records anything,
+  // all together, so History shows each on every day it was in the book,
+  // not only from its first edit; opening a book alone records nothing.
+  // They're one moment, and true when there were any, so the line that
+  // brought them shares it (the player's first moment is after them all).
+  baseUnseen() {
+    if (!this.unseen.size) return false;
+    const ids = [...this.unseen].filter((id) => this.model[id] !== undefined);
+    this.unseen.clear();
+    ids.forEach((id, i) => this.establish(id, this.model[id], i > 0));
+    return ids.length > 0;
+  },
+
   // The first time this session touches a chapter, a `b` line says what it
   // was: as the last recording left it (only its hash, or all of it again
   // when an anchor is due), then the change made while nothing was
   // recording (catch-up); or, for a chapter never recorded, all of it
   // (baseline). Rec.baseLines decides.
-  establish(chId, html) {
+  establish(chId, html, same = false) {
     if (this.inSession.has(chId)) return;
+    this.unseen.delete(chId);
+    if (this.baseUnseen()) same = true;
     this.inSession.add(chId);
     this.live = true;
     this.counts.bases++;
     Rec.baseLines(chId, html, this.known[chId], this.edited[chId] || 0).forEach((line, i) => {
       if (line[0] === 'b' && line[2] !== null) this.edited[chId] = 0;
       if (line[0] === 'e') this.counted(chId, line[2], line[3]);
-      this.event(line, i > 0);
+      this.event(line, same || i > 0);
     });
     this.cur = chId;
     this.order();
@@ -2808,8 +2826,11 @@ const rec = {
       if (Rec.isStream(chId)) this.wrote[chId] = html;
       // a chapter changed while nothing recorded (a file put back from a
       // backup, another program) is caught up now, not at its first edit,
-      // so History shows the book as it is
-      else if (this.known[chId] !== undefined && this.known[chId] !== html) this.establish(chId, html);
+      // so History shows the book as it is; one never recorded here waits
+      // for the session's first line (baseUnseen)
+      else if (this.known[chId] === undefined) this.unseen.add(chId);
+      else if (this.known[chId] !== html) this.establish(chId, html);
+      if (this.live) this.baseUnseen();
       return;
     }
     this.tick(); // (a new day's session starts before the change, not after)
@@ -2818,12 +2839,13 @@ const rec = {
     if (old === undefined) {
       // a chapter new to the page: all of it, with what made it (and, for a
       // restore, the moment it came from)
+      const same = this.baseUnseen();
       this.inSession.add(chId);
       this.live = true;
       this.counts.bases++;
       this.edited[chId] = 0;
-      if (opts.ref) this.event(['x', cause, ...opts.ref]);
-      this.event(['b', chId, html, Rec.digest(html), cause], !!opts.ref);
+      if (opts.ref) this.event(['x', cause, ...opts.ref], same);
+      this.event(['b', chId, html, Rec.digest(html), cause], same || !!opts.ref);
       this.cur = chId;
       this.order();
       this.noteCaret();
@@ -3015,6 +3037,7 @@ const rec = {
   tag(label, at = null, made = null, id = 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)) {
     if (!this.on || !this.w) return null;
     this.tick();
+    this.baseUnseen();
     this.live = true;
     this.order();
     const line = ['tag', id, label, at];

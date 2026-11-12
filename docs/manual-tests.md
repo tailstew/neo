@@ -69,6 +69,8 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged. *(first half passed 2026-10-30, 6947c24: Teacher's Pet, the laptop and the Chromebook, in order and named, on both; the divergence still to see, with the next item)*
 - [ ] **(2 computers)** NEO open on both at once on the same book (iCloud or Syncthing): no words lost, the twin chapter appears, and History shows both.
 
+- [ ] A book from before Writing History (or one just imported), with chapters you never edit: type in one chapter. History's first day lists every chapter in the side pane and shows them on the whole-book sheet, and a chapter set on a loose card or deleted later still shows on the days before. Opening the book without typing adds no day. *(e2e: `npm run test:history`, Nine; `npm run test:recording`, the imported book.)*
+
 ## Restore (phases 3 and 7)
 
 - [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.
