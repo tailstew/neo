@@ -2,7 +2,7 @@
 
 What `npm test` and `npm run test:recording` can't reach: real keyboards and input methods, the system trash, real sync between computers, a phone, long use, and how things look. Test with the portable exe (`dist\NEO-<version>-portable.exe`) rebuilt from the commit being tested.
 
-Each item says what to do and what should happen. Tick it with the date and the commit when it passes; when a change touches an area, untick what it could have broken. Items marked **(2 computers)** or **(phone)** need that setup.
+Items a script can check are in the end-to-end tests instead, listed at the end. Each item says what to do and what should happen. Tick it with the date and the commit when it passes; when a change touches an area, untick what it could have broken. Items marked **(2 computers)** or **(phone)** need that setup.
 
 The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-unpacked` packed as a tarball (`npm run package:linux` can't make the AppImage on Windows without Developer Mode, since it needs symlinks), and the library is synced with Syncthing over the Wi-Fi, `Documents\NEO Library` here and `~/Documents/NEO Library` there. The phone is the Android phone, with Pocket.
 
@@ -58,63 +58,32 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 ## Writing History, the dialog
 
 - [ ] The History tab's tooltip, the shelf menu's **Writing History…** and the empty history describe it plainly (how the book was written), in English and in French. Nowhere does the interface say "replay" or "recording" as a noun; it says Writing History, record, play and watch.
-- [ ] All four ways in open it: History in the footer, File → Writing History…, a book's shelf menu (without opening the book), and **Watch This Chapter Being Written** in a chapter's menu.
-- [ ] Days: ← and → move through the tiles and show each day as it ended; a tile clicked (or Space/Enter on it) opens its day paused, and nothing plays until Play or Space; Esc in the player goes back to the days, Esc again closes.
-- [ ] **Watch This Chapter Being Written** opens the player at the chapter's first day, paused.
-- [ ] While History is open, clicking any menu item (Goals, Export, Format…) closes History and then does it. The same item's shortcut does nothing while History is open. Find searches the history, and Ctrl+S is **Tag This Moment…** (where Take Snapshot was). A click outside the dialog closes it.
-- [ ] Player: ▶ plays as written, ▶▶ at 8× (lit while it's on; pressed again while playing fast goes back to as written; pressed while paused plays fast); a pause over 1.5 s plays 1.5 s at ▶ and is skipped at ▶▶, and either way a badge shows its true length ("paused 2 min") while it plays, or briefly at ▶▶. The exported page plays pauses the same way, with the same badge, in the writer's language. On a book with words written before recording began, the first day's start shows those words (not "Nothing written yet at this moment."), in NEO and in the exported page. Pick a chapter made partway through a day and click that day: the player opens on the chapter as it was made, never on "This chapter doesn’t exist yet at this moment."; dragging the timeline, Home and ← can't take the play head before that moment, nor End and → past the last. Cut a paragraph and paste it elsewhere in the book: its timeline marker says "Moved text (… characters)"; a paste from another app still says "Pasted from elsewhere". Dragging the timeline, ⇧← / ⇧→ between sessions, and play running on into the next day. A click or drag on the timeline scrolls the sheet to where the change is, as playing does.
-- [ ] Click a paragraph on the sheet: it's highlighted, and while paused **‹ Earlier version** and **Restore This Paragraph** float in the margin to its left and **Later version ›** to its right, as large as the footer's buttons or larger, following it as the sheet scrolls; nothing about it is left in the controls under the sheet. Hover them: the tooltips say "Back to how this read before it last changed" and "On to how this reads after it next changes". They (or [ ]) step back and forward through the times it changed, going off when there's nothing more that way. On a book imported (or written before recording began), step a first-day paragraph all the way back: the last stop is the day's first moment, and there ‹ is off; it never stays on while pressing it does nothing. In a narrower window they become ‹ and ›, and narrower still the restore button is ↺, its name in the tooltip. Esc or a click off the text puts it down. While it plays, the buttons hide.
-- [ ] Search (Ctrl+F in the dialog): a name finds first written, last written, written out and moved; the toggles for Match case and Whole words work; picking a finding lands on the moment with the phrase highlighted; Stop leaves "perhaps earlier/later".
+- [ ] Click or drag on the timeline: the sheet scrolls to where the change is, as playing does. The exported page plays pauses as NEO does, with the same badge in the writer's language. *(The rest of this item, ▶▶, the pause badge, the first moment of a day or a chapter, the play head's bounds and the moved and pasted markers, is in `npm run test:history`.)*
+- [ ] A paragraph picked: the buttons beside it are as large as the footer's or larger and follow it as the sheet scrolls; in the narrowest window restore is ↺. *(Found 2026-11-12: at 1904 px wide the sheet leaves 170 px margins, so ‹ Earlier version / Restore This Paragraph never show in words on this laptop. The tooltips, hiding while it plays and ‹ › in a narrow window are in `npm run test:history`.)*
+- [ ] Search a long history and press Stop while it looks inside the days: the findings say "perhaps earlier" / "perhaps later".
 - [ ] The replayed page looks exactly like the editor (fonts, italics, scene breaks, dialogue, a script's layout), in light and dark, with Brighter Interface on and off.
 - [ ] Opening History on a book with months of writing: the days appear quickly, the rest fill in with progress, and the window stays responsive.
-- [ ] Close and reopen History: nothing is rebuilt (instant).
-- [ ] The search toggles keep their setting while NEO is open, and go back to the defaults after a restart.
-- [ ] With a chapter picked in the side pane, only the days that touched it have tiles, and a split, joined or deleted chapter is labelled as such.
-- [ ] Join a chapter to the one before it (Backspace at its start), join another into a chapter as a section (a chapter card dropped on another, or Tab on its line in the List), move a third to loose cards, and delete a fourth. In History, the side pane lists only the chapters in the book at the moment shown, in its order then: on today's tile none of the four is listed; play the day and each leaves the list at the moment it went; go back to an earlier day and they're listed again. How It Was Written…'s chapter table still says what took each.
-- [ ] In History, pick a chapter in the side pane, then go to a day before it was written: it stays in the list, dimmed, and the sheet says it doesn't exist yet. The other chapters listed are only those there at that moment.
-- [ ] Keyboard only: Tab reaches every control in the days and the player, each shows on focus, and Esc always gets out.
+- [ ] In the days, a split, joined or deleted chapter is labelled as such.
+- [ ] How It Was Written…'s chapter table says what took each chapter no longer in the book (joined, made a section, set on a card, deleted).
 - [ ] In German (long words) and in Romanian, the dialog's labels fit and nothing overlaps, at the window's smallest size too.
 - [ ] **(2 computers)** Both computers' sessions on one day play interleaved, named by device; a chapter changed on both shows "As it was on …" where they diverged. *(first half passed 2026-10-30, 6947c24: Teacher's Pet, the laptop and the Chromebook, in order and named, on both; the divergence still to see, with the next item)*
 - [ ] **(2 computers)** NEO open on both at once on the same book (iCloud or Syncthing): no words lost, the twin chapter appears, and History shows both.
 
 ## Restore (phases 3 and 7)
 
-- [ ] In the player, pause on an earlier moment of a chapter and click **Restore This Chapter**. No confirmation: the dialog closes, the chapter reads as it did then, and a toast says "Chapter restored from …", that Ctrl+Z undoes it, and that the text it replaced is in Writing History at "Before restoring to …". Darlings and the snapshot list are unchanged.
-- [ ] Open History again: that day has a **Before restoring to …** tag (in Tags in the side pane, a flag on the timeline and on the day's tile). Picking it shows the chapter exactly as it was before the restore.
-- [ ] Ctrl+Z (with the caret outside the text) puts the chapter back as it was.
-- [ ] Set **Record Writing History** to Off, then restore a chapter from History (it still plays what was recorded). The toast says the replaced text is in a snapshot too; the Darlings tab's list has a new **Before a restore** snapshot holding it; Darlings is unchanged; Ctrl+Z undoes it.
-- [ ] In the days, ← to an earlier day and restore from there (the day as it ended).
-- [ ] In the whole book, click a paragraph of chapter 3: the restore goes to Chapter 3 (its name is in the button's tooltip); with nothing picked, to the caret's chapter.
-- [ ] At the moment that's the chapter as it is now, the button says **Same as now** and does nothing.
-- [ ] Go to a day before a chapter was deleted and pick it in the side pane, then the day it was deleted. The days show it as it was just before it went; **Put This Chapter Back** brings it back after the chapter it followed, with its old title, at once.
-- [ ] Restore from History opened on the shelf (book menu): it asks once whether to open the book (naming the book open now, if any, which is saved and closed); yes opens it and restores.
-- [ ] Click a paragraph on the sheet at an earlier moment: the button beside it is **Restore This Paragraph** (several selected: **Restore Paragraphs**, in its tooltip), and the footer's button still restores the whole chapter. Restoring changes only that paragraph, at once; nothing goes to Darlings; the day gets a "Before restoring to …" tag; Ctrl+Z undoes it.
 - [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.
-- [ ] Restore a paragraph that was moved within its chapter: it's found by its words and restored in its new place.
-- [ ] Restore a paragraph that was later deleted: the dialog says when it was taken out, and **Add to Darlings, and copy** puts it in Darlings and on the clipboard (paste it into a chapter to check).
-- [ ] Restore a paragraph that was moved to another chapter (cut and paste, or an Outline card): the dialog names the chapter it seems to be in now.
-- [ ] Restore a paragraph of a chapter that was deleted: the dialog says the chapter was deleted, and Copy works.
-- [ ] Select text on the sheet, Ctrl+C, close History, Ctrl+V in a chapter. It pastes as plain prose (no caret mark, no stray styles), and the timeline marks it as pasted from this book.
+- [ ] Restore a paragraph that was moved within its chapter: it's found by its words and restored in its new place. *(Fails in `npm run test:history`, 2026-11-12: a paragraph cut from the end of its chapter and pasted at the top, with another paragraph added at the end the same day, is taken for that other paragraph, and the restore writes over it. History carries a paragraph across days by comparing each day's end with the next, which can't see a move.)*
 - [ ] A restore made on a script restores the whole script, and its pages and (CONT'D) come back right.
-- [ ] Restore, then open History again: the day shows a Restored marker on the timeline.
 - [ ] **Delete this book's history…**: a confirmation says what goes and what stays (snapshots on the Darlings tab stay; the history's tags go, with their number), and **Delete history** stays off until you type "delete history" (any case; in another interface language, that language's phrase). Cancel, Esc and a click outside change nothing. Yes: `recording/` and `Backups/recordings/<book folder>/` are in the Recycle Bin, the book's words are all there, the snapshots are still listed, and History says nothing is recorded yet. Write a little: History shows it as the first day.
+- [ ] In another interface language, **Delete history** waits for that language's phrase. *(The rest of Delete, and Cancel, Esc and a click outside, are in the tests.)*
 - [ ] Restore both folders from the Recycle Bin (with NEO closed): the old history plays again beside the new.
 - [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
 - [ ] **(phone)** Restore works on the phone; the delete button isn't there.
 
 ## Tags and snapshots (phase 7)
 
-- [ ] In the player, pause, click **Tag This Moment…** (or Ctrl+S while History is open), type "Draft 2", Enter. A toast says it's tagged; Tags in the side pane lists it (newest first), the timeline has a flag there, and the day's tile has a flag in its corner with the name in its tooltip.
-- [ ] Tag a moment in the days (no player): the tag is on the day's end.
-- [ ] Pick a tag in the side pane: the player opens at that moment, paused, the sheet showing the book as it was then.
-- [ ] Right-click a tag: **Rename…** changes its name everywhere; **Remove Tag** takes it away (the moment is still there). Close and reopen History: both stick.
-- [ ] Search the history for a word in a tag's name: the tag is listed first, as "Tag · …", and picking it goes to it.
-- [ ] Ctrl+S while writing: the snapshot is taken as before (toast, Darlings tab), and History shows it as a tag "Snapshot · Taken by you" at that moment. A snapshot's tag can be named (right-click → **Name…**) and removed; removing it says the snapshot itself is still on the Darlings tab, and it is.
-- [ ] The first change of a writing day takes a "Start of the day" snapshot at the writer's day (`library.dayEndsAt`): with the day ending at 4am, writing at 1am and 3am takes no second one; at 5am it does.
-- [ ] On the Darlings tab, show a snapshot: **Watch from Here** is in its band (only while the book has a history) and opens History in the player at the snapshot's tag. Right-click a snapshot in the list: **Watch from Here** does the same. A snapshot older than the history opens at its first day.
-- [ ] With recording off, or History opened on a book from the shelf without opening it, **Tag This Moment…** is dimmed and its tooltip says why; Ctrl+S in History says the same and tags nothing.
-- [ ] History's footer has no **Snapshots** button. On the Darlings tab with no snapshots, the list's hint mentions Writing History.
-- [ ] Duplicate a book from the shelf: the copy has no `recording/` folder, opens with no history, and records its own from then on; the original's history is unchanged.
+- [ ] On the Darlings tab, show a snapshot: **Watch from Here** is in its band (only while the book has a history), and in a snapshot's right-click menu. *(What it opens is in `npm run test:history`.)*
+- [ ] On the Darlings tab with no snapshots, the list's hint mentions Writing History. *(No Snapshots button in History's footer: `npm run test:history`.)*
 - [ ] **(2 computers)** Tag on one computer, rename the tag on the other: once both have synced, History on each shows the newer name.
 - [ ] In German and Russian, Tags, the tag dialog and the restore toasts read right and fit.
 - [ ] **(phone)** A tag made on the desktop shows on the phone, and the phone can tag a moment.
@@ -243,3 +212,43 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [ ] **(phone)** A session written on the phone plays on the desktop, named "iPhone" / "Android", and the desktop's on the phone.
 - [ ] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile.
 - [ ] **(phone)** Delete a phone session from the book on the desktop after a desktop has mirrored it (7 days on): the phone still plays it from the mirror.
+
+## Checked by the e2e tests
+
+These were items here. `npm run test:history` (scripts/history.e2e.js) and `npm run test:recording` (scripts/recording.e2e.js) now check them; run both after a change to Writing History. When one fails, the item comes back here until it passes.
+
+- All four ways in open History: the footer, File → Writing History…, a book's shelf menu, Watch This Chapter Being Written. `test:history`, `test:recording`
+- The days: ← and → show each day as it ended; Enter opens one paused, Space plays, Esc goes back, then closes. `test:history`
+- Watch This Chapter Being Written opens at the chapter's first day, paused. `test:recording`
+- While History is open a menu item clicked closes it and does it; its shortcut does nothing; Find searches the history; Ctrl+S tags; a click outside closes it. `test:history`, `test:recording`
+- Search: first written, written out; Match case and Whole words; a finding lands on its moment, highlighted. `test:history`, `test:recording`
+- History closed and opened again rebuilds nothing. `test:history`
+- The search toggles keep their setting while NEO is open. `test:history`
+- With a chapter picked, only the days that changed it have tiles. `test:history`
+- Chapters joined, made a section, set on a card or deleted leave the side pane's list at the moment they went, and are listed on the day before. `test:history`
+- A chapter picked at a moment it isn't there stays listed, dimmed, and the sheet says so. `test:history`
+- Keyboard only: Tab reaches every control in the days and the player, each visible with focus, never leaves the dialog, and Esc gets out. `test:history`
+- Restore This Chapter: at once, no confirmation, the toast, the "Before restoring to …" tag first, no snapshot or Darlings. `test:recording`
+- After a restore, the "Before restoring to …" tag is in Tags, on the day's tile and on the timeline, and shows the chapter as it was. `test:history`
+- Ctrl+Z undoes a restore. `test:recording`
+- With recording off, a restore keeps the chapter in a "Before a restore" snapshot, and the toast says so. `test:history`, `test:recording`
+- Restore from the days, on an earlier day. `test:history`
+- In the whole book the restore goes to the picked paragraph's chapter, named in the tooltip. `test:history`
+- The chapter as it is now: Same as now, greyed out. `test:history`
+- Put This Chapter Back brings a deleted chapter back after the one it followed. `test:recording`
+- Restore from History opened on the shelf asks once to open the book, then restores. `test:history`
+- Restore This Paragraph (Restore Paragraphs for several) changes only them, tags the moment before, and Ctrl+Z undoes it. `test:history`, `test:recording`
+- A paragraph taken out since: History says when, and Add to Darlings, and copy keeps it. `test:history`
+- A paragraph moved to another chapter since: History names the chapter it seems to be in. `test:history`
+- A paragraph whose chapter was deleted: History says so, and Copy works. `test:recording`
+- Text copied from the sheet pastes without the player's caret, recorded as from this book and that moment. `test:recording`
+- A restore shows a Restored marker on the timeline. `test:history`
+- Tag This Moment… (Ctrl+S in History): toast, newest moment first in Tags, a flag on the timeline and on the day's tile. `test:history`, `test:recording`
+- A moment tagged in the days is the day's end. `test:history`
+- A tag picked opens the player at its moment. `test:recording`
+- Rename… and Remove Tag from a tag's right-click menu, kept after History is opened again. `test:history`
+- Search finds a tag by its name, first. `test:history`, `test:recording`
+- Ctrl+S's snapshot is a tag "Snapshot · Taken by you", which can be named and removed, the snapshot staying. `test:history`, `test:recording`
+- The writer's day (ending at 4am: 1am and 3am the day before), and a day's first change taking one start-of-day snapshot. `test:history`
+- Tag This Moment… is dimmed, saying why, with recording off and from the shelf; Ctrl+S then tags nothing. `test:history`
+- A duplicated book has no recording/; the original keeps its history. `test:recording`

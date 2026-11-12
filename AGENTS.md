@@ -236,6 +236,7 @@ npm run test:spellcheck    # node --test scripts/spellcheck.test.js
 npm run test:dashes        # node --test scripts/dashes.test.js
 npm run test:recording     # Electron end-to-end: every chapter change reaches the recording, and it replays to the files on disk
 npm run test:sync-conflicts # Electron end-to-end: a sync program's conflict copies become chapters, and are kept
+npm run test:history       # Electron end-to-end: the Writing History dialog, restore and tags, driven as a writer does (scripts/e2e-neo.js holds the helpers; NEO_E2E_ONLY=<regex> runs some)
 npm run bundle             # Hugh: brings in the newest .bundle from ~/Downloads and pushes main
 npm run release            # Hugh: next version (x.y.9 → x.(y+1).0), commit, push, tag (npm run release -- 2.0.0 for another)
 npm run package:mac        # macOS build; npm run package calls this

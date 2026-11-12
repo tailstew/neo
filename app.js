@@ -4730,6 +4730,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     seek, setMode, setPlaying, openPlayer, showDays, skipSession, paper,
     find: () => find, runFind: (q) => runFind(q), goFind: (kind, x) => goFind(kind, x),
     part: () => part, pickPart, partGo,
+    markers: () => markers.map((m) => ({ kind: m.kind, label: m.label, x: m.x })), playing: () => playing, tags: () => tags,
     speed: (x) => { if (x) historyPrefs.speed = x; return historyPrefs.speed; }
   };
   $h('.ps-done').onclick = close;
@@ -5994,6 +5995,21 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
 
   bd.addEventListener('keydown', (e) => {
     e.stopPropagation();
+    // Tab goes round the dialog's controls and never out of it: behind it is
+    // the book, which keys must not reach while History is open
+    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const all = [...bd.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])')]
+        .filter((x) => !x.disabled && x.offsetParent !== null && getComputedStyle(x).visibility !== 'hidden');
+      const at = document.activeElement;
+      const i = all.indexOf(at);
+      // (the browser also stops on the sheet's scrolling box: from there it goes on as usual)
+      const inside = at && at !== bd && bd.contains(at);
+      if (!all.length || (i < 0 && !inside) || (i >= 0 && (e.shiftKey ? i === 0 : i === all.length - 1))) {
+        e.preventDefault();
+        if (all.length) all[e.shiftKey ? all.length - 1 : 0].focus();
+        return;
+      }
+    }
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.code === 'KeyS' || e.key === 's')) { e.preventDefault(); tagHere(); return; }
     if (e.target === qIn) {
       if (e.key === 'Enter') { e.preventDefault(); runFind(qIn.value); } else if (e.key === 'Escape') { e.preventDefault(); if (qIn.value || find) clearFind(); else bd.focus(); }
