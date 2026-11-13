@@ -49,6 +49,28 @@ const test = (name, fn) => tests.push({ name, fn });
 
 const SYNCTHING = () => `${chId}.sync-conflict-20261030-144927-Q7EGGF3.html`;
 
+test("library.json: a setting and a book another device wrote stay when this window saves the library from memory", async () => {
+  // NEO re-reads library.json only on the shelf; the book is open here.
+  // The other device (the laptop, as the phone saw it) turns a timestamp
+  // service off and puts a book on a shelf.
+  const file = path.join(tmp, 'NEO Library', 'library.json');
+  const disk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  disk.proofTsas = [{ id: 'digicert', on: true }, { id: 'sectigo', on: true }, { id: 'globalsign', on: false }];
+  disk.shelves[0].bookIds.push('book-from-elsewhere');
+  fs.writeFileSync(file, JSON.stringify(disk));
+  // and this window saves a change of its own, from what it holds
+  await js('library.spellLanguage = "fr"; writeLibrary()');
+  await tick(400);
+  const now = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(now.proofTsas, disk.proofTsas, 'the other device’s timestamp services');
+  assert.ok(now.shelves[0].bookIds.includes('book-from-elsewhere'), 'the book it put on the shelf');
+  assert.ok(now.shelves[0].bookIds.includes(bookId), 'this book still there');
+  assert.equal(now.spellLanguage, 'fr', 'and the change made here');
+  assert.deepEqual(await js('library.proofTsas'), disk.proofTsas, 'taken into the window too');
+  await js('delete library.spellLanguage; library.shelves[0].bookIds = library.shelves[0].bookIds.filter((id) => id !== "book-from-elsewhere"); writeLibrary()');
+  await tick(300);
+});
+
 test('a copy left while the book was closed becomes the chapter after it as the book opens', async () => {
   const ids = await order();
   assert.equal(ids.length, 2, 'the chapter and the copy\'s');

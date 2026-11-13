@@ -257,3 +257,7 @@ With the test's own timestamp services. `test:proof`
 - Moved-in text: chapter 3 alone is warned of chapter 2's text, 2–3 isn't; a chapter joined to another: the export of the one that took it says the text came from a chapter no longer in the book.
 - The whole book with its seals: checked; each seal's fingerprint as verify-recording prints it; its files to download; its stamps check against the page's own roots. A seal changed by one character: "Some checks failed".
 - One chapter, timestamped, as a public sample: no Tags; its seals checked against its own lines; how many other chapters they cover; the same fingerprints as the whole book's; verify-recording still says everything checks.
+
+### Sync between devices
+
+- `library.json` written by another device (a timestamp service turned off, a book put on a shelf) while a book is open here keeps those when this window saves the library. `test:sync-conflicts`

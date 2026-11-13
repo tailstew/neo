@@ -213,12 +213,99 @@ const saveTimers = {};
 // its way, is older than the library in memory and must not replace it.
 let libraryGeneration = 0;
 let libraryWritesPending = 0;
+// The library as this window last read it from disk or wrote it. Another
+// device (the phone, the other computer) writes library.json too, and this
+// window re-reads it only on the shelf: a write here from what it holds in
+// memory would undo that device's change (its timestamp services, a book it
+// put on a shelf), and the sync program would set ours or theirs aside as a
+// conflict copy. So each write looks at the disk first and merges
+// (libraryMerged): what changed here since this base is ours, what changed
+// there is theirs. Writes go one at a time.
+let libraryBase = null;
+let libraryChain = Promise.resolve();
+const libraryCopy = (lib) => (lib ? JSON.parse(JSON.stringify(lib)) : null);
 function writeLibrary(lib = library) {
   rememberDeviceLook(lib);
   libraryGeneration++;
   libraryWritesPending++;
-  return new Promise((resolve) => resolve(window.neo.writeLibrary(lib)))
-    .finally(() => { libraryWritesPending--; });
+  const run = libraryChain.then(async () => {
+    const theirs = await libraryMerged(lib);
+    const ok = await window.neo.writeLibrary(lib);
+    libraryBase = libraryCopy(lib);
+    if (theirs) libraryTookTheirs();
+    return ok;
+  });
+  libraryChain = run.catch(() => {});
+  return run.finally(() => { libraryWritesPending--; });
+}
+// Merges into lib (the library in memory) what another device changed in
+// library.json since libraryBase, and says whether it took anything. A key
+// changed here keeps ours; one changed only there takes theirs. This
+// device's look (DEVICE_LOOK) is its own. Shelves merge shelf by shelf.
+async function libraryMerged(lib) {
+  if (!libraryBase || !lib) return false;
+  let disk;
+  try { disk = await window.neo.readLibrary(); } catch { return false; }
+  if (!disk || typeof disk !== 'object' || !Array.isArray(disk.shelves)) return false;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (same(disk, libraryBase)) return false;
+  let took = false;
+  for (const k of new Set([...Object.keys(disk), ...Object.keys(libraryBase)])) {
+    if (k === 'shelves' || DEVICE_LOOK.includes(k)) continue;
+    if (same(lib[k], libraryBase[k]) && !same(disk[k], libraryBase[k])) {
+      if (disk[k] === undefined) delete lib[k]; else lib[k] = libraryCopy(disk[k]);
+      took = true;
+    }
+  }
+  const shelves = mergeShelves(libraryBase.shelves || [], lib.shelves || [], disk.shelves);
+  if (!same(shelves, lib.shelves)) { lib.shelves = shelves; took = true; }
+  return took;
+}
+// Shelves changed here (ours) and there (theirs) since base: a shelf one side
+// added stays, one a side took out goes (unless the other changed it); on a
+// shelf both have, its name and the like are whoever changed them, and its
+// books are ours, less those theirs took off, plus those theirs put on.
+// (A plain function: scripts/library-merge.test.js)
+function mergeShelves(base, ours, theirs) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (same(theirs, base)) return ours;
+  if (same(ours, base)) return JSON.parse(JSON.stringify(theirs));
+  const byId = (l) => new Map(l.map((s) => [s.id, s]));
+  const B = byId(base), O = byId(ours), T = byId(theirs);
+  const out = [];
+  for (const o of ours) {
+    const b = B.get(o.id), th = T.get(o.id);
+    if (!th) { if (!b || !same(o, b)) out.push(o); continue; } // taken out there: goes, unless new or changed here
+    if (!b) { out.push(o); continue; }
+    const s = { ...o };
+    for (const k of new Set([...Object.keys(th), ...Object.keys(b)])) {
+      if (k === 'bookIds' || k === 'id') continue;
+      if (same(o[k], b[k]) && !same(th[k], b[k])) { if (th[k] === undefined) delete s[k]; else s[k] = th[k]; }
+    }
+    const was = new Set(b.bookIds || []), there = new Set(th.bookIds || []);
+    const ids = (o.bookIds || []).filter((id) => !(was.has(id) && !there.has(id)));
+    for (const id of th.bookIds || []) if (!was.has(id) && !ids.includes(id)) ids.push(id);
+    s.bookIds = ids;
+    out.push(s);
+  }
+  // a shelf added there, or one taken out here that was changed there
+  theirs.forEach((th, i) => {
+    if (O.has(th.id)) return;
+    const b = B.get(th.id);
+    if (b && same(th, b)) return;
+    out.splice(Math.min(i, out.length), 0, JSON.parse(JSON.stringify(th)));
+  });
+  // a book moved between shelves on one side and left on the other: once
+  const seen = new Set();
+  for (const s of out) s.bookIds = (s.bookIds || []).filter((id) => !seen.has(id) && seen.add(id));
+  return out;
+}
+// What another device changed reached this window: the proof flags, and
+// the shelf, as a look at the disk would have it
+function libraryTookTheirs() {
+  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+  if (window.neo.recState) window.neo.recState();
+  if (!book && !$('#bookshelf-view').hidden) renderShelves();
 }
 
 // How NEO looks is each device's own: dark on the iPad, light on the PC.
@@ -809,6 +896,7 @@ async function loadLibrary() {
   libraryDirPath = await window.neo.libraryPath();
   applyShelfZoom();
   library = applyDeviceLook(await window.neo.readLibrary());
+  libraryBase = libraryCopy(library);
   // A first shelf is named in the language NEO had when it was made. If the
   // writer never renamed it, it follows a change of language: from English,
   // or from the language this device last showed (any language, the first
@@ -16848,6 +16936,7 @@ async function refreshFromDisk() {
         if (gen !== libraryGeneration || libraryWritesPending) return;
         if (lib && lib.firstRunDone && JSON.stringify(lib) !== JSON.stringify(library)) {
           library = lib;
+          libraryBase = libraryCopy(lib);
           // proof, and the timestamp services, as another computer left them
           if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
           if (window.neo.recState) window.neo.recState();
