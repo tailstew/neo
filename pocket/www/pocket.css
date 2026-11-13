@@ -82,6 +82,10 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
 #tabs { min-width: 0; overflow-x: auto; justify-content: safe center; scrollbar-width: none; }
 #tabs::-webkit-scrollbar { display: none; }
 #tabs .tab { flex: none; }
+/* an edge with more tabs past it fades out, so the strip plainly scrolls */
+#tabs.more-right { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+#tabs.more-left { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+#tabs.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 @media (max-width: 600px) {
   #bottombar { gap: 6px; padding: 0 6px; }
   .tab { padding: 12px 10px; }

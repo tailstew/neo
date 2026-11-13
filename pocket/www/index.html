@@ -258,7 +258,11 @@
           ? `<div class="pm-row"><span class="pm-label">${t('Export')}</span><span class="pm-seg pm-wrap">` +
             (script ? [['fountain', 'Fountain'], ['fdx', 'Final Draft']] : [['txt', t('Text')], ['md', 'Markdown'], ['html', 'HTML'], ['docx', 'Word'], ['epub', 'EPUB']]).map(([f, l]) => `<button data-msg='${JSON.stringify({ type: 'export', format: f })}'>${l}</button>`).join('') + '</span></div>'
           : '') +
-        `<div class="pm-row pm-actions"><button data-msg='${JSON.stringify({ type: 'stats' })}'>${t('Goals…')}</button><button data-msg='${JSON.stringify({ type: 'help' })}'>${t('Keyboard shortcuts')}</button><button data-act="close">${t('Done')}</button></div>`;
+        // the footer's Darlings and History, which a narrow phone's tab strip has scrolled out of sight
+        `<div class="pm-row pm-actions">` +
+        (typeof book !== 'undefined' && book ? `<button data-act="darlings">${t('Darlings')}</button>` : '') +
+        (typeof book !== 'undefined' && book && !document.querySelector('#tabs .history-btn').hidden ? `<button data-act="history">${t('History')}</button>` : '') +
+        `<button data-msg='${JSON.stringify({ type: 'stats' })}'>${t('Goals…')}</button><button data-msg='${JSON.stringify({ type: 'help' })}'>${t('Keyboard shortcuts')}</button><button data-act="close">${t('Done')}</button></div>`;
     }
     more.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -272,6 +276,13 @@
       if (!b) return;
       if (b.dataset.act === 'close') { closeMenu(); return; }
       if (b.dataset.act === 'keyboard') { window.pocketToggleSoftKeyboard(); buildMenu(); return; }
+      if (b.dataset.act === 'darlings' || b.dataset.act === 'history') {
+        closeMenu();
+        const tab = document.querySelector(b.dataset.act === 'darlings' ? '#tabs .tab.darlings' : '#tabs .history-btn');
+        tab.click();
+        tab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+        return;
+      }
       if (b.dataset.msg) {
         const msg = JSON.parse(b.dataset.msg);
         send(msg);
@@ -288,6 +299,20 @@
         if (menuWrap.hidden) more.click(); else closeMenu();
       }
     }, true);
+
+    // The footer's tab strip scrolls sideways with no scrollbar; on a narrow
+    // phone Darlings and History are past its edge. It fades at an edge with
+    // more tabs past it (.more-left, .more-right in pocket.css).
+    const tabStrip = document.getElementById('tabs');
+    const tabEdges = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = tabStrip;
+      tabStrip.classList.toggle('more-left', scrollLeft > 1);
+      tabStrip.classList.toggle('more-right', scrollLeft + clientWidth < scrollWidth - 1);
+    };
+    tabStrip.addEventListener('scroll', tabEdges, { passive: true });
+    new ResizeObserver(tabEdges).observe(tabStrip);
+    // (History's button shows once the book has a history, which changes the width)
+    new MutationObserver(tabEdges).observe(tabStrip, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
 
     // Undo / redo above the on-screen keyboard. Undo is ⌘Z, so everything
     // ⌘Z takes back (a capital, a dash, a section break) comes back the same

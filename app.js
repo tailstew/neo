@@ -6042,9 +6042,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     timeline.setPointerCapture(e.pointerId);
     seekClock(fromPointer(e));
     const move = (ev) => seekClock(fromPointer(ev));
-    const up = () => { timeline.removeEventListener('pointermove', move); timeline.removeEventListener('pointerup', up); };
+    const up = () => { timeline.removeEventListener('pointermove', move); timeline.removeEventListener('pointerup', up); timeline.removeEventListener('pointercancel', up); };
     timeline.addEventListener('pointermove', move);
     timeline.addEventListener('pointerup', up);
+    timeline.addEventListener('pointercancel', up);
   });
   timeline.addEventListener('mousemove', (e) => {
     if (!h || !total) return;
