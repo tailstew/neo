@@ -285,6 +285,23 @@ test('⌘Z on a chapter set on a card marks it back', async () => {
   assert.ok(card, 'the card noted as removed');
 });
 
+test('a chapter a flush already wrote isn’t written again when its 800 ms save comes', async () => {
+  const id = (await order())[0];
+  const file = path.join(chapters(), id + '.html');
+  // typed (the edit and its save timer), then a flush before the timer fires: a blur, the 20 s tick
+  await js(`(() => {
+    const body = chapterBodyEl(${JSON.stringify(id)});
+    body.querySelector('p').append(' Typed then flushed.');
+    syncChapter(body, ${JSON.stringify(id)});
+    flushAllSaves();
+  })()`);
+  await tick(400);
+  const flushed = fs.statSync(file).mtimeMs;
+  assert.match(fs.readFileSync(file, 'utf8'), /Typed then flushed\./);
+  await tick(1200); // the 800 ms save has come and gone
+  assert.equal(fs.statSync(file).mtimeMs, flushed, 'the file wasn’t written again');
+});
+
 /* ---------- runner ---------- */
 
 async function main() {
