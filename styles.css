@@ -638,13 +638,13 @@ body.light .modal .tsa-said { color: #3f3b35; }
 body.light .modal .tsa-warn { color: #a8642a; }
 /* every button in the footer alike: tag this moment and restore it beside
    the moment's time, then How It Was Written…, Export… and Delete… */
-.hs-foot button {
+.hs-foot button, .hs-side-acts button {
   flex: none; min-width: 0; max-width: 260px; background: #262626; border: 1px solid #3a3a3a; border-radius: 14px;
   padding: 5px 13px; font-size: 12px; font-family: inherit; color: #c9c3b8; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.hs-foot button:hover:not(:disabled):not(.hs-off), .hs-foot button:focus-visible { border-color: var(--accent); color: var(--accent); }
-.hs-foot button:disabled, .hs-foot button.hs-off { opacity: 0.5; cursor: default; }
-.hs-foot .hs-delete:hover, .hs-foot .hs-delete:focus-visible { border-color: #d9776b; color: #d9776b; }
+.hs-foot button:hover:not(:disabled):not(.hs-off), .hs-foot button:focus-visible, .hs-side-acts button:hover:not(:disabled):not(.hs-off), .hs-side-acts button:focus-visible { border-color: var(--accent); color: var(--accent); }
+.hs-foot button:disabled, .hs-foot button.hs-off, .hs-side-acts button:disabled, .hs-side-acts button.hs-off { opacity: 0.5; cursor: default; }
+.hs-foot .hs-delete:hover, .hs-foot .hs-delete:focus-visible, .hs-side-acts .hs-delete:hover, .hs-side-acts .hs-delete:focus-visible { border-color: #d9776b; color: #d9776b; }
 /* a day with tags: a flag in its tile's corner */
 .hs-tile { position: relative; }
 .hs-tile.hs-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; width: 0; height: 0; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
@@ -694,7 +694,7 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-note.ex-bad { color: var(--red); }
 /* below 720 px (a phone held upright) the side pane is a drawer over the
    sheet: ☰ at the sheet's top left brings it, a tap beside it puts it away */
-.hs-pane-btn, .hs-scrim { display: none; }
+.hs-pane-btn, .hs-scrim, .hs-side-acts { display: none; }
 @media (max-width: 720px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; position: relative; }
   .hs-side {
@@ -703,13 +703,19 @@ body.light .modal .tsa-warn { color: #a8642a; }
   }
   .hs-pane-open .hs-side { transform: none; visibility: visible; transition: transform .2s ease; box-shadow: 4px 0 18px rgba(0, 0, 0, .45); }
   .hs-pane-open .hs-scrim { display: block; position: absolute; inset: 0; z-index: 5; background: rgba(0, 0, 0, .35); }
-  /* the sheet as wide as the editor's page there (pocket.css's .sheet), clear of ☰ */
+  /* the sheet as wide as the editor's page there (pocket.css's .sheet) */
   .hs-paper { width: calc(100% - 16px); }
-  .hs-paper .sheet { padding: 52px 26px 60px; }
+  .hs-paper .sheet { padding: 34px 26px 60px; }
+  /* ☰ in the title bar, before the dialog's name */
+  .page-sheet .ps-bar:has(.hs-pane-btn) { justify-content: flex-start; gap: 12px; }
+  .page-sheet .ps-bar:has(.hs-pane-btn) .ps-done { margin-left: auto; }
   .hs-pane-btn {
-    display: block; position: absolute; top: 8px; left: 8px; z-index: 4; width: 36px; height: 36px; padding: 0;
-    border: 1px solid #333; border-radius: 6px; background: var(--bg); color: inherit; font-size: 17px; line-height: 1; cursor: pointer;
+    display: block; flex: none; width: 36px; height: 32px; padding: 0;
+    border: 1px solid #3a3a3a; border-radius: 5px; background: transparent; color: inherit; font-size: 17px; line-height: 1; cursor: pointer;
   }
+  /* the footer's buttons, under the chapters and tags (when any is shown) */
+  .hs-side-acts:has(button:not([hidden])) { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 8px 12px; border-top: 1px solid #2a2a2a; }
+  .hs-side-acts button { max-width: 100%; }
 }
 @media (max-width: 560px) {
   .ps-paper { padding: 44px 26px 36px; }

@@ -4554,10 +4554,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     <div class="hs-side">
       <div class="hs-find" hidden><div class="hs-qbox"><input class="hs-q" type="search" spellcheck="false" autocomplete="off"><button class="hs-opt" type="button" data-opt="cs">Aa</button><button class="hs-opt" type="button" data-opt="word"><span class="hs-opt-word">ab</span></button></div><div class="hs-results" hidden></div></div>
       <div class="hs-list" role="listbox"></div>
+      <div class="hs-side-acts"></div>
     </div>
     <div class="hs-scrim"></div>
     <div class="hs-main">
-      <button class="hs-pane-btn" type="button" aria-expanded="false">☰</button>
       <div class="hs-scroll"><div class="hs-paper"></div>
         <div class="hs-part" hidden><button class="hs-part-prev" type="button">‹</button><button class="hs-part-restore" type="button"></button></div>
         <div class="hs-part hs-part-r" hidden><button class="hs-part-next" type="button">›</button></div>
@@ -4589,17 +4589,29 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     </div>`);
   const $h = (sel) => bd.querySelector(sel);
   // Below 720 px (a phone held upright) the side pane is a drawer over the
-  // sheet (styles.css): ☰ brings it; a chapter, a tag or a finding picked,
-  // a tap beside it, Esc or back put it away.
+  // sheet (styles.css): ☰ in the title bar brings it; a chapter, a tag or a
+  // finding picked, one of its buttons, a tap beside it, Esc or back put it
+  // away. The footer's buttons (tag, restore, how it was written, delete)
+  // move into it there, so the sheet keeps the screen.
   const sheetBox = $h('.ps-paper');
-  const paneBtn = $h('.hs-pane-btn');
+  const paneBtn = document.createElement('button');
+  paneBtn.className = 'hs-pane-btn';
+  paneBtn.type = 'button';
+  paneBtn.textContent = '☰';
+  paneBtn.setAttribute('aria-expanded', 'false');
+  $h('.ps-bar').prepend(paneBtn);
+  const narrowMq = matchMedia('(max-width: 720px)');
+  const footActs = ['.hs-tag', '.hs-restore', '.hs-evidence', '.hs-delete'].map((s) => $h(s));
+  const placeActs = () => { for (const b of footActs) (narrowMq.matches ? $h('.hs-side-acts') : $h('.hs-foot')).appendChild(b); };
+  placeActs();
+  narrowMq.addEventListener('change', placeActs);
   const paneOpen = () => sheetBox.classList.contains('hs-pane-open');
   const pane = (open) => { sheetBox.classList.toggle('hs-pane-open', open); paneBtn.setAttribute('aria-expanded', String(open)); };
   paneBtn.title = t('Chapters, tags and search');
   paneBtn.setAttribute('aria-label', paneBtn.title);
   paneBtn.addEventListener('click', () => pane(!paneOpen()));
   $h('.hs-scrim').addEventListener('click', () => pane(false));
-  $h('.hs-side').addEventListener('click', (e) => { if (paneOpen() && e.target.closest('.hs-ch')) pane(false); });
+  $h('.hs-side').addEventListener('click', (e) => { if (paneOpen() && e.target.closest('.hs-ch, .hs-side-acts button')) pane(false); });
   const list = $h('.hs-list');
   const scroller = $h('.hs-scroll');
   const paper = $h('.hs-paper');
@@ -4754,6 +4766,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     if (!bd.isConnected) return;
     cancelAnimationFrame(raf);
     resize.disconnect();
+    narrowMq.removeEventListener('change', placeActs);
     historyListeners.delete(progress);
     proofListeners.delete(proofChanged);
     CSS.highlights.delete('neo-replay-sel');
@@ -4774,7 +4787,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // Find, from the menu or ⌘F: the history's own search (in the drawer, where the pane is one)
   close.focusFind = () => {
     if ($h('.hs-find').hidden) return;
-    if (getComputedStyle(paneBtn).display !== 'none') pane(true);
+    if (narrowMq.matches) pane(true);
     qIn.focus();
     qIn.select();
   };

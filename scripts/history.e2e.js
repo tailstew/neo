@@ -358,6 +358,13 @@ test('a phone held upright: the side pane is a drawer that ☰ brings, and a pic
     // the text as wide as the editor's page there, not the desktop's margins
     const wide = await js('document.querySelector(".hs-paper .rp-body").getBoundingClientRect().width / document.querySelector(".hs-scroll").getBoundingClientRect().width');
     assert.ok(wide > 0.8, 'the text takes most of the sheet: ' + wide.toFixed(2));
+    // ☰ in the title bar, over none of the sheet; the footer's buttons in the drawer
+    const placed = await js(`(() => {
+      const btn = document.querySelector('.hs-pane-btn'), sheet = document.querySelector('.hs-scroll').getBoundingClientRect();
+      return { inBar: !!btn.closest('.ps-bar'), clear: btn.getBoundingClientRect().bottom <= sheet.top,
+        inDrawer: ['.hs-tag', '.hs-restore', '.hs-evidence', '.hs-delete'].every((s) => !!document.querySelector('.hs-side-acts ' + s)) };
+    })()`);
+    assert.deepEqual(placed, { inBar: true, clear: true, inDrawer: true });
     await js('document.querySelector(".hs-pane-btn").click()');
     await tick(400);
     const open = await state();
@@ -392,11 +399,12 @@ test('a phone held upright: the side pane is a drawer that ☰ brings, and a pic
     await tick(400);
     await neo.closeHistory();
   }
-  // wide again: no ☰, the pane where it always is
+  // wide again: no ☰, the pane where it always is, the buttons in the footer
   await neo.openHistory();
   await tick(300);
   assert.equal(await js('getComputedStyle(document.querySelector(".hs-pane-btn")).display'), 'none');
   assert.equal(await js('getComputedStyle(document.querySelector(".hs-side")).visibility'), 'visible');
+  assert.equal(await js('[".hs-tag", ".hs-restore", ".hs-evidence", ".hs-delete"].every((s) => !!document.querySelector(".hs-foot " + s))'), true);
   await neo.closeHistory();
 });
 

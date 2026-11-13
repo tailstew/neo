@@ -197,7 +197,7 @@ Each with no change the recorder didn't see, and every write replaying to its fi
 ### Writing History, the dialog, and restore
 
 - A search finding picked brings its phrase into sight, also where the chapter held it before the recording began (a baseline), far from the caret. `test:history`
-- At a phone's width History's text is as wide as the editor's page there, and the side pane is a drawer: ☰ brings it, a chapter picked, a tap beside it or Esc puts it away (Esc staying in the player), and Find brings it with the search field. `test:history`
+- At a phone's width History's text is as wide as the editor's page there, the side pane is a drawer (☰ in the title bar, clear of the sheet; the footer's buttons inside it): ☰ brings it, a chapter picked, a tap beside it or Esc puts it away (Esc staying in the player), and Find brings it with the search field. `test:history`
 - The History tab's tooltip, the dialog and an empty history say what it is plainly, with no "replay" or "recording" as a noun; their French is there. `test:history`
 - A search stopped while it looks inside the days: its findings say "perhaps earlier" and "perhaps later". `test:history`
 - A day's timeline names its split, its joins, its delete and its card. `test:history`
