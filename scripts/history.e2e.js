@@ -604,6 +604,46 @@ test('a chapter restored: History then shows the “Before restoring to …” t
   assert.equal(await chHTML(ID.One), before);
 });
 
+test('a restore can be undone from History while the chapter is as it left it; once written in, it can’t', async () => {
+  const before = await chHTML(ID.One);
+  const restoreTo = async () => {
+    await atDayEnd(0, ID.One);
+    const then = await js(`historyShown.player.chapters()[${JSON.stringify(ID.One)}]`);
+    await js('document.querySelector(".hs-restore").click()');
+    await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] === ${JSON.stringify(then)}`);
+    await flush();
+  };
+  const atEnd = async () => {
+    await neo.openHistory();
+    const last = await js('historyShown.player.days().length - 1');
+    await atDayEnd(last, ID.One);
+    await waitFor('!document.querySelector(".hs-restore").hidden');
+    return js('document.querySelector(".hs-restore").textContent');
+  };
+  try {
+    await restoreTo();
+    // just after it, with the chapter as it left it: Undo This Restore puts back what was there
+    assert.equal(await atEnd(), 'Undo This Restore');
+    await js('document.querySelector(".hs-restore").click()');
+    await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] === ${JSON.stringify(before)}`);
+    await flush();
+    // restored again, then written in: nothing to undo from here
+    await restoreTo();
+    await caretAt(await idx('One'), 0, -1);
+    await type(' Written after.');
+    await flush();
+    assert.equal(await atEnd(), 'Same as now');
+    const tag = (await neo.tagItems()).filter((n) => /^Before restoring to /.test(n)).pop();
+    await js(`[...document.querySelectorAll('.hs-tag-item')].reverse().find((b) => b.textContent.startsWith(${JSON.stringify(tag)})).click()`);
+    await waitFor(`historyShown.player.chapters()[${JSON.stringify(ID.One)}] === ${JSON.stringify(before)}`);
+    assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore This Chapter', 'an ordinary restore from the moment before');
+  } finally {
+    await neo.closeHistory();
+    for (let i = 0; i < 4 && (await chHTML(ID.One)) !== before; i++) { await js('structuralUndo()'); await tick(300); }
+  }
+  assert.equal(await chHTML(ID.One), before);
+});
+
 test('with recording off, the restore’s toast says the text it replaced is in a snapshot', async () => {
   const before = await chHTML(ID.One);
   await js('setHistoryLevel("off")');

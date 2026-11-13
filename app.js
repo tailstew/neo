@@ -5758,6 +5758,37 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const wall = Number.isFinite(s.wall) ? s.wall : historyDayMs(h.day);
     return { ref: [x.id, pos ? s.line : 1, x.device], wall, when: snapWhen(wall) };
   }
+  // The restore the moment shown sits on, for chapter ch: the sheet just
+  // before it or just after it, with nothing else changing ch between. It
+  // can be undone from here while the chapter in the book is still exactly
+  // what that restore made it (nothing written in it since, so nothing is
+  // lost): then the footer's button puts back the text from just before.
+  // { html, wall, ref } of that moment, or null.
+  function restoreUndo(ch) {
+    if (!h || !here || !book || book.id !== bookId || !meta.chapterOrder.includes(ch) || chapterHTML[ch] === undefined) return null;
+    const S = h.steps;
+    const own = (s) => (s.k === 'e' || s.k === 'b') && s.ch === ch && s.cause === 'restore';
+    const touches = (s) => (s.k === 'e' || s.k === 'b' || s.k === 'd') && s.ch === ch;
+    const n = nAt(pos);
+    let a = -1, z = -1; // the restore's own changes: steps a to z, z not included
+    for (let i = n; i < S.length; i++) { if (own(S[i])) { a = i; break; } if (touches(S[i])) break; }
+    if (a >= 0) { z = a; while (z < S.length && own(S[z])) z++; } else {
+      for (let i = n - 1; i >= 0; i--) { if (own(S[i])) { z = i + 1; break; } if (touches(S[i])) break; }
+      if (z < 0) return null;
+      a = z - 1;
+      while (a > 0 && own(S[a - 1])) a--;
+    }
+    const was = h.doc(a)[ch], made = h.doc(z)[ch];
+    if (!was || !made) return null;
+    const html = was.toString();
+    if (html === made.toString() || chapterHTML[ch] !== made.toString()) return null;
+    // the moment just before: the last step before the restore's own lines
+    let k = a - 1;
+    while (k > 0 && (S[k].k === 'x' || S[k].k === 'tag')) k--;
+    const s = S[Math.max(0, k)];
+    const x = h.sessions[s.session];
+    return { html, wall: Number.isFinite(s.wall) ? s.wall : historyDayMs(h.day), ref: [x.id, s.line, x.device] };
+  }
   // where what a restore replaces is kept, as a button's tooltip says it
   const keptWhere = () => (recordingWanted() ? t('What it holds now stays in Writing History, tagged on the moment before the restore.')
     : t('What it holds now is kept in a snapshot, on the Darlings tab.'));
@@ -5775,9 +5806,11 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const ch = target.ch;
     const inBook = meta.chapterOrder.includes(ch);
     const same = inBook && here && book && book.id === bookId && chapterHTML[ch] === chapters[ch].toString();
-    restoreBtn.disabled = same;
-    restoreBtn.textContent = same ? t('Same as now') : inBook ? t('Restore This Chapter') : t('Put This Chapter Back');
-    restoreBtn.title = same ? '' : inBook ? chapterName(ch, meta) + ': ' + t('The chapter becomes what you see here.') + ' ' + keptWhere()
+    const undo = restoreUndo(ch);
+    restoreBtn.disabled = same && !undo;
+    restoreBtn.textContent = undo ? t('Undo This Restore') : same ? t('Same as now') : inBook ? t('Restore This Chapter') : t('Put This Chapter Back');
+    restoreBtn.title = undo ? chapterName(ch, meta) + ': ' + t('The chapter goes back to how it was just before this restore.') + ' ' + keptWhere()
+      : same ? '' : inBook ? chapterName(ch, meta) + ': ' + t('The chapter becomes what you see here.') + ' ' + keptWhere()
       : t('The chapter comes back as you see it here, after the chapter it followed.');
   }
   // A restore acts at once, and ⌘Z undoes it. The one thing it asks is
@@ -5800,7 +5833,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     if (!target) return;
     const ch = target.ch;
     const n = nAt(pos);
-    const html = chapters[ch].toString();
+    const undo = restoreUndo(ch); // (Undo This Restore: the text from just before it)
+    const html = undo ? undo.html : chapters[ch].toString();
     let title = '';
     try {
       const tt = h.doc(n)[Rec.STREAMS.titles];
@@ -5809,7 +5843,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const order = h.order(n) || dayOrder();
     const at = order.indexOf(ch);
     const before = at < 0 ? order.slice() : order.slice(0, at);
-    const { ref, wall } = momentRef();
+    const { ref, wall } = undo || momentRef();
     setPlaying(false);
     if (!(await opensFirst())) { bd.focus(); return; }
     close();

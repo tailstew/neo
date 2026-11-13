@@ -889,6 +889,8 @@
   "Restore This Chapter": "Вернуть эту главу",
   "Put This Chapter Back": "Вернуть эту главу в книгу",
   "The chapter becomes what you see here.": "Глава станет такой, как здесь.",
+  "Undo This Restore": "Отменить этот возврат",
+  "The chapter goes back to how it was just before this restore.": "Глава станет такой, какой была перед этим возвратом.",
   "Open “{title}” to restore it?": "Открыть «{title}», чтобы вернуть?",
   "NEO opens the book, then restores it as you see it here. {undo} undoes the restore.": "NEO откроет книгу, а затем вернёт её такой, как здесь. {undo} отменяет возврат.",
   "“{title}”, open now, is saved and closed first.": "«{title}», открытая сейчас, сначала сохраняется и закрывается.",
