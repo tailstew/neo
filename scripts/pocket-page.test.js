@@ -28,6 +28,18 @@ for (const page of ['index.html', 'pocket/www/index.html']) {
   });
 }
 
+// The same for elements app.js finds by class, as $('.tab.history-btn'): one
+// that's on the desktop's page must be on Pocket's too (History's button wasn't,
+// and Pocket's shelf did nothing).
+test('every element app.js finds by class on the desktop\'s page is on Pocket\'s', () => {
+  const classSets = (html) => [...html.matchAll(/class="([^"]*)"/g)].map((m) => new Set(m[1].split(/\s+/)));
+  const holds = (sets, sel) => { const want = sel.split('.').filter(Boolean); return sets.some((s) => want.every((c) => s.has(c))); };
+  const desktop = classSets(fs.readFileSync(path.join(root, 'index.html'), 'utf8'));
+  const pocket = classSets(fs.readFileSync(path.join(root, 'pocket/www/index.html'), 'utf8'));
+  const sels = new Set([...app.matchAll(/\$\('((?:\.[\w-]+)+)'\)/g)].map((m) => m[1]));
+  assert.deepEqual([...sels].filter((sel) => holds(desktop, sel) && !holds(pocket, sel)), []);
+});
+
 // Pocket's page shows the same locales/ files as the desktop, so every word on
 // it is marked for translation the same way (data-i18n, data-i18n-title,
 // data-i18n-placeholder, data-i18n-ph, data-i18n-label). Its ⋯ sheet, built
