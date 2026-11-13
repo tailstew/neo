@@ -6239,6 +6239,26 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     let p = 0;
     while (p < steps.length && steps[p] <= e.step) p++;
     seek(p);
+    showFind(e.ch);
+  }
+
+  // A finding picked: its phrase in sight. One already on screen (typed at
+  // the caret, which the sheet follows) is left as it is; otherwise the
+  // chapter's first comes to the middle. A phrase the chapter held before
+  // the recording began (a baseline) is wherever the chapter has it, not
+  // at the caret, and was highlighted out of sight.
+  function showFind(ch) {
+    findPainted = 0;
+    paintFind(performance.now());
+    const hl = CSS.highlights.get('neo-replay-find');
+    const sec = ch && paper.querySelector(`.rp-chapter[data-ch="${CSS.escape(ch)}"]`);
+    if (!hl || !sec) return;
+    const box = scroller.getBoundingClientRect();
+    const mine = [...hl].filter((r) => sec.contains(r.startContainer)).map((r) => r.getBoundingClientRect());
+    if (!mine.length || mine.some((r) => r.bottom > box.top && r.top < box.bottom)) return;
+    const first = mine.reduce((a, b) => (b.top < a.top ? b : a));
+    follow = false;
+    scroller.scrollTop += first.top - box.top - box.height * 0.4;
   }
 
   // The phrase on the sheets, with the Highlight API. While playing, at most

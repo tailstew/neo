@@ -307,6 +307,39 @@ test('search: Match case and Whole words change what is found, and stay while NE
   await neo.closeHistory();
 });
 
+test('search: a finding picked brings its phrase into sight, where it was there before the recording began', async () => {
+  // "Nine ends." is in chapter Nine's baseline, which is never edited: first found at the day's
+  // start, nowhere near the caret, so the sheet doesn't follow it there by itself
+  await neo.closeHistory();
+  await neo.openHistory();
+  const [w, h] = neo.win.getSize();
+  try {
+    // a phone's worth of sheet, and the test book's short chapters spread
+    // out, so the phrase falls well below the fold
+    neo.win.setSize(w, 360);
+    await js(`(() => { const s = document.createElement('style'); s.id = 'e2e-tall'; s.textContent = '.hs-paper .rp-body p { margin-bottom: 600px; }'; document.head.appendChild(s); })()`);
+    await tick(600);
+    await js('historyShown.player.runFind("Nine ends")');
+    await waitFor('!!historyShown.player.find() && historyShown.player.find().finished', 60000);
+    const first = await js('historyShown.player.find().findings.first');
+    assert.ok(first, 'found');
+    await js(`historyShown.player.paper.parentElement.scrollTop = 0; historyShown.player.goFind('first', ${JSON.stringify(first)})`);
+    await waitFor('!!CSS.highlights.get("neo-replay-find") && CSS.highlights.get("neo-replay-find").size > 0', 30000);
+    await tick(400);
+    const seen = await js(`(() => {
+      const box = document.querySelector('.hs-scroll').getBoundingClientRect();
+      return [...CSS.highlights.get('neo-replay-find')].map((r) => r.getBoundingClientRect()).some((r) => r.bottom > box.top && r.top < box.bottom);
+    })()`);
+    assert.ok(seen, 'the highlighted phrase is on screen');
+  } finally {
+    neo.win.setSize(w, h);
+    await js(`document.getElementById('e2e-tall')?.remove()`);
+    await tick(400);
+    await js('historyShown && historyShown.player.runFind("")');
+    await neo.closeHistory();
+  }
+});
+
 test('History closed and opened again rebuilds nothing', async () => {
   await neo.openHistory();
   await neo.closeHistory();
