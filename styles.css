@@ -692,9 +692,21 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-warn .ex-warn-risk { font-weight: 600; }
 .ex-note { color: #8f8a80; }
 .ex-note.ex-bad { color: var(--red); }
+/* below 720 px (a phone held upright) the side pane is a drawer over the
+   sheet: ☰ at the sheet's top left brings it, a tap beside it puts it away */
+.hs-pane-btn, .hs-scrim { display: none; }
 @media (max-width: 720px) {
-  .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; }
-  .hs-side { display: none; }
+  .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; position: relative; }
+  .hs-side {
+    grid-area: auto; position: absolute; top: 0; bottom: 0; left: 0; z-index: 6; width: min(280px, 85%);
+    background: var(--bg); transform: translateX(-100%); visibility: hidden; transition: transform .2s ease, visibility 0s .2s;
+  }
+  .hs-pane-open .hs-side { transform: none; visibility: visible; transition: transform .2s ease; box-shadow: 4px 0 18px rgba(0, 0, 0, .45); }
+  .hs-pane-open .hs-scrim { display: block; position: absolute; inset: 0; z-index: 5; background: rgba(0, 0, 0, .35); }
+  .hs-pane-btn {
+    display: block; position: absolute; top: 8px; left: 8px; z-index: 4; width: 36px; height: 36px; padding: 0;
+    border: 1px solid #333; border-radius: 6px; background: var(--bg); color: inherit; font-size: 17px; line-height: 1; cursor: pointer;
+  }
 }
 @media (max-width: 560px) {
   .ps-paper { padding: 44px 26px 36px; }

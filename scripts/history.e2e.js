@@ -340,6 +340,63 @@ test('search: a finding picked brings its phrase into sight, where it was there 
   }
 });
 
+test('a phone held upright: the side pane is a drawer that ☰ brings, and a pick, a tap beside it or Esc puts away', async () => {
+  await neo.closeHistory();
+  const [w, h] = neo.win.getSize();
+  try {
+    neo.win.setSize(600, h);
+    await tick(600);
+    await atDayEnd(0);
+    const state = () => js(`(() => {
+      const side = document.querySelector('.hs-side'), btn = document.querySelector('.hs-pane-btn');
+      const r = side.getBoundingClientRect(), sheet = document.querySelector('.hs-scroll').getBoundingClientRect();
+      return { btn: getComputedStyle(btn).display !== 'none', shown: getComputedStyle(side).visibility === 'visible' && r.right > sheet.left + 40,
+        expanded: btn.getAttribute('aria-expanded') };
+    })()`);
+    await tick(300);
+    assert.deepEqual(await state(), { btn: true, shown: false, expanded: 'false' }, 'put away to begin with');
+    await js('document.querySelector(".hs-pane-btn").click()');
+    await tick(400);
+    const open = await state();
+    assert.ok(open.shown && open.expanded === 'true', 'out over the sheet: ' + JSON.stringify(open));
+    // a chapter picked: the drawer goes, the chapter is shown
+    const was = await js('historyShown.player.mode()');
+    await js('document.querySelector(".hs-list .hs-ch[role=option]:not([disabled]):not([aria-selected=true])").click()');
+    await tick(400);
+    assert.equal((await state()).shown, false, 'a pick puts it away');
+    assert.notEqual(await js('historyShown.player.mode()'), was, 'and shows what was picked');
+    // a tap beside it
+    await js('document.querySelector(".hs-pane-btn").click()');
+    await tick(400);
+    await js('document.querySelector(".hs-scrim").click()');
+    await tick(400);
+    assert.equal((await state()).shown, false, 'a tap beside it puts it away');
+    // Esc puts it away before it leaves the player
+    await js('document.querySelector(".hs-pane-btn").click()');
+    await tick(400);
+    await js('document.querySelector(".page-sheet-backdrop").focus()');
+    key('Escape');
+    await tick(400);
+    assert.equal((await state()).shown, false, 'Esc puts it away');
+    assert.equal(await js('historyShown.player.view()'), 'player', 'and stays in the player');
+    // ⌘F (Ctrl+F) brings it with the search field
+    await js('historyShown.focusFind()');
+    await tick(400);
+    assert.ok((await state()).shown, 'Find brings it');
+    assert.equal(await js('document.activeElement === document.querySelector(".hs-q")'), true);
+  } finally {
+    neo.win.setSize(w, h);
+    await tick(400);
+    await neo.closeHistory();
+  }
+  // wide again: no ☰, the pane where it always is
+  await neo.openHistory();
+  await tick(300);
+  assert.equal(await js('getComputedStyle(document.querySelector(".hs-pane-btn")).display'), 'none');
+  assert.equal(await js('getComputedStyle(document.querySelector(".hs-side")).visibility'), 'visible');
+  await neo.closeHistory();
+});
+
 test('History closed and opened again rebuilds nothing', async () => {
   await neo.openHistory();
   await neo.closeHistory();

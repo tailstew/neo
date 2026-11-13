@@ -4555,7 +4555,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <div class="hs-find" hidden><div class="hs-qbox"><input class="hs-q" type="search" spellcheck="false" autocomplete="off"><button class="hs-opt" type="button" data-opt="cs">Aa</button><button class="hs-opt" type="button" data-opt="word"><span class="hs-opt-word">ab</span></button></div><div class="hs-results" hidden></div></div>
       <div class="hs-list" role="listbox"></div>
     </div>
+    <div class="hs-scrim"></div>
     <div class="hs-main">
+      <button class="hs-pane-btn" type="button" aria-expanded="false">☰</button>
       <div class="hs-scroll"><div class="hs-paper"></div>
         <div class="hs-part" hidden><button class="hs-part-prev" type="button">‹</button><button class="hs-part-restore" type="button"></button></div>
         <div class="hs-part hs-part-r" hidden><button class="hs-part-next" type="button">›</button></div>
@@ -4586,6 +4588,18 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       <button class="hs-delete" type="button" hidden></button>
     </div>`);
   const $h = (sel) => bd.querySelector(sel);
+  // Below 720 px (a phone held upright) the side pane is a drawer over the
+  // sheet (styles.css): ☰ brings it; a chapter, a tag or a finding picked,
+  // a tap beside it, Esc or back put it away.
+  const sheetBox = $h('.ps-paper');
+  const paneBtn = $h('.hs-pane-btn');
+  const paneOpen = () => sheetBox.classList.contains('hs-pane-open');
+  const pane = (open) => { sheetBox.classList.toggle('hs-pane-open', open); paneBtn.setAttribute('aria-expanded', String(open)); };
+  paneBtn.title = t('Chapters, tags and search');
+  paneBtn.setAttribute('aria-label', paneBtn.title);
+  paneBtn.addEventListener('click', () => pane(!paneOpen()));
+  $h('.hs-scrim').addEventListener('click', () => pane(false));
+  $h('.hs-side').addEventListener('click', (e) => { if (paneOpen() && e.target.closest('.hs-ch')) pane(false); });
   const list = $h('.hs-list');
   const scroller = $h('.hs-scroll');
   const paper = $h('.hs-paper');
@@ -4756,9 +4770,14 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // the menus are the dialog's while it's open: the rest is greyed out
   if (window.neo.uiModal) window.neo.uiModal(true);
   // Esc, or Pocket's back gesture: from the player to the days, then closed
-  close.back = () => { if (part) clearPart(); else if (view === 'player') showDays(curDay()); else close(); };
-  // Find, from the menu or ⌘F: the history's own search
-  close.focusFind = () => { if ($h('.hs-find').hidden) return; qIn.focus(); qIn.select(); };
+  close.back = () => { if (paneOpen()) pane(false); else if (part) clearPart(); else if (view === 'player') showDays(curDay()); else close(); };
+  // Find, from the menu or ⌘F: the history's own search (in the drawer, where the pane is one)
+  close.focusFind = () => {
+    if ($h('.hs-find').hidden) return;
+    if (getComputedStyle(paneBtn).display !== 'none') pane(true);
+    qIn.focus();
+    qIn.select();
+  };
   // for the tests and the console: historyShown.player.h() and the rest
   close.player = {
     h: () => h, loaded: () => loaded, view: () => view, steps: () => steps, pos: () => pos, lead: () => lead, mode: () => mode,
