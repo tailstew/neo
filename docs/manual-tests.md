@@ -41,7 +41,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 ## Record Writing History, the setting
 
 - [ ] **(2 computers)** Answer the question on one computer: once the library has synced, the other isn't asked (an open question there goes away) and follows the answer.
-- [ ] **(phone)** The ⋯ sheet's **Record Writing History** offers Off and Record only, and follows the desktop's choice (Record and timestamp on the desktop shows as Record only).
+- [x] **(phone)** The ⋯ sheet's **Record Writing History** is an on/off switch, and follows the desktop's choice (Record and timestamp on the desktop shows as ✓ On). A phone joining a library that has chosen isn't asked. *(2026-11-13, ad0e872, OnePlus 9, Android 14, library by Syncthing)*
 
 ## Writing History, the dialog
 
