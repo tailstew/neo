@@ -116,7 +116,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [x] **(phone)** **Record Writing History** in the ⋯ sheet turns recording off and on: Off writes no session and `recordWriting: false`; back on, the words written meanwhile come in as a `catch-up`. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** iPhone with the library in iCloud: History fetches the desktop's sessions first, and shows them.
 - [ ] **(phone)** Open and close History several times on a long book: it doesn't get slower, and the app's memory goes back down once it closes.
-- [ ] **(phone)** Kill the app mid-session, reopen the book: the session is closed as crashed and plays.
+- [x] **(phone)** Kill the app mid-session (`adb shell am force-stop com.hughhowey.neopocket`), reopen the book: the session is closed as crashed (only once the book opens: reopening the app alone leaves it open), the words it hadn't recorded come in as a `catch-up`, and the day plays through, those words all at once. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** A session written on the phone plays on the desktop, named "iPhone" / "Android", and the desktop's on the phone.
 - [ ] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile.
 - [ ] **(phone)** Delete a phone session from the book on the desktop after a desktop has mirrored it (7 days on): the phone still plays it from the mirror.
