@@ -260,4 +260,5 @@ With the test's own timestamp services. `test:proof`
 
 ### Sync between devices
 
+- A chapter emptied on the other device while this one typed in it makes no empty "from other device" chapter; one with new words there still does. `test:sync-conflicts`
 - `library.json` written by another device (a timestamp service turned off, a book put on a shelf) while a book is open here keeps those when this window saves the library. `test:sync-conflicts`

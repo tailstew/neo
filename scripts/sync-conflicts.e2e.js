@@ -290,6 +290,30 @@ test('a chapter written in here after the other device took it out stays, and go
   assert.match(fs.readFileSync(path.join(chapters(), 'ch-both-0007.html'), 'utf8'), /carried on here/);
 });
 
+test('a chapter emptied on the other device while this one typed in it makes no empty "from other device" chapter; one with new words there still does', async () => {
+  // the other device set the chapter's only section on a card (the file is
+  // left with an empty line) while this one went on typing in it
+  await newChapter('ch-emptied-0010', '<p>Here it begins.</p>');
+  await js("setChapterHTML('ch-emptied-0010', '<p>Here it begins. Typed on.</p>', 'input')");
+  await tick(50);
+  fs.writeFileSync(path.join(chapters(), 'ch-emptied-0010.html'), '<p><br></p>');
+  const before = (await order()).length;
+  await js('refreshFromDisk()');
+  await tick(1200);
+  assert.equal((await order()).length, before, 'no chapter made');
+  assert.equal(await html('ch-emptied-0010'), '<p>Here it begins. Typed on.</p>', 'the page keeps what was typed');
+  assert.match(fs.readFileSync(path.join(chapters(), 'ch-emptied-0010.html'), 'utf8'), /Typed on/, 'and saves it');
+  // words there that the page lacks: kept beside it, as before
+  await js("setChapterHTML('ch-emptied-0010', '<p>Here it begins. Typed on. More here.</p>', 'input')");
+  await tick(50);
+  fs.writeFileSync(path.join(chapters(), 'ch-emptied-0010.html'), '<p>Here it begins. Typed on. Written there.</p>');
+  await js('refreshFromDisk()');
+  await tick(1200);
+  const now = await order();
+  assert.equal(now.length, before + 1, 'a chapter for the other device’s words');
+  assert.equal(await html(now[now.indexOf('ch-emptied-0010') + 1]), '<p>Here it begins. Typed on. Written there.</p>');
+});
+
 test('⌘Z on a chapter set on a card marks it back', async () => {
   await newChapter('ch-undo-0008', '<p>Undone.</p>');
   await js("chapterToLoose('ch-undo-0008')");

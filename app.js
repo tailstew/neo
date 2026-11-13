@@ -15891,7 +15891,9 @@ function persistChapter(chId, html) {
     let r = await window.neo.writeChapter(bookId, chId, html, diskKnown[key]);
     for (let tries = 0; r && typeof r.conflict === 'string' && tries < 3; tries++) {
       knowDisk(bookId, chId, r.conflict);
-      await keepOtherDeviceVersion(bookId, chId, r.conflict);
+      // (one with no word this text lacks, say the chapter emptied there, has
+      // nothing to keep: no empty "from other device" chapter)
+      if (wordsBeyond(r.conflict, html)) await keepOtherDeviceVersion(bookId, chId, r.conflict);
       r = await window.neo.writeChapter(bookId, chId, html, r.conflict);
     }
     if (r && typeof r.conflict === 'string') throw new Error('chapter keeps changing on disk');
@@ -17100,6 +17102,14 @@ async function refreshFromDisk() {
         knowDisk(bookId, chId, disk);
         wordCache[chId] = null;
         adopted++;
+      } else if (!wordsBeyond(disk, chapterHTML[chId])) {
+        // Changed on both, but theirs has no word the page lacks (the chapter
+        // emptied there, a section set on a card while this device typed in
+        // it): nothing of theirs to keep, so no "from other device" chapter,
+        // least of all an empty one. The page's text goes over it.
+        savedHTML[chId] = disk;
+        knowDisk(bookId, chId, disk);
+        persistChapter(chId);
       } else {
         savedHTML[chId] = disk; // what's on disk now; our text goes over it on the next save
         knowDisk(bookId, chId, disk);
