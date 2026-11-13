@@ -692,6 +692,13 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-warn .ex-warn-risk { font-weight: 600; }
 .ex-note { color: #8f8a80; }
 .ex-note.ex-bad { color: var(--red); }
+/* the book's last change a restore that can be undone: said above the sheet */
+.hs-undo-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 18px; border-bottom: 1px solid #2a2a2a; font-size: 13px; color: #c9c3b8; }
+.hs-undo-bar[hidden] { display: none; }
+.hs-undo-last {
+  background: transparent; border: 1px solid var(--accent); border-radius: 14px; padding: 4px 13px;
+  color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
 /* below 720 px wide or 500 px tall (a phone, either way up) the side pane is
    a drawer over the sheet: ☰ in the title bar brings it, a tap beside it puts
    it away. The same query is HISTORY_DRAWER in app.js. */

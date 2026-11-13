@@ -611,7 +611,6 @@ test('a restore can be undone from History while the chapter is as it left it; o
     const then = await js(`historyShown.player.chapters()[${JSON.stringify(ID.One)}]`);
     await js('document.querySelector(".hs-restore").click()');
     await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] === ${JSON.stringify(then)}`);
-    await flush();
   };
   const atEnd = async () => {
     await neo.openHistory();
@@ -622,9 +621,12 @@ test('a restore can be undone from History while the chapter is as it left it; o
   };
   try {
     await restoreTo();
-    // just after it, with the chapter as it left it: Undo This Restore puts back what was there
+    // the book's last change: History says so above the sheet as it opens,
+    // and the footer's button at that moment is Undo This Restore too
     assert.equal(await atEnd(), 'Undo This Restore');
-    await js('document.querySelector(".hs-restore").click()');
+    await waitFor('!document.querySelector(".hs-undo-bar").hidden', 30000);
+    assert.match(await js('document.querySelector(".hs-undo-said").textContent'), /^Your last change was restoring Chapter 1./);
+    await js('document.querySelector(".hs-undo-last").click()');
     await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] === ${JSON.stringify(before)}`);
     await flush();
     // restored again, then written in: nothing to undo from here
@@ -633,6 +635,8 @@ test('a restore can be undone from History while the chapter is as it left it; o
     await type(' Written after.');
     await flush();
     assert.equal(await atEnd(), 'Same as now');
+    await tick(1500);
+    assert.equal(await js('document.querySelector(".hs-undo-bar").hidden'), true, 'no bar once it was written in');
     const tag = (await neo.tagItems()).filter((n) => /^Before restoring to /.test(n)).pop();
     await js(`[...document.querySelectorAll('.hs-tag-item')].reverse().find((b) => b.textContent.startsWith(${JSON.stringify(tag)})).click()`);
     await waitFor(`historyShown.player.chapters()[${JSON.stringify(ID.One)}] === ${JSON.stringify(before)}`);

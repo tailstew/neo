@@ -197,7 +197,7 @@ Each with no change the recorder didn't see, and every write replaying to its fi
 ### Writing History, the dialog, and restore
 
 - A restore's toast has an Undo button that undoes it, and goes. `test:history`
-- History offers Undo This Restore just before or after a restore while the chapter is as the restore left it, and puts back the text from before; once the chapter is written in, it doesn't. `test:history`
+- History offers Undo This Restore just before or after a restore while the chapter is as the restore left it, and puts back the text from before; once the chapter is written in, it doesn't. When the book's last change is that restore, a bar above the sheet says so as History opens, and undoes it. `test:history`
 - A search finding picked brings its phrase into sight, also where the chapter held it before the recording began (a baseline), far from the caret. `test:history`
 - On a phone either way up (600 px wide; 800 × 380), History's text is as wide as the editor's page there, the side pane is a drawer (☰ in the title bar, clear of the sheet; the footer's buttons inside it): ☰ brings it, a chapter picked, a tap beside it or Esc puts it away (Esc staying in the player), and Find brings it with the search field. `test:history`
 - The History tab's tooltip, the dialog and an empty history say what it is plainly, with no "replay" or "recording" as a noun; their French is there. `test:history`

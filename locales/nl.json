@@ -829,6 +829,7 @@
   "Put This Chapter Back": "Dit hoofdstuk terugplaatsen",
   "The chapter becomes what you see here.": "Het hoofdstuk wordt wat je hier ziet.",
   "Undo This Restore": "Dit terugzetten ongedaan maken",
+  "Your last change was restoring {chapter}.": "Je laatste wijziging was het terugzetten van {chapter}.",
   "The chapter goes back to how it was just before this restore.": "Het hoofdstuk wordt weer zoals het was vlak voor dit terugzetten.",
   "Open “{title}” to restore it?": "“{title}” openen om terug te zetten?",
   "NEO opens the book, then restores it as you see it here. {undo} undoes the restore.": "NEO opent het boek en zet het daarna terug zoals je het hier ziet. {undo} maakt dat ongedaan.",

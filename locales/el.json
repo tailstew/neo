@@ -770,6 +770,7 @@
   "Put This Chapter Back": "Επιστροφή αυτού του κεφαλαίου",
   "The chapter becomes what you see here.": "Το κεφάλαιο γίνεται ό,τι βλέπετε εδώ.",
   "Undo This Restore": "Αναίρεση αυτής της επαναφοράς",
+  "Your last change was restoring {chapter}.": "Η τελευταία σας αλλαγή ήταν η επαναφορά του {chapter}.",
   "The chapter goes back to how it was just before this restore.": "Το κεφάλαιο γίνεται όπως ήταν λίγο πριν από αυτή την επαναφορά.",
   "Open “{title}” to restore it?": "Άνοιγμα του «{title}» για επαναφορά;",
   "NEO opens the book, then restores it as you see it here. {undo} undoes the restore.": "Το NEO ανοίγει το βιβλίο και μετά το επαναφέρει όπως το βλέπετε εδώ. Το {undo} αναιρεί την επαναφορά.",

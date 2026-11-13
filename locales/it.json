@@ -832,6 +832,7 @@
   "Put This Chapter Back": "Rimetti questo capitolo",
   "The chapter becomes what you see here.": "Il capitolo diventa ciò che vedi qui.",
   "Undo This Restore": "Annulla questo ripristino",
+  "Your last change was restoring {chapter}.": "L’ultima modifica è stata il ripristino di {chapter}.",
   "The chapter goes back to how it was just before this restore.": "Il capitolo torna com’era subito prima di questo ripristino.",
   "Open “{title}” to restore it?": "Aprire «{title}» per ripristinarlo?",
   "NEO opens the book, then restores it as you see it here. {undo} undoes the restore.": "NEO apre il libro, poi lo ripristina come lo vedi qui. {undo} annulla il ripristino.",

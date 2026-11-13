@@ -777,6 +777,7 @@
   "Put This Chapter Back": "Bu Bölümü Geri Koy",
   "The chapter becomes what you see here.": "Bölüm burada gördüğünüz hâle gelir.",
   "Undo This Restore": "Bu Geri Yüklemeyi Geri Al",
+  "Your last change was restoring {chapter}.": "Son değişikliğiniz {chapter} bölümünü geri yüklemekti.",
   "The chapter goes back to how it was just before this restore.": "Bölüm, bu geri yüklemeden hemen önceki hâline döner.",
   "Open “{title}” to restore it?": "Geri yüklemek için “{title}” açılsın mı?",
   "NEO opens the book, then restores it as you see it here. {undo} undoes the restore.": "NEO kitabı açar, sonra burada gördüğünüz gibi geri yükler. {undo} geri yüklemeyi geri alır.",

@@ -4581,6 +4581,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     </div>
     <div class="hs-scrim"></div>
     <div class="hs-main">
+      <div class="hs-undo-bar" hidden><span class="hs-undo-said"></span><button class="hs-undo-last" type="button"></button></div>
       <div class="hs-scroll"><div class="hs-paper"></div>
         <div class="hs-part" hidden><button class="hs-part-prev" type="button">‹</button><button class="hs-part-restore" type="button"></button></div>
         <div class="hs-part hs-part-r" hidden><button class="hs-part-next" type="button">›</button></div>
@@ -4617,6 +4618,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // away. The footer's buttons (tag, restore, how it was written, delete)
   // move into it there, so the sheet keeps the screen.
   const sheetBox = $h('.ps-paper');
+  const undoBar = $h('.hs-undo-bar');
+  let lastUndo = null;     // the book's last change, a restore that can be undone (lookForLastRestore)
+  let lastLooked = false;
   const paneBtn = document.createElement('button');
   paneBtn.className = 'hs-pane-btn';
   paneBtn.type = 'button';
@@ -4869,6 +4873,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     });
     S.untouched = meta.chapterOrder.filter((ch) => !seen.has(ch));
     computeTags();
+    if (!S.building && !lastLooked) lookForLastRestore();
     // a chapter the recording never saw: the whole book instead
     if (!S.building && !settled) {
       settled = true;
@@ -5764,12 +5769,13 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // what that restore made it (nothing written in it since, so nothing is
   // lost): then the footer's button puts back the text from just before.
   // { html, wall, ref } of that moment, or null.
-  function restoreUndo(ch) {
-    if (!h || !here || !book || book.id !== bookId || !meta.chapterOrder.includes(ch) || chapterHTML[ch] === undefined) return null;
-    const S = h.steps;
+  const restoreUndo = (ch) => (h ? restoreUndoIn(h, ch, nAt(pos)) : null);
+  // the same, in day hh, at the moment n steps in
+  function restoreUndoIn(hh, ch, n) {
+    if (!here || !book || book.id !== bookId || !meta.chapterOrder.includes(ch) || chapterHTML[ch] === undefined) return null;
+    const S = hh.steps;
     const own = (s) => (s.k === 'e' || s.k === 'b') && s.ch === ch && s.cause === 'restore';
     const touches = (s) => (s.k === 'e' || s.k === 'b' || s.k === 'd') && s.ch === ch;
-    const n = nAt(pos);
     let a = -1, z = -1; // the restore's own changes: steps a to z, z not included
     for (let i = n; i < S.length; i++) { if (own(S[i])) { a = i; break; } if (touches(S[i])) break; }
     if (a >= 0) { z = a; while (z < S.length && own(S[z])) z++; } else {
@@ -5778,7 +5784,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       a = z - 1;
       while (a > 0 && own(S[a - 1])) a--;
     }
-    const was = h.doc(a)[ch], made = h.doc(z)[ch];
+    const was = hh.doc(a)[ch], made = hh.doc(z)[ch];
     if (!was || !made) return null;
     const html = was.toString();
     if (html === made.toString() || chapterHTML[ch] !== made.toString()) return null;
@@ -5786,9 +5792,43 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     let k = a - 1;
     while (k > 0 && (S[k].k === 'x' || S[k].k === 'tag')) k--;
     const s = S[Math.max(0, k)];
-    const x = h.sessions[s.session];
-    return { html, wall: Number.isFinite(s.wall) ? s.wall : historyDayMs(h.day), ref: [x.id, s.line, x.device] };
+    const x = hh.sessions[s.session];
+    return { html, wall: Number.isFinite(s.wall) ? s.wall : historyDayMs(hh.day), ref: [x.id, s.line, x.device] };
   }
+
+  // The book's last change a restore that can still be undone (the
+  // chapter as it left it): said in a bar above the sheet as History opens,
+  // with Undo This Restore, so it isn't only in the footer (or a phone's
+  // drawer). Looked for once the days are read.
+  async function lookForLastRestore() {
+    lastLooked = true;
+    if (!here || !book || book.id !== bookId || !S.days.length) return;
+    let hh;
+    try { hh = await loadDay(S.days.length - 1); } catch { return; }
+    if (!bd.isConnected) return;
+    let last = null;
+    for (let i = hh.steps.length - 1; i >= 0 && !last; i--) {
+      const s = hh.steps[i];
+      if ((s.k === 'e' || s.k === 'b' || s.k === 'd') && !Rec.isStream(s.ch)) last = s;
+    }
+    if (!last || last.cause !== 'restore') return;
+    const undo = restoreUndoIn(hh, last.ch, hh.steps.length);
+    if (!undo) return;
+    lastUndo = { ...undo, ch: last.ch };
+    $h('.hs-undo-said').textContent = t('Your last change was restoring {chapter}.', { chapter: chapterName(last.ch, meta) });
+    $h('.hs-undo-last').textContent = t('Undo This Restore');
+    undoBar.hidden = false;
+  }
+  $h('.hs-undo-last').addEventListener('click', () => {
+    const u = lastUndo;
+    if (!u || chapterHTML[u.ch] === undefined) return;
+    setPlaying(false);
+    close();
+    historyRestore({ bookId, ch: u.ch, html: u.html, wall: u.wall, ref: u.ref }).catch((err) => {
+      window.neo.logError('history restore: ' + (err && err.stack || err));
+      toast(t('That couldn’t be restored. The book is as it was.'));
+    });
+  });
   // where what a restore replaces is kept, as a button's tooltip says it
   const keptWhere = () => (recordingWanted() ? t('What it holds now stays in Writing History, tagged on the moment before the restore.')
     : t('What it holds now is kept in a snapshot, on the Darlings tab.'));

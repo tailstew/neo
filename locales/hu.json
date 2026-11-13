@@ -931,6 +931,7 @@
   "The book itself is untouched: every chapter, note and Darling stays as it is, and so do its snapshots on the Darlings tab.": "Magához a könyvhöz nem nyúl: minden fejezet, jegyzet és kedvenc úgy marad, ahogy van, és a Kedvencek lapon lévő pillanatképei is.",
   "The chapter becomes what you see here.": "A fejezet olyan lesz, amilyennek itt látod.",
   "Undo This Restore": "A visszaállítás visszavonása",
+  "Your last change was restoring {chapter}.": "Az utolsó módosításod a(z) {chapter} visszaállítása volt.",
   "The chapter goes back to how it was just before this restore.": "A fejezet olyan lesz, amilyen közvetlenül e visszaállítás előtt volt.",
   "The chapter comes back as you see it here, after the chapter it followed.": "A fejezet úgy tér vissza, ahogy itt látod, az után a fejezet után, amelyet követett.",
   "The chapter these paragraphs were in was deleted": "A fejezetet, amelyben ezek a bekezdések voltak, törölték",
