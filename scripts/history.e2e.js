@@ -614,9 +614,13 @@ test('restore from the days: ← to an earlier day restores the chapter as that 
   assert.equal(await js('document.querySelector(".hs-restore").textContent'), 'Restore This Chapter');
   await js('document.querySelector(".hs-restore").click()');
   await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] === ${JSON.stringify(then)}`);
-  await js('structuralUndo()');
+  // undone by the toast's own Undo, as on a phone with no keyboard
+  await waitFor('!$("#hint").hidden && !!$("#hint .hint-act")');
+  assert.equal(await js('$("#hint .hint-act").textContent'), 'Undo');
+  await js('$("#hint .hint-act").click()');
   await tick(300);
   assert.equal(await chHTML(ID.One), before);
+  assert.equal(await js('$("#hint").hidden'), true, 'the toast goes with it');
 });
 
 test('in the whole book, the restore goes to the picked paragraph’s chapter; the chapter as it is now says Same as now', async () => {

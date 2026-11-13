@@ -585,13 +585,33 @@ function showWindowTitle() {
   if (strip) strip.textContent = title;
 }
 
-function toast(msg, ms = 4000, { warn = false } = {}) {
+function toast(msg, ms = 4000, { warn = false, action = null } = {}) {
   const h = $('#hint');
   h.textContent = msg;
   h.classList.toggle('hint-warn', warn);
+  // a button in the toast (Undo, below): the toast takes taps while it has one
+  h.classList.toggle('hint-has-act', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'hint-act';
+    b.textContent = action.label;
+    b.addEventListener('click', () => { h.hidden = true; action.run(); });
+    h.append(' ', b);
+  }
   h.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { h.hidden = true; }, ms);
+}
+
+// A toast for something ⌘Z undoes, with an Undo button for a hand with no
+// keyboard (Pocket's undo above the keyboard is gone once it's down). The
+// button is there only while the newest undo is fresh, the action's own,
+// and it undoes only that one: nothing else undone or done since.
+function undoToast(msg, ms = 6000) {
+  const snap = undoStack[undoStack.length - 1];
+  const fresh = snap && performance.now() - snap.made < 15000;
+  toast(msg, ms, fresh ? { action: { label: t('Undo'), run: () => { if (undoStack[undoStack.length - 1] === snap) structuralUndo(); } } } : {});
 }
 
 // Scripts that do not separate words with spaces: a whitespace count reports
@@ -4465,7 +4485,7 @@ async function historyRestore({ bookId, ch, html, title = '', before = [], wall,
   focusChapterStart(target);
   resetNativeUndo();
   breakRun = 1; // ⌘Z, before any typing, undoes it
-  toast(said, 9000);
+  undoToast(said, 9000);
 }
 
 // Paragraphs a…b of a chapter (as it was when they were found: `expect`)
@@ -4507,7 +4527,7 @@ async function historyRestoreParagraphs({ ch, html, wall, ref, paras }) {
   resetNativeUndo();
   breakRun = 1;
   const many = (html.match(/<p[\s>]/g) || []).length > 1;
-  toast((many ? t('Paragraphs restored from {when}.', { when: snapWhen(wall) }) : t('Paragraph restored from {when}.', { when: snapWhen(wall) })) + ' ' + historyKeptSaid(kept, wall, many), 9000);
+  undoToast((many ? t('Paragraphs restored from {when}.', { when: snapWhen(wall) }) : t('Paragraph restored from {when}.', { when: snapWhen(wall) })) + ' ' + historyKeptSaid(kept, wall, many), 9000);
 }
 
 // When a book was last timestamped, and by whom, from proof:status
@@ -7241,7 +7261,7 @@ async function deleteChapterToDarlings(chId, quiet = false) {
   if (currentChapterId === chId) currentChapterId = null;
   await deleteChapterQuiet(chId);
   if (text && !quiet) {
-    toast(kind === 'chapter'
+    undoToast(kind === 'chapter'
       ? t('Chapter removed — its words are in Darlings, or {key} to undo', { key: KZ })
       : t('{name} removed — its words are in Darlings, or {key} to undo', { name, key: KZ }));
   }
@@ -11037,7 +11057,7 @@ async function deleteSceneToDarlings(cell, quiet = false) {
   renderNav();
   renderBoard();
   updateCounters();
-  if (text && !quiet) toast(t('Scene removed — its lines are in Darlings, or {key} to undo', { key: KZ }));
+  if (text && !quiet) undoToast(t('Scene removed — its lines are in Darlings, or {key} to undo', { key: KZ }));
 }
 
 // ---- the title page: title, "Written by", the writer, and at the foot
@@ -12308,7 +12328,7 @@ async function moveSelectionToDarlings(html, text) {
   }
   if (chId && book && book.id === bookId) scheduleChapterSave(chId);
   updateCounters();
-  toast(t('Saved to Darlings — kill without remorse ({key} to undo)', { key: KZ }));
+  undoToast(t('Saved to Darlings — kill without remorse ({key} to undo)', { key: KZ }));
 }
 
 // Older versions of NEO planted invisible marker spans at darling cut points,
@@ -13903,7 +13923,7 @@ async function deleteSectionToDarlings(chId, segIdx, quiet = false) {
     .catch((err) => window.neo.logError('section delete: ' + (err && err.message || err)));
   renderBoard();
   updateCounters();
-  if (seg.words && !quiet) toast(t('Section removed — its words are in Darlings, or {key} to undo', { key: KZ }));
+  if (seg.words && !quiet) undoToast(t('Section removed — its words are in Darlings, or {key} to undo', { key: KZ }));
 }
 
 // ---- moving cards ----
@@ -14346,7 +14366,7 @@ async function deleteSelectedCards() {
   renderLooseCards();
   if (currentTab === 'outline') renderOutline();
   updateCounters();
-  toast(t('{n} cards removed — their writing is in Darlings, or {key} to undo', { n: cells.length, key: KZ }), 6000);
+  undoToast(t('{n} cards removed — their writing is in Darlings, or {key} to undo', { n: cells.length, key: KZ }), 6000);
 }
 
 function beginCardDrag(st) {
@@ -17148,6 +17168,7 @@ function snapshotStructure(label, opts) {
   sealUndo(undoStack[undoStack.length - 1]);
   const snap = {
     armed: false, // the action's own edits, in this same moment, don't seal it
+    made: performance.now(), // (undoToast's Undo is for a snapshot just made)
     label,
     rejoin: !!(opts && opts.rejoin),
     outlineFocus: (opts && opts.outlineFocus) || null, // the outline line to return to
@@ -17663,7 +17684,7 @@ function replaceAllMatches() {
   }
   if (n === 0) undoStack.pop(); // nothing changed, nothing to undo
   else breakRun++; // ⌘Z from inside the text reaches this undo too
-  toast(n ? t('{n} replaced across the whole book — {key} to undo', { n, key: KZ }) : t('0 replaced'));
+  if (n) undoToast(t('{n} replaced across the whole book — {key} to undo', { n, key: KZ })); else toast(t('0 replaced'));
   runSearch();
 }
 

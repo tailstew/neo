@@ -1693,6 +1693,12 @@ body.bright #add-shelf-btn, body.bright #import-btn { color: #b4b4b4; border-col
   max-width: min(640px, calc(100vw - 48px)); text-align: center; line-height: 1.45;
   box-shadow: 0 3px 14px rgba(0,0,0,0.4);
 }
+/* a toast with a button (Undo): it takes taps then */
+#hint.hint-has-act { pointer-events: auto; }
+#hint .hint-act {
+  margin-left: 8px; padding: 3px 12px; border: 1px solid #555; border-radius: 12px; background: transparent;
+  color: var(--accent); font: inherit; font-weight: 600; cursor: pointer;
+}
 /* a warning: timestamps that have failed for a week */
 #hint.hint-warn { background: #3a2a1c; color: #f0c38f; border: 1px solid #6b4a2a; }
 

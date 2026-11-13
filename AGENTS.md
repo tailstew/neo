@@ -261,5 +261,6 @@ Hugh pushes and releases himself and isn't a git user. Hand him work as a git bu
 - A new writer-visible string needs `t()` and a template refresh.
 - A new dialog is a `.modal-backdrop` holding a `.modal`: `dialogify` makes it a dialog and moves focus in, and the one Tab trap (`topDialog`, `tabStops`) keeps Tab and Shift+Tab inside whichever dialog is on top. Don't write a trap of your own.
 - A new way to remove text needs a recovery path and a sentence in the UI that says where the words went.
+- A toast that says ⌘Z undoes an action (one that took a `snapshotStructure`) is an `undoToast`: it adds an Undo button, for Pocket with no keyboard, while that snapshot is the newest.
 - Export formats are assembled in `app.js` and written by `export:save` in `main.js`. EPUB is a zip built in memory. PDF is printed from temporary HTML.
 - Errors in the main process are appended to `neo-errors.log` via `logError`. Renderer failures go through `window.neo.logError`. Do not swallow a save failure; `persistChapter` rolls `savedHTML` back so the next flush retries.
