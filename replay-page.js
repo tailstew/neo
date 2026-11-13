@@ -928,6 +928,9 @@
         } else if (s.k === 'x' && CAUSES[s.cause] && !(Rec.QUIET.has(s.cause) && !reached(j))) {
           const kind = SYNC.includes(s.cause) ? 'sync' : s.cause === 'catch-up' || s.cause === 'unobserved' ? 'catch' : s.cause === 'restore' ? 'restore' : 'move';
           markers.push({ x, kind, label: T(CAUSES[s.cause]) });
+        } else if (s.k === 'd' && s.cause === 'delete' && s.page !== false) {
+          // a chapter deleted changes no text, so no `x` says so: its `d` does (as NEO's History)
+          markers.push({ x, kind: 'move', label: T(CAUSES.delete) });
         } else if (s.k === 'b' && s.cause === 'baseline' && s.page !== false) {
           markers.push({ x, kind: 'catch', label: T('Written before NEO started recording') });
         } else if (s.k === 'f' && (s.what === 'blur' || s.what === 'hidden')) {

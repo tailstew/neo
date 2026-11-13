@@ -20,7 +20,9 @@ const path = require('path');
 const zlib = require('zlib');
 const R = require('../recording.js');
 
-module.exports = function e2e(name, library = {}) {
+// opts.proof: the timestamp services and drand stand in for (fake-tsa.js),
+// so Record and Timestamp seals and stamps with no network (neo.tsa)
+module.exports = function e2e(name, library = {}, opts = {}) {
   // A folder of its own for each run; earlier runs' folders go once their
   // process has ended (see words.e2e.js)
   const prefix = `neo-${name}-test-`;
@@ -42,12 +44,93 @@ module.exports = function e2e(name, library = {}) {
     ...library
   }));
   const loadFile = BrowserWindow.prototype.loadFile;
-  BrowserWindow.prototype.loadFile = function (file, opts) {
-    return loadFile.call(this, path.resolve(__dirname, '..', file), opts);
+  BrowserWindow.prototype.loadFile = function (file, o) {
+    return loadFile.call(this, path.resolve(__dirname, '..', file), o);
   };
+  const neo = { tmp, LIB, R, assert, book: null };
+
+  /* ---------- the clock, the trash and the network, for the tests ---------- */
+
+  // Timers of these lengths in the main process run after neo.shorten[ms]
+  // instead (proof's five minutes after the writing stops); the half-hour
+  // retry runs when a test calls neo.halfHour(). neo.mainAhead(ms) moves the
+  // main process's clock on (Date.now and new Date()), 0 back.
+  neo.shorten = {};
+  const realTimeout = global.setTimeout;
+  const realInterval = global.setInterval;
+  global.setTimeout = function (fn, ms, ...a) { return realTimeout(fn, ms in neo.shorten ? neo.shorten[ms] : ms, ...a); };
+  const halfHourly = [];
+  global.setInterval = function (fn, ms, ...a) {
+    if (ms === 30 * 60 * 1000) halfHourly.push(fn);
+    return realInterval(fn, ms, ...a);
+  };
+  neo.halfHour = async () => { for (const fn of halfHourly) fn(); await neo.tick(300); };
+  const RealDate = Date;
+  let ahead = 0;
+  class TestDate extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(RealDate.now() + ahead); }
+    static now() { return RealDate.now() + ahead; }
+  }
+  neo.mainAhead = (ms) => { ahead = ms; global.Date = ms ? TestDate : RealDate; };
+
+  // the system trash, as a folder of the test's own: what NEO trashes lands
+  // in neo.trashed, and in <tmp>/Trash
+  const { shell, utilityProcess } = require('electron');
+  neo.trashed = [];
+  shell.trashItem = async (p) => {
+    const to = path.join(tmp, 'Trash', neo.trashed.length + '-' + path.basename(p));
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.renameSync(p, to);
+    neo.trashed.push({ from: p, to });
+  };
+
+  if (opts.proof) {
+    const Proof = require('../proof.js');
+    const FakeTsa = require('./fake-tsa.js');
+    // three authorities on 127.0.0.1 in place of DigiCert, Sectigo and
+    // GlobalSign (their names and addresses as NEO shows them), started in
+    // neo.run; a fourth for a service the writer adds
+    neo.tsa = {};
+    neo.Proof = Proof;
+    const HOSTS = { 'timestamp.digicert.com': 'digicert', 'timestamp.sectigo.com': 'sectigo', 'timestamp.globalsign.com': 'globalsign' };
+    const realFetch = globalThis.fetch;
+    neo.drandUp = false;
+    globalThis.fetch = async (url, o) => {
+      const u = new URL(String(url));
+      if (HOSTS[u.hostname]) return realFetch(neo.tsa[HOSTS[u.hostname]].url, o);
+      if (/drand/.test(u.hostname)) throw new Error('offline'); // no `after`: the seals are made without one
+      if (u.hostname !== '127.0.0.1') throw new Error('the tests reach no network: ' + u.href);
+      return realFetch(url, o);
+    };
+    neo.startTsas = async () => {
+      for (const id of ['digicert', 'sectigo', 'globalsign', 'added', 'other']) neo.tsa[id] = await FakeTsa.start({ certs: id === 'added' ? 'added' : 'test' });
+      neo.tsa.other.mode = 'html';
+      // (Sectigo asks for 15 s between requests: tests that seal often would pass it over)
+      Proof.TSAS.find((t) => t.id === 'sectigo').gap = 0;
+      // the test root (made as fake-tsa.js loads) trusted as NEO's own roots
+      // are, here and in History's worker
+      neo.tsa.digicert.trust(Proof);
+      const roots = path.join(tmp, 'test-roots.pem');
+      fs.writeFileSync(roots, FakeTsa.rootPem);
+      process.env.NEO_E2E_ROOTS = roots;
+    };
+    // (History's worker swapped for one that trusts the test root: if main.js
+    // stops forking history-worker.js by that name, say so, rather than let
+    // every timestamp in History quietly go untrusted)
+    if (!fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8').includes("'history-worker.js'")) {
+      throw new Error('e2e-neo.js: main.js no longer forks history-worker.js; update the worker swap below');
+    }
+    const fork = utilityProcess.fork;
+    utilityProcess.fork = function (file, args, o) {
+      if (/history-worker\.js$/.test(file)) file = path.join(__dirname, 'e2e-history-worker.js');
+      return fork.call(this, file, args, o);
+    };
+    neo.sealsDir = () => path.join(neo.recDir(), 'seals');
+    neo.seals = () => { try { return fs.readdirSync(neo.sealsDir()).sort(); } catch { return []; } };
+  }
+
   require('../main.js');
 
-  const neo = { tmp, LIB, R, assert, book: null };
   let wc;
   const js = neo.js = (code) => wc.executeJavaScript(code, true);
   const tick = neo.tick = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -230,10 +313,12 @@ module.exports = function e2e(name, library = {}) {
   /* ---------- running ---------- */
 
   const tests = [];
+  const TEST_MS = 5 * 60 * 1000;
   neo.test = (title, fn) => tests.push({ title, fn });
   neo.run = (setup) => {
     (async () => {
       await app.whenReady();
+      if (neo.startTsas) await neo.startTsas();
       let failed = 0;
       try {
         let win;
@@ -252,12 +337,16 @@ module.exports = function e2e(name, library = {}) {
         for (const t of tests) {
           if (only && !only.test(t.title)) continue;
           ran++;
+          const t0 = Date.now();
           try {
-            await t.fn();
+            // a test that never finishes fails, rather than holding up the rest
+            let timer;
+            await Promise.race([t.fn(), new Promise((resolve, reject) => { timer = realTimeout(() => reject(new Error('the test took over ' + TEST_MS / 1000 + ' s')), TEST_MS); })])
+              .finally(() => clearTimeout(timer));
             const r = await js('rec.on ? rec.check() : { unobserved: 0, mismatched: [] }');
             assert.equal(r.unobserved || 0, 0, 'changes the recorder didn’t see');
             assert.deepEqual(r.mismatched || [], [], 'chapters the log doesn’t replay to');
-            console.log('ok   ' + t.title);
+            console.log('ok   ' + t.title + ` (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
           } catch (err) {
             failed++;
             console.log('FAIL ' + t.title + '\n     ' + String(err && err.stack || err).replace(/\n/g, '\n     '));

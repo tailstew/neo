@@ -4756,6 +4756,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     find: () => find, runFind: (q) => runFind(q), goFind: (kind, x) => goFind(kind, x),
     part: () => part, pickPart, partGo,
     markers: () => markers.map((m) => ({ kind: m.kind, label: m.label, x: m.x })), playing: () => playing, tags: () => tags,
+    stampMarks: () => stampMarks.map((m) => ({ x: m.x, j: m.j, by: m.by })),
     speed: (x) => { if (x) historyPrefs.speed = x; return historyPrefs.speed; }
   };
   $h('.ps-done').onclick = close;
@@ -5062,7 +5063,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       const j = lastJ[si];
       if (j < 0 || seen.has(j)) return;
       seen.add(j);
-      stampMarks.push({ x: vt[j], by: e.by });
+      stampMarks.push({ x: vt[j], j, by: e.by });
     };
     for (let j = 0; j < steps.length; j++) {
       const st = h.steps[steps[j]];
@@ -5227,6 +5228,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       } else if (s.k === 'x' && HISTORY_CAUSES[s.cause]) {
         const kind = HISTORY_SYNC.includes(s.cause) ? 'sync' : s.cause === 'catch-up' || s.cause === 'unobserved' ? 'catch' : s.cause === 'restore' ? 'restore' : 'move';
         markers.push({ x, kind, step: i, label: t(HISTORY_CAUSES[s.cause]) });
+      } else if (s.k === 'd' && s.cause === 'delete' && s.page !== false) {
+        // a chapter deleted (to Darlings, or with nothing in it) changes no
+        // text, so no `x` says so: its `d` does
+        markers.push({ x, kind: 'move', step: i, label: t(HISTORY_CAUSES.delete) });
       } else if ((s.k === 'b' || s.k === 'e') && s.sync !== undefined && typeof s.html !== 'string' && !(s.k === 'e' && s.page === false)) {
         // the page took this device's copy, which wasn't what another device
         // left (where a catch-up ends, its own marker says so)
@@ -15809,6 +15814,9 @@ function scheduleChapterSave(chId) {
     // above while this save waited: its words are already where they belong,
     // and writing now would only leave an empty stray file in chapters/
     if (book.id !== bookId || !book.chapterOrder.includes(chId)) return;
+    // a flush (a blur, the 20 s tick) already wrote it: writing it again
+    // would only touch the file, and log a `w` that asks for another seal
+    if (chapterHTML[chId] === savedHTML[chId]) return;
     persistChapter(chId);
   }, 800);
 }

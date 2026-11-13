@@ -762,6 +762,183 @@ test('the writer’s day: with the day ending at 4am, 1am and 3am are the day be
   assert.equal(await dsnaps(), was + 1);
 });
 
+/* ---------- what the dialog says ---------- */
+
+test('a day’s timeline names its split, its joins, its delete and its card', async () => {
+  const labels = async (di) => {
+    await atDayEnd(di);
+    return js('historyShown.player.markers().map((m) => m.label)');
+  };
+  assert.ok((await labels(1)).includes('Chapter split'), 'day two: the split');
+  const three = await labels(2);
+  for (const l of ['Chapters joined', 'Chapter deleted', 'Moved in the Outline']) assert.ok(three.includes(l), 'day three: ' + l + ' in ' + three.join(', '));
+  await neo.closeHistory();
+});
+
+test('How It Was Written…’s chapter table says what took each chapter no longer in the book', async () => {
+  await neo.openHistory();
+  await js('document.querySelector(".hs-evidence").click()');
+  await waitFor('!!document.querySelector(".ev-chapters")', 60000);
+  const rows = await js(`[...document.querySelectorAll('.ev-chapters tr[data-ch]')].map((tr) => [tr.dataset.ch, tr.firstElementChild.textContent])`);
+  const label = (title) => (rows.find(([ch]) => ch === ID[title]) || [])[1] || '';
+  assert.match(label('Eight'), /\(joined to another chapter\)$/);
+  assert.match(label('Six'), /\(joined to another chapter\)$/);
+  assert.match(label('Nine'), /\(moved to a loose card\)$/);
+  assert.match(label('Ten'), /\(deleted\)$/);
+  key('Escape');
+  await tick(200);
+  await neo.closeHistory();
+});
+
+test('a search stopped while it looks inside the days: what it found says “perhaps earlier” and “perhaps later”', async () => {
+  await neo.openHistory();
+  // (the worker answers at once from the days it can see; what it finds
+  // inside them comes later, as news: held back here, as on a long history)
+  const r = await js(`(async () => {
+    const held = [...historyListeners];
+    historyListeners.clear();
+    try {
+      historyShown.player.runFind('begins');
+      for (let i = 0; i < 300 && !document.querySelector('.hs-find-stop'); i++) await new Promise((res) => setTimeout(res, 20));
+      const stop = document.querySelector('.hs-find-stop');
+      if (!stop) return null;
+      stop.click();
+      await new Promise((res) => setTimeout(res, 200));
+      return [...document.querySelectorAll('.hs-hit .hs-ch-when')].map((x) => x.textContent);
+    } finally { for (const f of held) historyListeners.add(f); }
+  })()`);
+  assert.ok(r, 'a Stop button while it looks inside the days');
+  assert.ok(r.some((x) => / · perhaps earlier$/.test(x)), JSON.stringify(r));
+  assert.ok(r.some((x) => / · perhaps later$/.test(x)), JSON.stringify(r));
+  await neo.closeHistory();
+});
+
+test('History says what it is plainly, in English and French: the tab’s tooltip, the shelf menu, an empty history; no “replay” or “recording” as a noun', async () => {
+  const words = async () => js(`({
+    tab: document.querySelector('.history-btn').title,
+    dialog: (() => { const d = document.querySelector('.page-sheet-backdrop'); return d ? d.textContent : ''; })()
+  })`);
+  await neo.openHistory();
+  const w = await words();
+  assert.equal(w.tab, 'Watch this book being written');
+  assert.doesNotMatch(w.dialog, /\breplay|\ba recording\b|\bthe recording\b/i);
+  await neo.closeHistory();
+  // an empty history
+  await js(`addImportedBooks([{ name: 'Fresh', chapters: [{ title: 'Only', paras: [{ text: 'Nothing typed.' }] }] }], library.shelves[0])`);
+  await tick(400);
+  const fresh = await js('library.shelves[0].bookIds[library.shelves[0].bookIds.length - 1]');
+  await js(`openHistory({ bookId: ${JSON.stringify(fresh)} })`);
+  await waitFor('!!historyShown');
+  await waitFor('/Nothing recorded yet\\. Write in this book and its history shows here\\./.test(document.querySelector(".page-sheet-backdrop").textContent)', 30000);
+  await neo.closeHistory();
+  // in French
+  const fr = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'locales', 'fr.json'), 'utf8'));
+  for (const s of ['Watch this book being written', 'Writing History…', 'Nothing recorded yet. Write in this book and its history shows here.']) assert.ok(fr[s] && fr[s] !== s, 'French for ' + s);
+});
+
+test('History has no level setting of its own', async () => {
+  await neo.openHistory();
+  const text = await js('document.querySelector(".page-sheet-backdrop").textContent');
+  assert.doesNotMatch(text, /Record only|Record and timestamp|Record Writing History/i);
+  assert.equal(await js('document.querySelectorAll(".page-sheet-backdrop .fr-choice, .page-sheet-backdrop select").length'), 0);
+  await neo.closeHistory();
+});
+
+test('in French, Delete history waits for the French phrase', async () => {
+  const fr = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'locales', 'fr.json'), 'utf8'));
+  const phrase = fr['delete history'];
+  assert.ok(phrase && phrase !== 'delete history');
+  await js(`NeoI18n.setLocale('fr', ${JSON.stringify(fr)}, {})`);
+  try {
+    await neo.openHistory();
+    await js('document.querySelector(".hs-delete").click()');
+    await waitFor('!!document.querySelector(".confirm-modal input")');
+    const typeIt = (s) => js(`(() => { const i = document.querySelector('.confirm-modal input'); i.value = ${JSON.stringify(s)}; i.dispatchEvent(new Event('input')); return document.querySelector('.confirm-modal .m-ok').disabled; })()`);
+    assert.equal(await typeIt('delete history'), true, 'not the English phrase');
+    assert.equal(await typeIt(phrase.toUpperCase()), false, 'the French, any case');
+    await js('document.querySelector(".confirm-modal .m-cancel").click()');
+    await tick(200);
+    await neo.closeHistory();
+  } finally { await js(`NeoI18n.setLocale('en', {}, {})`); }
+});
+
+test('the Darlings tab: Watch from Here in a snapshot’s band and its right-click menu while the book has a history; with no snapshots the hint mentions Writing History', async () => {
+  await js('switchTab("darlings")');
+  await tick(500);
+  await waitFor('document.querySelectorAll("#snap-list .snap-k, #snap-list .snap-a, .snap-list .snap-k, .snap-list .snap-a").length > 0 || true');
+  const snaps = await neo.snapList();
+  assert.ok(snaps.length, 'snapshots to show');
+  await js(`showSnapshot(${JSON.stringify(snaps[snaps.length - 1].name)})`);
+  await waitFor('!!document.querySelector(".snap-band .snap-watch") && !document.querySelector(".snap-band .snap-watch").hidden', 10000);
+  const menu = await js(`(async () => {
+    const real = popMenu;
+    let items = null;
+    popMenu = async (x, y, list) => { popMenu = real; items = list.map((i) => ({ label: i.label, disabled: !!i.disabled })); return null; };
+    const b = document.querySelector('.snap-k, .snap-a');
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 }));
+    for (let i = 0; i < 50 && !items; i++) await new Promise((r) => setTimeout(r, 20));
+    return items;
+  })()`);
+  assert.deepEqual(menu, [{ label: 'Show This Snapshot', disabled: false }, { label: 'Watch from Here', disabled: false }]);
+  await js('showDarlingsAgain()');
+  // a book with no snapshots
+  await js(`addImportedBooks([{ name: 'No Snaps', chapters: [{ title: 'Only', paras: [{ text: 'Still.' }] }] }], library.shelves[0])`);
+  await tick(400);
+  const other = await js('library.shelves[0].bookIds[library.shelves[0].bookIds.length - 1]');
+  await js(`openBook(${JSON.stringify(other)})`);
+  await waitFor(`!!book && book.id === ${JSON.stringify(other)}`);
+  await tick(400);
+  await js('switchTab("darlings")');
+  await waitFor('!!document.querySelector(".snap-empty")', 10000);
+  assert.match(await js('document.querySelector(".snap-empty").textContent'), /Writing History keeps every moment in between, and shows your snapshots there as tags\./);
+  await js('switchTab("manuscript")');
+  await js(`openBook(${JSON.stringify(neo.book)})`);
+  await waitFor(`!!book && book.id === ${JSON.stringify(neo.book)} && rec.on`);
+  await tick(400);
+});
+
+// In a language with long words, the dialog's buttons and labels, at the
+// window's smallest: nothing overlaps, nothing runs out of its box
+for (const lang of ['de', 'ro', 'ru']) {
+  test(`in ${lang}, at the smallest window, History’s controls, footer, tags and restore don’t overlap`, async () => {
+    const dict = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'locales', lang + '.json'), 'utf8'));
+    await js(`NeoI18n.setLocale(${JSON.stringify(lang)}, ${JSON.stringify(dict)}, {})`);
+    const was = neo.win.getSize();
+    const [mw, mh] = neo.win.getMinimumSize();
+    neo.win.setSize(mw, mh);
+    await tick(500);
+    try {
+      await atDayEnd(2, ID.Three);
+      await tick(500);
+      const bad = await js(`(() => {
+        const out = [];
+        for (const sel of ['.hs-foot', '.hs-controls', '.hs-side']) {
+          const box = document.querySelector(sel);
+          if (!box) continue;
+          const kids = [...box.querySelectorAll('button, .hs-when, .hs-stamped, .hs-ch-name')].filter((x) => !x.hidden && x.getClientRects().length && getComputedStyle(x).visibility !== 'hidden');
+          const rs = kids.map((x) => [x, x.getBoundingClientRect()]);
+          for (let i = 0; i < rs.length; i++) {
+            const [a, ra] = rs[i];
+            if (a.scrollWidth > a.clientWidth + 2 && getComputedStyle(a).textOverflow !== 'ellipsis' && getComputedStyle(a).overflow !== 'hidden') out.push(sel + ': ' + a.className + ' runs out of its box: ' + a.textContent);
+            for (let j = i + 1; j < rs.length; j++) {
+              const [b, rb] = rs[j];
+              if (a.contains(b) || b.contains(a)) continue;
+              if (ra.left < rb.right - 1 && rb.left < ra.right - 1 && ra.top < rb.bottom - 1 && rb.top < ra.bottom - 1) out.push(sel + ': ' + a.className + ' overlaps ' + b.className);
+            }
+          }
+        }
+        return out;
+      })()`);
+      assert.deepEqual(bad, []);
+    } finally {
+      await neo.closeHistory();
+      neo.win.setSize(was[0], was[1]);
+      await js(`NeoI18n.setLocale('en', {}, {})`);
+      await tick(300);
+    }
+  });
+}
+
 /* ---------- the book the tests start from ---------- */
 
 neo.run(async () => {

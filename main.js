@@ -1357,7 +1357,9 @@ ipcMain.handle('proof:serviceTry', async (_e, url) => {
   let u;
   try { u = new URL(String(url).trim()); } catch { return { ok: false, problems: [t('that isn’t a web address')] }; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, problems: [t('it must start with http:// or https://')] };
-  if (proofServices().some((s) => s.url === u.href)) return { ok: false, problems: [t('it’s already in the list')] };
+  // (the same address however it's written: http://host and http://host/)
+  const same = (url) => { try { return new URL(url).href === u.href; } catch { return false; } };
+  if (proofServices().some((s) => same(s.url))) return { ok: false, problems: [t('it’s already in the list')] };
   const r = await Proof.tryService(u.href, { fetch: (...a) => globalThis.fetch(...a) });
   if (!r.ok) return { ok: false, url: u.href, problems: r.problems };
   const rootName = r.root.subject.split('\n').reverse().find((l) => /^(CN|O)=/.test(l)) || r.root.subject;
