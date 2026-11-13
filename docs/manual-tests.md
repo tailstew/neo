@@ -115,7 +115,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [ ] **(phone)** iPhone (iOS 16.4 or later): the same. On iOS 15 or 16.3 History isn't offered and nothing is recorded.
 - [x] **(phone)** **Record Writing History** in the ⋯ sheet turns recording off and on: Off writes no session and `recordWriting: false`; back on, the words written meanwhile come in as a `catch-up`. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** iPhone with the library in iCloud: History fetches the desktop's sessions first, and shows them.
-- [ ] **(phone)** Open and close History several times on a long book: it doesn't get slower, and the app's memory goes back down once it closes.
+- [x] **(phone)** Open and close History several times on a long book: it doesn't get slower, and the app's memory goes back down once it closes. *(2026-11-13, 9045ce8, OnePlus 9, Android 14: a copy of Jagged Future, 22 sessions, 2.4 MB; first open ~2 s, then ~0.5 s each; 157 MB on the shelf, 165 MB in the book after five opens)*
 - [x] **(phone)** Kill the app mid-session (`adb shell am force-stop com.hughhowey.neopocket`), reopen the book: the session is closed as crashed (only once the book opens: reopening the app alone leaves it open), the words it hadn't recorded come in as a `catch-up`, and the day plays through, those words all at once. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** A session written on the phone plays on the desktop, named "iPhone" / "Android", and the desktop's on the phone.
 - [ ] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile.
