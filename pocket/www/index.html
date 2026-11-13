@@ -250,8 +250,13 @@
           : '') +
         (script ? '' : tick(t('Flush paragraph') + '  ⇧Enter', st.flush, { type: 'flush' }) +
         tick(t('Poetry paragraph') + '  Ctrl+⇧Enter', st.poetry, { type: 'poetry' })) +
-        // the File menu's Record Writing History: Pocket records, and can't timestamp
-        (window.neo.recStart ? seg(t('Record Writing History'), [['off', t('Off')], ['record', t('Record only')]], lib.historyAsked !== true || lib.recordWriting === false ? 'off' : 'record', (v) => ({ type: 'historyLevel', value: v })) : '') +
+        // the File menu's Record Writing History: Pocket records, and can't
+        // timestamp, so it's on or off like the rows above (on leaves the
+        // desktop's timestamping as it is; off is off for every device)
+        (window.neo.recStart ? (() => {
+          const on = lib.historyAsked === true && lib.recordWriting !== false;
+          return tick(t('Record Writing History'), on, { type: 'historyLevel', value: on ? 'off' : 'record' });
+        })() : '') +
         (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios' ? '' :
           `<div class="pm-row"><span class="pm-label">${t('On-screen keyboard')}</span><span class="pm-seg"><button data-act="keyboard">${onOff(!(window.pocketSoftKeyboardOn && !window.pocketSoftKeyboardOn()))}</button></span></div>`) +
         (typeof book !== 'undefined' && book
