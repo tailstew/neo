@@ -118,7 +118,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [x] **(phone)** Open and close History several times on a long book: it doesn't get slower, and the app's memory goes back down once it closes. *(2026-11-13, 9045ce8, OnePlus 9, Android 14: a copy of Jagged Future, 22 sessions, 2.4 MB; first open ~2 s, then ~0.5 s each; 157 MB on the shelf, 165 MB in the book after five opens)*
 - [x] **(phone)** Kill the app mid-session (`adb shell am force-stop com.hughhowey.neopocket`), reopen the book: the session is closed as crashed (only once the book opens: reopening the app alone leaves it open), the words it hadn't recorded come in as a `catch-up`, and the day plays through, those words all at once. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** A session written on the phone plays on the desktop, named "iPhone" / "Android", and the desktop's on the phone.
-- [ ] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile.
+- [x] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile. A finding picked shows its phrase; upright and on its side History's side pane and footer buttons are in the ☰ drawer, and the text fills the sheet; a restore can be undone from its toast, or from History while the chapter is as it left it. *(2026-11-13, a601c42, OnePlus 9, Android 14: a copy of Jagged Future; "the door" in about a second; "zebra crossing" finds nothing)*
 - [ ] **(phone)** Delete a phone session from the book on the desktop after a desktop has mirrored it (7 days on): the phone still plays it from the mirror.
 
 ## Checked by the e2e tests
@@ -196,7 +196,7 @@ Each with no change the recorder didn't see, and every write replaying to its fi
 
 ### Writing History, the dialog, and restore
 
-- A restore's toast has an Undo button that undoes it, and goes. `test:history`
+- A restore's toast has an Undo button that undoes it, and goes; typing in the book puts it away. `test:history`
 - History offers Undo This Restore just before or after a restore while the chapter is as the restore left it, and puts back the text from before; once the chapter is written in, it doesn't. When the book's last change is that restore, a bar above the sheet says so as History opens, and undoes it. `test:history`
 - A search finding picked brings its phrase into sight, also where the chapter held it before the recording began (a baseline), far from the caret. `test:history`
 - On a phone either way up (600 px wide; 800 × 380), History's text is as wide as the editor's page there, the side pane is a drawer (☰ in the title bar, clear of the sheet; the footer's buttons inside it): ☰ brings it, a chapter picked, a tap beside it or Esc puts it away (Esc staying in the player), and Find brings it with the search field. `test:history`

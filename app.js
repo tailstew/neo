@@ -608,10 +608,21 @@ function toast(msg, ms = 4000, { warn = false, action = null } = {}) {
 // keyboard (Pocket's undo above the keyboard is gone once it's down). The
 // button is there only while the newest undo is fresh, the action's own,
 // and it undoes only that one: nothing else undone or done since.
+// Typing again puts it away: the writer has moved on (and an Undo then would
+// send what they typed to Darlings).
 function undoToast(msg, ms = 6000) {
   const snap = undoStack[undoStack.length - 1];
   const fresh = snap && performance.now() - snap.made < 15000;
   toast(msg, ms, fresh ? { action: { label: t('Undo'), run: () => { if (undoStack[undoStack.length - 1] === snap) structuralUndo(); } } } : {});
+  if (!fresh) return;
+  const h = $('#hint');
+  const shown = h.firstChild && h.firstChild.data;
+  const away = () => {
+    document.removeEventListener('input', away, true);
+    if (!h.hidden && h.firstChild && h.firstChild.data === shown && h.querySelector('.hint-act')) h.hidden = true;
+  };
+  document.addEventListener('input', away, true);
+  setTimeout(() => document.removeEventListener('input', away, true), ms);
 }
 
 // Scripts that do not separate words with spaces: a whitespace count reports

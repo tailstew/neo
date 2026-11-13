@@ -631,8 +631,10 @@ test('a restore can be undone from History while the chapter is as it left it; o
     await flush();
     // restored again, then written in: nothing to undo from here
     await restoreTo();
+    assert.equal(await js('!$("#hint").hidden && !!$("#hint .hint-act")'), true, 'the toast offers Undo');
     await caretAt(await idx('One'), 0, -1);
     await type(' Written after.');
+    assert.equal(await js('$("#hint").hidden'), true, 'and goes once the writer types');
     await flush();
     assert.equal(await atEnd(), 'Same as now');
     await tick(1500);
