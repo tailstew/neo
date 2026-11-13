@@ -355,6 +355,9 @@ test('a phone held upright: the side pane is a drawer that ☰ brings, and a pic
     })()`);
     await tick(300);
     assert.deepEqual(await state(), { btn: true, shown: false, expanded: 'false' }, 'put away to begin with');
+    // the text as wide as the editor's page there, not the desktop's margins
+    const wide = await js('document.querySelector(".hs-paper .rp-body").getBoundingClientRect().width / document.querySelector(".hs-scroll").getBoundingClientRect().width');
+    assert.ok(wide > 0.8, 'the text takes most of the sheet: ' + wide.toFixed(2));
     await js('document.querySelector(".hs-pane-btn").click()');
     await tick(400);
     const open = await state();

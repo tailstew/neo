@@ -20950,7 +20950,13 @@ function reportError(msg) {
     toast(t('Something hiccuped — your words are safe, and the details were logged'));
   }
 }
-window.addEventListener('error', (e) => reportError(`${e.message} @ ${e.filename}:${e.lineno}`));
+window.addEventListener('error', (e) => {
+  // The browser's word that a size observer's change moved the layout again
+  // before the frame ended (History's drawer as a chapter redraws, say): the
+  // rest is delivered next frame. Not an error, and Pocket showed it as one.
+  if (/^ResizeObserver loop/.test(String(e.message))) return;
+  reportError(`${e.message} @ ${e.filename}:${e.lineno}`);
+});
 window.addEventListener('unhandledrejection', (e) => reportError('Unhandled: ' + (e.reason && e.reason.stack || e.reason)));
 
 /* ================================================================== */

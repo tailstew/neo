@@ -703,6 +703,9 @@ body.light .modal .tsa-warn { color: #a8642a; }
   }
   .hs-pane-open .hs-side { transform: none; visibility: visible; transition: transform .2s ease; box-shadow: 4px 0 18px rgba(0, 0, 0, .45); }
   .hs-pane-open .hs-scrim { display: block; position: absolute; inset: 0; z-index: 5; background: rgba(0, 0, 0, .35); }
+  /* the sheet as wide as the editor's page there (pocket.css's .sheet), clear of ☰ */
+  .hs-paper { width: calc(100% - 16px); }
+  .hs-paper .sheet { padding: 52px 26px 60px; }
   .hs-pane-btn {
     display: block; position: absolute; top: 8px; left: 8px; z-index: 4; width: 36px; height: 36px; padding: 0;
     border: 1px solid #333; border-radius: 6px; background: var(--bg); color: inherit; font-size: 17px; line-height: 1; cursor: pointer;
