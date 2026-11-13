@@ -111,7 +111,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 
 ## Pocket
 
-- [ ] **(phone)** Android: write in a book, close it, reopen. History is in the footer and the book menu and plays the session; the back gesture leaves the player, then the dialog.
+- [x] **(phone)** Android: write in a book (the on-screen keyboard, then a hardware one), close it, reopen. Each session ends with its `end` line (`verify-recording` on the book pulled with `adb pull`). History is in the footer (the tab strip fades at an edge with more tabs past it), the ⋯ sheet and the book menu, and plays the session; a finger dragged along the timeline moves the play head; the back gesture leaves the player, then the dialog. ⋯ → Darlings opens Darlings. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [ ] **(phone)** iPhone (iOS 16.4 or later): the same. On iOS 15 or 16.3 History isn't offered and nothing is recorded.
 - [ ] **(phone)** **Record Writing History** in the ⋯ sheet turns recording off and on.
 - [ ] **(phone)** iPhone with the library in iCloud: History fetches the desktop's sessions first, and shows them.
