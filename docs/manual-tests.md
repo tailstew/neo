@@ -62,7 +62,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 - [ ] **(2 computers)** Tag on one computer, rename the tag on the other: once both have synced, History on each shows the newer name.
 - [ ] In German and Russian, the tag dialog and the restore toasts read right and fit. *(History's controls, footer and side pane, Tags among them, at the smallest window in German, Romanian and Russian: `npm run test:history`.)*
-- [ ] **(phone)** A tag made on the desktop shows on the phone, and the phone can tag a moment.
+- [x] **(phone)** A tag made on the desktop shows on the phone, and the phone can tag a moment, which shows on the desktop. *(2026-11-13, ad0e872 / desktop 28a0c7f, OnePlus 9 by Syncthing: each way in about 30 s)*
 
 ## Proof of when I wrote (phase 5)
 
