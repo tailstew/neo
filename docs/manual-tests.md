@@ -56,7 +56,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 - [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.
 - [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
-- [ ] **(phone)** Restore works on the phone; the delete button isn't there.
+- [x] **(phone)** Restore works on the phone; the delete button isn't there. *(2026-11-13, 69bf432, OnePlus 9: restore, Undo This Restore and the toast's Undo; no Delete in the drawer)*
 
 ## Tags and snapshots (phase 7)
 
@@ -87,8 +87,8 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [ ] In the exported page: within a few seconds of opening, each day tile shows the same map as that day's tile in NEO (green where words came, red where they went, gold where both); picking a chapter on the left redraws them for that chapter, as a 6×6 grid.
 - [ ] Open an exported file in Firefox, Safari and Edge, with the network off: it looks and plays as it does in Chrome, and its checks button ends "✓ Checked". *(Chrome's engine: `npm run test:export`.)*
 - [ ] Hover the timeline, in History and in the exported page: the tips say what's there (pastes, time away, tags, and on the timestamps' track "Timestamped …").
-- [ ] **(phone)** The exported page on a phone's browser (email it to yourself): no side pane, the sheet, the controls and the header's buttons fit, it plays, and there's no sideways scrolling. *(At a phone's width in Chrome's engine: `npm run test:export`.)*
-- [ ] **(phone)** Pocket's History has neither button.
+- [x] **(phone)** The exported page on a phone's browser (email it to yourself): no side pane, the sheet, the controls and the header's buttons fit, it plays, and there's no sideways scrolling. *(At a phone's width in Chrome's engine: `npm run test:export`.)* *(2026-11-13, 69bf432: Chrome on the OnePlus 9, the page served through `adb reverse`)*
+- [x] **(phone)** Pocket's History has neither button. *(2026-11-13, 69bf432)*
 
 ## Upstream 1.5.0's features, recorded
 
