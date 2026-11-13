@@ -340,7 +340,7 @@ test('search: a finding picked brings its phrase into sight, where it was there 
   }
 });
 
-test('a phone held upright: the side pane is a drawer that ☰ brings, and a pick, a tap beside it or Esc puts away', async () => {
+test('a phone, upright or on its side: the side pane is a drawer that ☰ brings, and a pick, a tap beside it or Esc puts away', async () => {
   await neo.closeHistory();
   const [w, h] = neo.win.getSize();
   try {
@@ -395,6 +395,27 @@ test('a phone held upright: the side pane is a drawer that ☰ brings, and a pic
     assert.ok((await state()).shown, 'Find brings it');
     assert.equal(await js('document.activeElement === document.querySelector(".hs-q")'), true);
   } finally {
+    neo.win.setSize(w, h);
+    await tick(400);
+    await neo.closeHistory();
+  }
+  // a phone on its side: the drawer too, and the player's buttons beside its timeline
+  // (NEO's window is never under 600 pixels tall on a computer: a phone's is)
+  const [minW, minH] = neo.win.getMinimumSize();
+  try {
+    neo.win.setMinimumSize(300, 300);
+    neo.win.setSize(800, 380);
+    await tick(600);
+    await atDayEnd(0);
+    await tick(300);
+    const side = await js(`(() => {
+      const btn = document.querySelector('.hs-pane-btn'), c = document.querySelector('.hs-controls').getBoundingClientRect(), d = document.querySelector('.hs-dayline').getBoundingClientRect();
+      return { btn: getComputedStyle(btn).display !== 'none', pane: getComputedStyle(document.querySelector('.hs-side')).visibility,
+        inDrawer: !!document.querySelector('.hs-side-acts .hs-restore'), oneRow: Math.abs((c.top + c.bottom) / 2 - (d.top + d.bottom) / 2) < 12 };
+    })()`);
+    assert.deepEqual(side, { btn: true, pane: 'hidden', inDrawer: true, oneRow: true });
+  } finally {
+    neo.win.setMinimumSize(minW, minH);
     neo.win.setSize(w, h);
     await tick(400);
     await neo.closeHistory();

@@ -4557,6 +4557,9 @@ async function proofWarnStale(bookId) {
   }), 12000, { warn: true });
 }
 
+// Where History's side pane is a drawer (styles.css): a phone, either way up
+const HISTORY_DRAWER = '(max-width: 720px), (max-height: 500px)';
+
 // Opens the Writing History of a book (the open one unless another is
 // named). It opens on the days: the chapter the writer is in (or the
 // book) as it is now, with a tile for each day it was written on below.
@@ -4620,7 +4623,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   paneBtn.textContent = '☰';
   paneBtn.setAttribute('aria-expanded', 'false');
   $h('.ps-bar').prepend(paneBtn);
-  const narrowMq = matchMedia('(max-width: 720px)');
+  const narrowMq = matchMedia(HISTORY_DRAWER);
   const footActs = ['.hs-tag', '.hs-restore', '.hs-evidence', '.hs-delete'].map((s) => $h(s));
   const placeActs = () => { for (const b of footActs) (narrowMq.matches ? $h('.hs-side-acts') : $h('.hs-foot')).appendChild(b); };
   placeActs();

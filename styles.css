@@ -692,10 +692,11 @@ body.light .modal .tsa-warn { color: #a8642a; }
 .ex-warn .ex-warn-risk { font-weight: 600; }
 .ex-note { color: #8f8a80; }
 .ex-note.ex-bad { color: var(--red); }
-/* below 720 px (a phone held upright) the side pane is a drawer over the
-   sheet: ☰ at the sheet's top left brings it, a tap beside it puts it away */
+/* below 720 px wide or 500 px tall (a phone, either way up) the side pane is
+   a drawer over the sheet: ☰ in the title bar brings it, a tap beside it puts
+   it away. The same query is HISTORY_DRAWER in app.js. */
 .hs-pane-btn, .hs-scrim, .hs-side-acts { display: none; }
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 500px) {
   .ps-paper.kind-history { grid-template: "main" 1fr "foot" auto / 1fr; position: relative; }
   .hs-side {
     grid-area: auto; position: absolute; top: 0; bottom: 0; left: 0; z-index: 6; width: min(280px, 85%);
@@ -716,6 +717,22 @@ body.light .modal .tsa-warn { color: #a8642a; }
   /* the footer's buttons, under the chapters and tags (when any is shown) */
   .hs-side-acts:has(button:not([hidden])) { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 8px 12px; border-top: 1px solid #2a2a2a; }
   .hs-side-acts button { max-width: 100%; }
+}
+/* a phone on its side: the sheet gets the height the chrome took */
+@media (max-height: 500px) {
+  .page-sheet { gap: 4px; }
+  .ps-paper.kind-history { height: calc(100vh - var(--kb, 0px) - 52px); }
+  .page-sheet .ps-done { padding: 3px 12px; }
+  .hs-pane-btn { height: 28px; }
+  /* the player's buttons and its timeline on one row */
+  .hs-bottom { display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px; }
+  .hs-controls { margin-bottom: 0; flex: none; }
+  .hs-dayline, .hs-strip { flex: 1; min-width: 0; }
+  .hs-timeline { height: 36px; }
+  .hs-tile { gap: 2px; padding: 3px 2px 2px; }
+  .hs-tile canvas { width: 30px; height: 30px; }
+  .hs-strip-empty { padding: 8px 4px; }
+  .hs-foot { padding: 4px 12px; }
 }
 @media (max-width: 560px) {
   .ps-paper { padding: 44px 26px 36px; }
