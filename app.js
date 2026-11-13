@@ -2706,6 +2706,7 @@ const rec = {
     this.live = false;
     this.chunks = 0;
     this.retry = [];
+    this.sending = new Set(); // chunks on their way to the disk, which a close waits for
     this.clock = Math.round(performance.now());
     this.lastKind = '';
     this.counts = { keys: 0, edits: 0, bases: 0, drops: 0, writes: 0, unobserved: 0, drift: 0 };
@@ -2713,20 +2714,25 @@ const rec = {
 
   // The session's last line, its last chunk, and the folder joined into one
   // file. A session that never changed a chapter leaves nothing behind.
-  // The promise is the close reaching the disk.
+  // The promise is the close reaching the disk. The close waits for every
+  // chunk sent, the last one with `end` above all: the close joins what's on
+  // disk and removes the folder, so a chunk that lands after it is lost.
+  // (Pocket's writes are a few awaits each, and the close won that race.)
   closeSession() {
     clearTimeout(this.idleTimer);
     if (!this.live) return Promise.resolve();
     const { keys, edits, unobserved } = this.counts;
     this.event(['end', { keys, edits, unobserved }]);
     this.flush();
+    const sent = Promise.all([...this.sending]);
     for (const chId of this.inSession) {
       if (chId in this.model) this.known[chId] = this.model[chId];
       else delete this.known[chId];
     }
     this.prev = this.w.H;
     this.live = false;
-    return window.neo.recClose(this.bookId, this.session.id).catch((err) => window.neo.logError('recording close: ' + (err && err.message || err)));
+    const bookId = this.bookId, id = this.session.id;
+    return sent.then(() => window.neo.recClose(bookId, id)).catch((err) => window.neo.logError('recording close: ' + (err && err.message || err)));
   },
 
   end() {
@@ -3066,11 +3072,17 @@ const rec = {
     if (!c) return null;
     const { bookId } = this;
     const id = this.session.id;
-    const send = (part) => window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; return true; }, (err) => {
-      window.neo.logError('recording chunk: ' + (err && err.message || err));
-      if (this.session && this.session.id === id) this.retry.push(part); // tried again with the next
-      return false;
-    });
+    const send = (part) => {
+      const sent = window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; return true; }, (err) => {
+        window.neo.logError('recording chunk: ' + (err && err.message || err));
+        if (this.session && this.session.id === id) this.retry.push(part); // tried again with the next
+        return false;
+      });
+      const sending = this.sending;
+      sending.add(sent);
+      sent.then(() => sending.delete(sent));
+      return sent;
+    };
     for (const part of this.retry.splice(0)) send(part);
     return { chunk: c, saved: send(c) };
   },
