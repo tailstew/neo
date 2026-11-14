@@ -290,6 +290,33 @@ test('a chapter written in here after the other device took it out stays, and go
   assert.match(fs.readFileSync(path.join(chapters(), 'ch-both-0007.html'), 'utf8'), /carried on here/);
 });
 
+test("a chapter set on a card there while this one typed in it stays, and the card goes when the chapter holds all it held", async () => {
+  for (const [chId, cardId, held, goes] of [
+    ['ch-card-0011', 'lc-card-0011', '<p><br></p>', true], // set aside before the words reached it
+    ['ch-card-0012', 'lc-card-0012', '<p>Only on the card.</p>', false]
+  ]) {
+    await newChapter(chId, '<p><br></p>');
+    const hash = await js("textHash('<p><br></p>')");
+    await js(`(async () => {
+      setChapterHTML(${JSON.stringify(chId)}, '<p>Typed here meanwhile.</p>', 'input');
+      await persistChapter(${JSON.stringify(chId)});
+    })()`);
+    const name = `book.sync-conflict-20261114-1200${goes ? '00' : '01'}-ZJR4MCC.json`;
+    bookCopy(name, (m) => {
+      m.chapterOrder = m.chapterOrder.filter((id) => id !== chId);
+      m.looseCards.push({ id: cardId, held: 'chapter', from: chId, title: '', text: '', html: held, notes: [], words: 0 });
+      m.removed = { ...(m.removed || {}), [chId]: { at: Date.now(), hash } };
+    });
+    await js('refreshFromDisk()');
+    await tick(1200);
+    assert.equal((await order()).includes(chId), true, 'the chapter stays');
+    const saved = standing();
+    assert.equal(saved.removed[chId].back, true);
+    assert.equal(saved.looseCards.some((c) => c.id === cardId), !goes, goes ? 'the empty card went' : 'a card with words of its own stays');
+    if (goes) assert.ok(saved.removed[cardId] && !saved.removed[cardId].back, 'noted, so the other device lets it go too');
+  }
+});
+
 test('a chapter emptied on the other device while this one typed in it makes no empty "from other device" chapter; one with new words there still does', async () => {
   // the other device set the chapter's only section on a card (the file is
   // left with an empty line) while this one went on typing in it

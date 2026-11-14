@@ -15116,6 +15116,7 @@ async function chapterToLoose(chId) {
   const card = {
     id: 'lc-' + Date.now().toString(36),
     held: 'chapter',
+    from: chId, // so the card can go if another device keeps the chapter (joinStructure)
     title: (book.chapterTitles || {})[chId] || '',
     text: (book.chapterNotes || {})[chId] || '',
     html: chapterHTML[chId] || '',
@@ -16895,10 +16896,27 @@ function joinStructure(base, other, removed, stamps, wanted) {
       if (r.hash === cardHash(c)) continue;
       back.add(c.id); // changed after it went: kept
     }
+    // a chapter set on this card here, kept against that by the other
+    // device's words: the card goes, when the chapter holds all it held
+    if (c.held === 'chapter' && back.has(c.from) && order.includes(c.from) && heldIn(c, c.from, base, other)) {
+      removed[c.id] = { at: Date.now(), hash: cardHash(c) };
+      continue;
+    }
     cards.push(c);
   }
   for (const id of back) removed[id] = { at: Date.now(), back: true };
   return { order, cards, back: [...back] };
+}
+// True when chapter `chId` (its text here, its title and notes in either
+// book.json) holds every word of a card that held it: nothing goes with the card
+function heldIn(card, chId, a, b) {
+  const field = (k) => [a, b].map((m) => m && m[k] && m[k][chId]).filter(Boolean);
+  const titles = field('chapterTitles');
+  if (card.title && !titles.includes(card.title)) return false;
+  if (wordsBeyond(card.html, chapterHTML[chId])) return false;
+  if (wordsBeyond(card.text, field('chapterNotes').join(' '))) return false;
+  const noteWords = (n) => JSON.stringify(n || []).replace(/[[\]{}",:]/g, ' ');
+  return !wordsBeyond(noteWords(card.notes), field('sectionNotes').map(noteWords).join(' '));
 }
 // what `from` holds for a chapter (its title, kind, notes), where `into` has nothing
 function carryChapterFields(into, from, chId) {
