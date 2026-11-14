@@ -3249,12 +3249,13 @@ const rec = {
     const mismatched = [];
     const texts = book ? Rec.streamTexts(book, stickies) : {};
     const want = (chId) => {
-      if (chId === Rec.STREAMS.notes) return recNotesNow();
+      if (recIsNotes(chId)) return recNotesNow(chId);
       if (Rec.isStream(chId)) return book ? texts[chId] : this.model[chId];
       return chapterHTML[chId] == null ? undefined : String(chapterHTML[chId]);
     };
     for (const chId of this.inSession) if (r.chapters[chId] !== want(chId)) mismatched.push(chId);
-    if (this.on) for (const chId of [...Object.keys(chapterHTML), ...Object.keys(texts), Rec.STREAMS.notes]) if (!this.inSession.has(chId) && this.model[chId] !== want(chId)) mismatched.push(chId);
+    const notesPages = [Rec.STREAMS.notes, ...Object.keys(this.model).filter((id) => recIsNotes(id) && id !== Rec.STREAMS.notes)];
+    if (this.on) for (const chId of [...Object.keys(chapterHTML), ...Object.keys(texts), ...notesPages]) if (!this.inSession.has(chId) && this.model[chId] !== want(chId)) mismatched.push(chId);
     const badWrites = r.bad.map((w) => w.line);
     const result = {
       ok: !mismatched.length && !badWrites.length && !r.problems.length && !this.counts.unobserved,
@@ -3289,28 +3290,49 @@ async function recOpenStreams(bookId) {
   for (const [id, text] of Object.entries(Rec.streamTexts(book, stickies))) rec.change(id, text, 'open');
 }
 
-// The Notes tab, as it reads notes.html: text that isn't what the recorder
-// last saw came from another device. recNotesShown is the notes as the
-// page drew them, so a page that drew them differently (the browser tidies
-// HTML it's given) is a tidy of its own, not part of the first key.
+// The notes pages: the book's (notes.html, the stream :notes) and each
+// chapter's own (notes-<chapter>.html, the stream :notes-<chapter>), named
+// after their files. A stream is any id that starts with ':', so every
+// reader already sets them apart from the chapters.
+const recNotesId = (kind) => (kind === 'notes' ? Rec.STREAMS.notes : ':' + kind);
+const recIsNotesKind = (kind) => kind === 'notes' || /^notes-./.test(kind || '');
+const recIsNotes = (id) => id === Rec.STREAMS.notes || /^:notes-./.test(id || '');
+
+// The Notes tab, as it reads a page: text that isn't what the recorder
+// last saw came from another device. recNotesShown is the page as the
+// tab drew it, so a page drawn differently (the browser tidies HTML it's
+// given) is a tidy of its own, not part of the first key. A chapter's page
+// is first recorded when it is first read.
 let recNotesShown = null;
-function recNotesRead(html, bookId) {
+function recNotesRead(html, bookId, kind = 'notes') {
   if (!rec.on || rec.bookId !== bookId) return;
-  const id = Rec.STREAMS.notes;
+  const id = recNotesId(kind);
   if (rec.model[id] === undefined) rec.change(id, html, 'open');
   else if (rec.model[id] !== html) rec.change(id, html, 'disk-adopt');
 }
 function recNotesInput(e) {
   if (!rec.on) return;
-  const id = Rec.STREAMS.notes;
+  const ed = $('#aux-editor');
+  const id = recNotesId(ed.dataset.kind);
   if (recNotesShown !== null && rec.model[id] !== undefined && rec.model[id] !== recNotesShown) rec.change(id, recNotesShown, 'tidy');
   recNotesShown = null;
-  rec.change(id, $('#aux-editor').innerHTML, 'input', { inputType: e.inputType });
+  rec.change(id, ed.innerHTML, 'input', { inputType: e.inputType });
 }
-// the notes as they are now: on the page while the Notes tab shows them
-function recNotesNow() {
+// a notes page as it is now: on the page while the Notes tab shows it
+function recNotesNow(id = Rec.STREAMS.notes) {
   const ed = $('#aux-editor');
-  return currentTab === 'notes' && ed.dataset.kind === 'notes' && !ed.hidden ? ed.innerHTML : rec.model[Rec.STREAMS.notes];
+  return currentTab === 'notes' && recIsNotesKind(ed.dataset.kind) && recNotesId(ed.dataset.kind) === id && !ed.hidden ? ed.innerHTML : rec.model[id];
+}
+// A notes page NEO itself rewrites (a joined chapter's notes folded into
+// the page of the one it joined): `was` what the page held, `html` what
+// is written, with its cause and then its write
+function recNotesWrite(bookId, kind, was, html, cause) {
+  if (!rec.on || rec.bookId !== bookId) return;
+  const id = recNotesId(kind);
+  if (rec.model[id] === undefined) rec.change(id, was || '', 'open');
+  else if (rec.model[id] !== (was || '')) rec.change(id, was || '', 'disk-adopt');
+  rec.change(id, html, cause);
+  rec.reconcile(id, html);
 }
 
 // Where the caret sits in a chapter's HTML: the length of what captureBody
@@ -3337,7 +3359,7 @@ function recWhere(target) {
   if (body) return body.closest('.chapter').dataset.id;
   const el = target && (target.nodeType === Node.TEXT_NODE ? target.parentElement : target);
   const notes = el && el.closest ? el.closest('#aux-editor') : null;
-  return notes && notes.dataset.kind === 'notes' ? Rec.STREAMS.notes : null;
+  return notes && recIsNotesKind(notes.dataset.kind) ? recNotesId(notes.dataset.kind) : null;
 }
 const recInChapter = (target) => !!recWhere(target);
 // the notes' caret isn't recorded, so neither are the keys that only move it
@@ -3826,7 +3848,7 @@ const HISTORY_SYNC = ['disk-adopt', 'disk-twin', 'disk-new'];
 // the book's other writing, as a day names it
 function historyStreamName(id) {
   const S = Rec.STREAMS;
-  return id === S.notes ? tabName('notes') : id === S.outline ? tabName('outline')
+  return recIsNotes(id) ? tabName('notes') : id === S.outline ? tabName('outline')
     : id === S.titles ? t('Chapter titles') : id === S.stickies ? t('Notes & Comments') : '';
 }
 
@@ -5171,7 +5193,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     // the devices it was written on
     const on = [...new Set(d.list.map((s) => S.names[s.device] || ''))].filter(Boolean).join(', ');
     // and what else it changed: the notes, titles, outline, stickies
-    const also = mode === 'book' ? (d.stats.streams || []).map(historyStreamName).filter(Boolean).join(', ') : '';
+    const also = mode === 'book' ? [...new Set((d.stats.streams || []).map(historyStreamName).filter(Boolean))].join(', ') : '';
     return [historyWhen(historyDayMs(d.day), HISTORY_DATE), historySpent(d.stats.ms), on, historyWords(added, removed), also].filter(Boolean).join(' · ');
   }
 
@@ -13228,6 +13250,7 @@ async function foldNotesPage(fromId, intoId) {
     const [from, into] = await Promise.all([readNotesPage(bookId, fromId), readNotesPage(bookId, intoId)]);
     if (!htmlText(from)) return;
     const html = (into || '') + from;
+    recNotesWrite(bookId, notesKind(intoId), into, html, 'merge');
     const key = bookId + '/' + notesKind(intoId);
     auxPending[key] = { bookId, kind: notesKind(intoId), html, inFlight: false };
     flushAux();
@@ -13592,9 +13615,9 @@ function switchTab(name) {
     (pending ? Promise.resolve(pending.html) : window.neo.readAux(bookId, kind)).then((html) => {
       if (load !== auxLoad || !book || book.id !== bookId || currentTab !== name || notesKind(notesPage) !== kind) return;
       // (the book's own notes page is recorded; a chapter's isn't yet)
-      if (kind === 'notes') recNotesRead(html || '', bookId);
+      recNotesRead(html || '', bookId, kind);
       auxEditor.innerHTML = html || '';
-      recNotesShown = kind === 'notes' ? auxEditor.innerHTML : null;
+      recNotesShown = auxEditor.innerHTML;
       auxEditor.dataset.kind = kind;
       auxEditor.dataset.book = bookId;
       auxEditor.contentEditable = 'true';
@@ -16666,7 +16689,7 @@ let auxDirty = false;
 $('#aux-editor').addEventListener('keydown', (e) => { if (styleKeepScroll(e)) return; smartKeys(e, e.currentTarget); });
 $('#aux-editor').addEventListener('input', (e) => {
   auxDirty = true;
-  if (e.currentTarget.dataset.kind === 'notes') recNotesInput(e);
+  if (recIsNotesKind(e.currentTarget.dataset.kind)) recNotesInput(e);
   scheduleAuxSave();
   notesTyped();
   if (spellOn) {
@@ -16694,7 +16717,7 @@ const auxPending = {};
 function flushAux() {
   const ed = $('#aux-editor');
   if (auxDirty && ed.dataset.kind && ed.dataset.book) {
-    if (ed.dataset.kind === 'notes' && rec.bookId === ed.dataset.book) rec.reconcile(Rec.STREAMS.notes, ed.innerHTML);
+    if (recIsNotesKind(ed.dataset.kind) && rec.bookId === ed.dataset.book) rec.reconcile(recNotesId(ed.dataset.kind), ed.innerHTML);
     const key = ed.dataset.book + '/' + ed.dataset.kind;
     auxPending[key] = { bookId: ed.dataset.book, kind: ed.dataset.kind, html: ed.innerHTML, inFlight: false };
     auxDirty = false;

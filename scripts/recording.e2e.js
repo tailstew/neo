@@ -336,6 +336,33 @@ test('notes typed in the Notes tab are recorded as typing', async () => {
   assert.ok(!lines.slice(from, to).some((l) => l[1] === 'n' || l[1] === 's'), 'the notes’ caret isn’t kept, nor the keys that only move it');
 });
 
+test('a chapter’s own notes page is recorded as a stream of its own', async () => {
+  const id = (await chapterIds())[0];
+  await js(`switchTab('notes'); openNotesPage('${id}')`);
+  await tick(500);
+  assert.equal(await js('document.getElementById("aux-editor").dataset.kind'), 'notes-' + id);
+  await js(`(() => {
+    const ed = document.getElementById('aux-editor');
+    ed.focus();
+    const r = document.createRange();
+    r.selectNodeContents(ed);
+    r.collapse(false);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+  })()`);
+  await type('The lighthouse keeper knows.');
+  await tick(100);
+  await js('switchTab(\'manuscript\')'); // the page is written as the tab goes
+  await tick(500);
+  const sid = ':notes-' + id;
+  assert.match(await js(`rec.model[${JSON.stringify(sid)}]`), /lighthouse keeper knows/);
+  const lines = await lastLines();
+  assert.ok(lines.some((l) => (l[1] === 'ch' || l[1] === 'b') && l[2] === sid), 'the chapter’s notes are a stream of their own');
+  assert.ok(lines.some((l) => l[1] === 'r' && /ighthouse/.test(l[2])), 'their typing is a run');
+  assert.ok(writesOf(lines).includes(sid), 'and they were written');
+  assert.match(await js(`rec.model[":notes"]`), /harbor master lies/, 'the book’s notes are their own stream still');
+});
+
 test('a chapter title, an outline note and a sticky are recorded when they are saved', async () => {
   const id = (await chapterIds())[0];
   await js(`(() => {
@@ -577,6 +604,10 @@ test('the session on disk is sealed, and replays to every chapter file byte for 
   }
   // and the notes, titles, outline and stickies to the files that hold them
   assert.equal(R.digest(fs.readFileSync(path.join(LIB, BOOK, 'notes.html'))), last[':notes'], 'notes.html');
+  // (each chapter's own page too)
+  const pages = fs.readdirSync(path.join(LIB, BOOK)).filter((f) => /^notes-.+\.html$/.test(f));
+  assert.ok(pages.length, 'a chapter’s notes page was written');
+  for (const f of pages) assert.equal(R.digest(fs.readFileSync(path.join(LIB, BOOK, f))), last[':' + f.slice(0, -5)], f);
   const texts = R.streamTexts(JSON.parse(fs.readFileSync(path.join(LIB, BOOK, 'book.json'), 'utf8')),
     JSON.parse(fs.readFileSync(path.join(LIB, BOOK, 'stickies.json'), 'utf8')));
   for (const [id, text] of Object.entries(texts)) assert.equal(R.digest(text), last[id], id);
