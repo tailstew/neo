@@ -574,6 +574,16 @@ test('the exported player: a tile opens its day paused, ▶ and ❚❚, ▶▶ l
 });
 
 test('the exported pop-ups: How it was written opens the report, matched; the checks button what the export checks, ending “Made with NEO”; Close, Esc and a click outside close them', async () => {
+  // while the checks run, “Made with NEO” waits out of sight: it showed
+  // through the header's title until they took it into their pop-up
+  const early = await openPage(WHOLE, { checked: false });
+  try {
+    await early.js('new Promise((r) => requestAnimationFrame(() => r()))');
+    const made = await early.js('(() => { const m = document.getElementById("rx-made"); return { inChecks: !!m.closest("#rx-checks"), shown: m.getClientRects().length > 0 }; })()');
+    assert.ok(made.inChecks || !made.shown, 'not shown under the header: ' + JSON.stringify(made));
+  } finally {
+    early.close();
+  }
   const page = await openPage(WHOLE);
   try {
     await page.js('document.querySelector(".rx-evbtn").click()');

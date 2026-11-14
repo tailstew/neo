@@ -57,6 +57,9 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-js .rx-lede { flex-basis: 100%; font-size: 13px; color: var(--soft); margin: 0; }
 .rx-js .rx-note { flex-basis: 100%; font-size: 13px; margin: 4px 0 0; }
 .rx-js .rx-made { padding: 16px 0 0; margin: 0; max-width: none; }
+/* under the player until the checks are done and take it into their pop-up:
+   left there, it shows through the header's title */
+.rx-js > .rx-made { display: none; }
 
 /* the side: chapters, then tags */
 .rx-side { grid-area: side; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--rule); background: var(--pane); }
