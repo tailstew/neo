@@ -995,38 +995,9 @@ async function verifyDevice(dir, { sessions = null, others = null, chapters = nu
   return out;
 }
 
-// The time cover of one device's sessions: when each was first timestamped
-// in part (a seal over the session while it was open) and when as a whole
-// (a seal naming its last `h`), from the seals verifyDevice checked, in any
-// order (R.sealsOver: its own, and other devices' that sealed it).
-// Sessions are { id, open, last (its last h), settled, wrote, from, to }:
-// a seal over any `settled` h (R.verifyChain) covers it whole, since only
-// the caret, focus and the clock came after; without them, only its last.
-// A closed session that wrote, with no whole stamp or one stamped more
-// than a day after it ended, is a gap:
-// [{ session, from, to, firstStamped, wholeBy, gap: 'never' | 'late' }]
-const DAY_MS = 24 * 3600 * 1000;
-function timeCover(sessions, seals) {
-  const bySession = new Map();
-  for (const s of seals) {
-    const when = s.by !== null ? s.by : s.byLater || null;
-    for (const [id, h] of Object.entries(s.heads || {})) {
-      const was = bySession.get(id) || { first: null, whole: null };
-      if (when && (was.first === null || when < was.first)) was.first = when;
-      const x = sessions.find((y) => y.id === id) || {};
-      if (s.ok && when && (was.whole === null || when < was.whole) && (x.settled ? x.settled.includes(h) : h === x.last)) was.whole = when;
-      bySession.set(id, was);
-    }
-  }
-  return sessions.map((s) => {
-    const b = bySession.get(s.id) || { first: null, whole: null };
-    const c = { session: s.id, from: s.from, to: s.to, firstStamped: b.first, wholeBy: b.whole };
-    if (s.wrote === false) return c;
-    if (!b.whole && !s.open) c.gap = 'never';
-    else if (b.whole && s.to !== null && b.whole - s.to > DAY_MS) c.gap = 'late';
-    return c;
-  });
-}
+// The time cover of one device's sessions: Rec.timeCover (recording.js),
+// where the exported page can use it too
+const timeCover = R.timeCover;
 
 module.exports = {
   TSAS, DRAND, STAMPS_WANTED, ROOT_FILE, timeCover,

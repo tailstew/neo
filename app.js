@@ -3393,8 +3393,10 @@ function historyLevelCards(box, picked, onPick, { existing = false } = {}) {
     ['off', t('Off'), t('NEO keeps no history. Snapshots still work.')],
     ['record', t('Record only'), t('Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.')],
     ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp'),
-      t('Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.') +
-      (existing ? ' ' + t('Timestamps cover your writing from the day they’re turned on.') : '')]] : [])
+      t('Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.') + ' ' +
+      // (a history can't be timestamped afterwards: what was written before is nobody's proof)
+      (existing ? t('Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.')
+        : t('Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.'))]] : [])
   ];
   const pick = (value) => box.querySelectorAll('.fr-choice').forEach((b) => {
     b.classList.toggle('sel', b.dataset.level === value);
@@ -3473,6 +3475,7 @@ async function proofConsent() {
       t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
       ...await proofWhoSays(),
       t('Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
+      t('Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.'),
       t('A timestamp shows when your writing existed, not who wrote it. Your Writing History, which shows how you wrote it, speaks to that.')
     ],
     ok: t('Turn on timestamping')
@@ -4238,7 +4241,10 @@ const REPLAY_PAGE_WORDS = [
   tk('These seals also cover the writing of {n} other chapters of the book, which this export doesn’t hold.'),
   tk('A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.'),
   tk('Fingerprint'),
-  tk('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'),
+  tk('Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.'),
+  tk('Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.'),
+  tk('Checked, but not timestamped'),
+  tk('What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.'),
   tk('{n} seals, signed with one key, from {from} to {to}, each timestamped.'),
   tk('{n} seals, signed with one key, from {from} to {to}: {s} timestamped, the others fixed in time by a later seal.'),
   tk('This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.'),
@@ -4414,10 +4420,21 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
     if (partial) text += ' ' + t('NEO checked the timestamps against the whole history when it made this export. It holds only some chapters, so it can itself check only the timestamps over their own lines.');
     row(t('Timestamps'), text);
   }
+  // first, whether anything fixes the history in time: the figures below
+  // could be made up afterwards, all at once; timestamps taken as it was
+  // written can't be (Rec.coverSummary, every device's sessions)
+  const fixed = Rec.coverSummary((cover || []).flatMap((d) => d.cover || []));
+  const lead = !fixed.stamped
+    ? t('Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.')
+    : !fixed.sessions ? '' // only a session still open, timestamped so far
+    : fixed.median === null
+      ? t('Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.', { n: n(fixed.within), all: n(fixed.sessions) })
+      : t('Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.', { n: n(fixed.within), all: n(fixed.sessions), soon: fixed.median < 60000 ? t('a minute') : span(fixed.median) });
   let html = `<h2 class="ev-h">${e(title)}</h2>
+    ${lead ? `<p class="ev-lead${fixed.stamped ? '' : ' ev-unfixed'}">${e(lead)}</p>` : ''}
     <p class="ev-small">${e(t('Figures from the Writing History NEO kept as the words were written.'))}</p>
     <table class="ev-facts">${rows.join('')}</table>
-    <p class="ev-small">${e(t('Writing History shows how the words were typed and when. It can’t show whose ideas they were.'))}</p>`;
+    <p class="ev-small">${e(t('What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.'))}</p>`;
   if (!scope) {
     const ids = [...order.filter((ch) => ev.chapters[ch] || ev.words[ch] !== undefined), ...Object.keys(ev.chapters).filter((ch) => !order.includes(ch))];
     if (ids.length > 1) {

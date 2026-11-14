@@ -978,7 +978,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Von außerhalb von NEO eingefügt: {chars} Zeichen, {share} des jetzigen Texts.",
   "Text moved within the book: {chars} characters.": "Innerhalb des Buchs verschobener Text: {chars} Zeichen.",
   "Pauses": "Pausen",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "Zeitstempel waren nicht eingeschaltet, also legt nichts in diesem Export den Verlauf zeitlich fest. Er zeigt, wie das Buch geschrieben wurde, nicht wann.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Nichts legt diesen Verlauf zeitlich fest: Keine Schreibsitzung bekam einen Zeitstempel. Ein nachträglich erfundener Verlauf könnte jede Prüfung unten bestehen.",
   "Timestamp your writing history?": "Deinen Schreibverlauf mit Zeitstempeln versehen?",
   "Reading every session…": "Alle Sitzungen werden gelesen…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1058,7 +1058,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO führt keinen Verlauf. Schnappschüsse funktionieren weiterhin.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Jeder Tastendruck wird mit dem Buch auf diesem Computer gespeichert, damit du sehen kannst, wie es geschrieben wurde, und jede frühere Fassung zurückholen kannst. Nichts wird irgendwohin gesendet.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Jeder Tastendruck wird aufgezeichnet, und in jeder Stunde, in der du schreibst, geht ein eindeutiger Fingerabdruck der Aufzeichnung (nie deine Worte) an zwei Zeitstempeldienste. Ihre Quittungen belegen, dass dein Text über die Zeit hinweg entstanden ist.",
-  "Timestamps cover your writing from the day they’re turned on.": "Zeitstempel decken dein Schreiben ab dem Tag ab, an dem du sie einschaltest.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Zeitstempel lassen sich nicht nachträglich hinzufügen: Sie decken ab, was du ab dem Tag schreibst, an dem du sie einschaltest.",
   "New: your writing history": "Neu: dein Schreibverlauf",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO kann jetzt aufzeichnen, wie du schreibst, Tastendruck für Tastendruck, damit du sehen kannst, wie jedes Kapitel geschrieben und überarbeitet wurde, und jede frühere Fassung zurückholen kannst.",
   "With timestamps, you also have proof that your work was written over time.": "Mit Zeitstempeln kannst du außerdem belegen, dass dein Text über die Zeit hinweg entstanden ist.",
@@ -1112,7 +1112,7 @@
   "Undo or redo from the Edit menu: {n}.": "Rückgängig oder Wiederholen aus dem Menü Bearbeiten: {n}.",
   "When the text you see here was first timestamped": "Wann der Text, den du hier siehst, zum ersten Mal einen Zeitstempel bekam",
   "Not typed": "Nicht getippt",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Der Schreibverlauf zeigt, wie und wann die Worte getippt wurden. Er kann nicht zeigen, wessen Ideen sie waren.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Was dies zeigen kann: dass der Verlauf in sich stimmig ist und sich genau bis zum Buch abspielen lässt und, wo er Zeitstempel hat, dass es ihn da schon gab und er im gezeigten Tempo wuchs, also nicht nachträglich erfunden wurde. Was es nicht zeigen kann: wer an der Tastatur saß oder wessen Ideen die Worte waren.",
   "How It Was Written…": "Wie es geschrieben wurde…",
   "How it was written": "Wie es geschrieben wurde",
   "{name} (joined to another chapter)": "{name} (an ein anderes Kapitel angehängt)",
@@ -1125,5 +1125,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Sie enthält jeden Tastendruck in den Kapiteln, die sie trägt: die Wörter, die du gelöscht hast, ebenso wie die, die geblieben sind, jede Pause, und wann du geschrieben hast (die Daten, die Uhrzeiten und deine Zeitzone).",
   "Device {n}": "Gerät {n}",
   "Older": "Früher",
-  "Newer": "Später"
+  "Newer": "Später",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Zeitstempel lassen sich nicht nachträglich hinzufügen. Wenn du diesen Nachweis für ein Buch vielleicht willst, schalte sie ein, bevor du damit anfängst.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Zeitstempel lassen sich nicht nachträglich hinzufügen: Sie decken ab, was du ab jetzt schreibst. Was du vorher geschrieben hast, bleibt in deinem Schreibverlauf, aber nichts legt es zeitlich fest.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Zeitlich festgelegt: {n} von {all} Schreibsitzungen bekamen innerhalb eines Tages nach ihrem Ende einen Zeitstempel.",
+  "Checked, but not timestamped": "Geprüft, aber ohne Zeitstempel",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Was diese Prüfungen zeigen können: dass der Verlauf in sich stimmig ist und sich genau abspielen lässt und, wo er Zeitstempel hat, dass es ihn da schon gab und er nicht nachträglich erfunden wurde. Was sie nicht zeigen können: wer an der Tastatur saß oder wessen Ideen die Worte waren.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nichts legt diesen Verlauf zeitlich fest: Keine Schreibsitzung bekam einen Zeitstempel. Er zeigt, wie das Buch geschrieben wurde, aber nicht wann, und ein nachträglich erfundener Verlauf könnte genauso aussehen.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Zeitlich festgelegt: {n} von {all} Schreibsitzungen bekamen innerhalb eines Tages nach ihrem Ende einen Zeitstempel, die Hälfte davon innerhalb von {soon}.",
+  "a minute": "einer Minute"
 }

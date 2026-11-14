@@ -88,7 +88,9 @@
 
   // Each device's chains: every session's verifies (an open one's up to its
   // last flush), and each names the one before it (`prev`)
-  function checkChains(sessions, partial) {
+  // cover: an object to fill with what Rec.timeCover needs of each
+  // device's sessions, when the caller wants the time cover too
+  function checkChains(sessions, partial, cover = null) {
     const out = {};
     const last = {};
     for (const s of sessions) {
@@ -96,6 +98,12 @@
       d.sessions++;
       if (partial) continue;
       const v = Rec.verifyChain(s.text);
+      // what the time cover needs of it (Rec.timeCover): its heads, and when it began and ended
+      const { header, lines } = Rec.parseSession(s.text);
+      const from = header ? Date.parse(header.startedAt) : null;
+      let to = from;
+      for (const w of Rec.lineWalls(header, lines).walls) if (Number.isFinite(w)) to = Math.max(to, w);
+      if (cover) (cover[s.device] || (cover[s.device] = [])).push({ id: s.id, open: !!s.open, last: v.last, settled: v.settled, wrote: v.wrote, from, to });
       if (v.ok || (s.open && v.breaks.every((b) => b.reason === 'unsealed' || b.reason === 'torn'))) d.whole++;
       else d.broken.push(s.id);
       if (s.device in last && s.header && s.header.prev !== last[s.device]) d.unchained.push(s.id);
@@ -1336,10 +1344,12 @@
           drawTimeline();
           drawWhen();
         },
-        checked(ok, text) {
+        // unfixed: it holds together, but nothing fixes it in time
+        checked(ok, text, unfixed = false) {
           ckBtn.textContent = text;
           ckBtn.classList.toggle('ok', ok === true);
           ckBtn.classList.toggle('bad', ok === false);
+          ckBtn.classList.toggle('unfixed', ok === true && unfixed);
         }
       };
     }
@@ -1353,7 +1363,8 @@
     const total = sessions.length * 2 + 1;
     let done = 0;
     const step = () => progress(++done, total);
-    const chains = checkChains(sessions, partial);
+    const spans = {};
+    const chains = checkChains(sessions, partial, spans);
     const replays = await checkReplay(sessions, step);
     const out = { chains, replays, seals: {}, evidence: null };
     if (!partial) {
@@ -1366,6 +1377,8 @@
         if (!files.length) continue;
         out.seals[d] = await checkSeals(files, byDevice.get(d) || new Map(), byDevice);
       }
+      // how much of the history the seals fix in time, every device's sessions
+      out.cover = Rec.coverSummary(Object.entries(spans).flatMap(([d, list]) => Rec.timeCover(list, Rec.sealsOver(d, out.seals))));
     } else if (seals) {
       // some chapters: the seals over their lines
       const kept = keptOf(sessions) || new Set();
@@ -1448,6 +1461,16 @@
       ui.checked(null, pct);
     });
     waiting.remove();
+    // first, whether anything fixes the history in time: a history made up
+    // afterwards can hold together, and play back, as well as a real one
+    if (!data.partial && res.cover && (!res.cover.stamped || res.cover.sessions)) {
+      const c = res.cover;
+      const lead = line(null, !c.stamped
+        ? T('Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.')
+        : T('Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.', { n: fmtNum(c.within), all: fmtNum(c.sessions) }));
+      lead.classList.add('rx-lead');
+      if (!c.stamped) lead.classList.add('rx-unfixed');
+    }
     for (const [d, c] of Object.entries(res.chains)) {
       if (!data.partial) {
         const ok = !c.broken.length && !c.unchained.length;
@@ -1478,7 +1501,7 @@
     // seals
     if (!data.partial || chapterSealed) {
       const devices = Object.keys(res.seals);
-      if (!devices.length) line(null, T('Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.'));
+      // (none: the first line says nothing fixes the history in time)
       for (const d of devices) {
         const r = res.seals[d];
         const stampedOnes = r.seals.filter((s) => s.by !== null);
@@ -1505,9 +1528,11 @@
       const report = doc.getElementById('rx-report');
       report.insertBefore(p, report.firstChild);
     }
+    box.append(el('p', 'rx-small', T('What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.')));
     const made = doc.getElementById('rx-made');
     if (made) box.append(made);
-    ui.checked(!bad, bad ? T('Some checks failed') : T('Checked'));
+    const unfixed = data.partial ? !chapterSealed : !(res.cover && res.cover.stamped);
+    ui.checked(!bad, bad ? T('Some checks failed') : unfixed ? T('Checked, but not timestamped') : T('Checked'), unfixed);
   }
 
   function download(name, bytes, type = 'application/octet-stream') {

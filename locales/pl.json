@@ -1034,7 +1034,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Wklejone spoza NEO: znaki: {chars}, {share} obecnego tekstu.",
   "Text moved within the book: {chars} characters.": "Tekst przeniesiony w obrębie książki: znaki: {chars}.",
   "Pauses": "Pauzy",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "Znaczniki czasu nie były włączone, więc nic w tym eksporcie nie osadza historii w czasie. Pokazuje, jak powstawała książka, a nie kiedy.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Nic nie ustala tej historii w czasie: żadna sesja pisania nie dostała znacznika czasu. Historia zmyślona później mogłaby przejść każdą kontrolę poniżej.",
   "Timestamp your writing history?": "Dodawać znaczniki czasu do historii pisania?",
   "Reading every session…": "Czytanie wszystkich sesji…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1120,7 +1120,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO nie prowadzi historii. Migawki nadal działają.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Każde naciśnięcie klawisza zostaje z książką, na tym komputerze, więc możesz zobaczyć, jak powstawała, i przywrócić każdą wcześniejszą wersję. Nic nie jest nigdzie wysyłane.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Każde naciśnięcie klawisza jest nagrywane, a w każdej godzinie pisania niepowtarzalny odcisk nagrania (nigdy twoje słowa) trafia do dwóch usług znaczników czasu. Ich potwierdzenia dowodzą, że twój tekst powstawał stopniowo, z czasem.",
-  "Timestamps cover your writing from the day they’re turned on.": "Znaczniki czasu obejmują twoje pisanie od dnia, w którym je włączysz.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Znaczników czasu nie da się dodać później: obejmują to, co piszesz od dnia, w którym je włączysz.",
   "New: your writing history": "Nowość: twoja historia pisania",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO może teraz nagrywać, jak piszesz, klawisz po klawiszu, więc możesz zobaczyć, jak powstawał i zmieniał się każdy rozdział, i przywrócić każdą wcześniejszą wersję.",
   "With timestamps, you also have proof that your work was written over time.": "Ze znacznikami czasu masz też dowód, że twój tekst powstawał stopniowo, z czasem.",
@@ -1174,7 +1174,7 @@
   "Undo or redo from the Edit menu: {n}.": "Cofnij lub Ponów z menu Edycja: {n}.",
   "When the text you see here was first timestamped": "Kiedy tekst, który tu widzisz, pierwszy raz dostał znacznik czasu",
   "Not typed": "Nie wpisane",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Historia pisania pokazuje, jak i kiedy wpisano słowa. Nie może pokazać, czyje były pomysły.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Co to może pokazać: że historia jest spójna i odtwarza się dokładnie aż do książki, a tam, gdzie ma znacznik czasu, że istniała już wtedy i rosła w pokazanym tempie, więc nie została zmyślona później. Czego nie może pokazać: kto siedział przy klawiaturze ani czyje były pomysły.",
   "How It Was Written…": "Jak to powstało…",
   "How it was written": "Jak to powstało",
   "{name} (joined to another chapter)": "{name} (dołączony do innego rozdziału)",
@@ -1187,5 +1187,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Zawiera każde naciśnięcie klawisza w rozdziałach, które niesie: słowa usunięte tak samo jak zachowane, każdą przerwę, a także kiedy pisałeś (daty, godziny i twoją strefę czasową).",
   "Device {n}": "Urządzenie {n}",
   "Older": "Wcześniejsza",
-  "Newer": "Późniejsza"
+  "Newer": "Późniejsza",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Znaczników czasu nie da się dodać później, więc jeśli możesz chcieć tego dowodu dla książki, włącz je, zanim ją zaczniesz.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Znaczników czasu nie da się dodać później: obejmują to, co piszesz od teraz. To, co napisałeś wcześniej, zostaje w Historii pisania, ale nic nie ustala tego w czasie.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Ustalone w czasie: sesje pisania ze znacznikiem czasu w ciągu dnia od zakończenia: {n} z {all}.",
+  "Checked, but not timestamped": "Sprawdzono, ale bez znacznika czasu",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Co mogą pokazać te kontrole: że historia jest spójna i odtwarza się dokładnie, a tam, gdzie ma znacznik czasu, że istniała już wtedy i nie została zmyślona później. Czego nie mogą pokazać: kto siedział przy klawiaturze ani czyje były pomysły.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nic nie ustala tej historii w czasie: żadna sesja pisania nie dostała znacznika czasu. Pokazuje, jak książka była pisana, ale nie kiedy, a historia zmyślona później mogłaby wyglądać tak samo.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Ustalone w czasie: sesje pisania ze znacznikiem czasu w ciągu dnia od zakończenia: {n} z {all}, połowa w ciągu {soon}.",
+  "a minute": "minuty"
 }

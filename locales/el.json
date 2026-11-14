@@ -916,7 +916,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Επικολλήθηκαν από έξω από το NEO: {chars} χαρακτήρες, {share} του σημερινού κειμένου.",
   "Text moved within the book: {chars} characters.": "Κείμενο που μετακινήθηκε μέσα στο βιβλίο: {chars} χαρακτήρες.",
   "Pauses": "Παύσεις",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "Η χρονοσήμανση δεν ήταν ενεργή, οπότε τίποτα σε αυτή την εξαγωγή δεν τοποθετεί το ιστορικό στον χρόνο. Δείχνει πώς γράφτηκε το βιβλίο, όχι πότε.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Τίποτα δεν τοποθετεί αυτό το ιστορικό στον χρόνο: καμία συνεδρία γραφής δεν χρονοσημάνθηκε. Ένα ιστορικό φτιαγμένο εκ των υστέρων θα περνούσε κάθε έλεγχο παρακάτω.",
   "Timestamp your writing history?": "Χρονοσήμανση του ιστορικού γραφής σας;",
   "Reading every session…": "Ανάγνωση όλων των συνεδριών…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -996,7 +996,7 @@
   "NEO keeps no history. Snapshots still work.": "Το NEO δεν κρατά ιστορικό. Τα στιγμιότυπα λειτουργούν κανονικά.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Κάθε πάτημα πλήκτρου φυλάγεται μαζί με το βιβλίο, σε αυτόν τον υπολογιστή, ώστε να βλέπετε πώς γράφτηκε και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή. Τίποτα δεν αποστέλλεται πουθενά.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Κάθε πλήκτρο καταγράφεται, και κάθε ώρα που γράφετε, ένα μοναδικό αποτύπωμα της καταγραφής (ποτέ οι λέξεις σας) πηγαίνει σε δύο υπηρεσίες χρονοσήμανσης. Οι αποδείξεις τους αποδεικνύουν ότι το έργο σας γράφτηκε σταδιακά, με τον χρόνο.",
-  "Timestamps cover your writing from the day they’re turned on.": "Οι χρονοσημάνσεις καλύπτουν τη γραφή σας από την ημέρα που ενεργοποιούνται.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Οι χρονοσημάνσεις δεν προστίθενται εκ των υστέρων: καλύπτουν ό,τι γράφετε από την ημέρα που ενεργοποιούνται.",
   "New: your writing history": "Νέο: το ιστορικό γραφής σας",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "Το NEO μπορεί πλέον να καταγράφει πώς γράφετε, πλήκτρο προς πλήκτρο, ώστε να βλέπετε πώς γράφτηκε και αναθεωρήθηκε κάθε κεφάλαιο και να επαναφέρετε οποιαδήποτε προηγούμενη εκδοχή.",
   "With timestamps, you also have proof that your work was written over time.": "Με τις χρονοσημάνσεις έχετε επιπλέον απόδειξη ότι το έργο σας γράφτηκε σταδιακά, με τον χρόνο.",
@@ -1050,7 +1050,7 @@
   "Undo or redo from the Edit menu: {n}.": "Αναίρεση ή Επανάληψη από το μενού Επεξεργασία: {n}.",
   "When the text you see here was first timestamped": "Πότε χρονοσημάνθηκε για πρώτη φορά το κείμενο που βλέπετε εδώ",
   "Not typed": "Χωρίς πληκτρολόγηση",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Το Ιστορικό γραφής δείχνει πώς και πότε πληκτρολογήθηκαν οι λέξεις. Δεν μπορεί να δείξει ποιανού ήταν οι ιδέες.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Τι μπορεί να δείξει: ότι το ιστορικό στέκει και αναπαράγεται ακριβώς ως το βιβλίο και, όπου χρονοσημάνθηκε, ότι υπήρχε ως τότε και μεγάλωνε με τον ρυθμό που δείχνει, άρα δεν φτιάχτηκε εκ των υστέρων. Τι δεν μπορεί να δείξει: ποιος ήταν στο πληκτρολόγιο ή ποιανού ήταν οι ιδέες.",
   "How It Was Written…": "Πώς γράφτηκε…",
   "How it was written": "Πώς γράφτηκε",
   "{name} (joined to another chapter)": "{name} (ενώθηκε με άλλο κεφάλαιο)",
@@ -1063,5 +1063,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Περιέχει κάθε πάτημα πλήκτρου στα κεφάλαια που φέρει: τις λέξεις που σβήσατε όπως και αυτές που κρατήσατε, κάθε παύση, και πότε γράψατε (τις ημερομηνίες, τις ώρες και τη ζώνη ώρας σας).",
   "Device {n}": "Συσκευή {n}",
   "Older": "Προηγούμενη",
-  "Newer": "Επόμενη"
+  "Newer": "Επόμενη",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Οι χρονοσημάνσεις δεν προστίθενται εκ των υστέρων, οπότε αν ίσως θέλετε αυτή την απόδειξη για ένα βιβλίο, ενεργοποιήστε τες πριν το ξεκινήσετε.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Οι χρονοσημάνσεις δεν προστίθενται εκ των υστέρων: καλύπτουν ό,τι γράφετε από τώρα και στο εξής. Ό,τι γράψατε πριν μένει στο Ιστορικό γραφής σας, αλλά τίποτα δεν το τοποθετεί στον χρόνο.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Τοποθετημένο στον χρόνο: {n} από {all} συνεδρίες γραφής χρονοσημάνθηκαν μέσα σε μία ημέρα από το τέλος τους.",
+  "Checked, but not timestamped": "Ελέγχθηκε, αλλά χωρίς χρονοσήμανση",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Τι μπορούν να δείξουν αυτοί οι έλεγχοι: ότι το ιστορικό στέκει και αναπαράγεται ακριβώς και, όπου χρονοσημάνθηκε, ότι υπήρχε ως τότε και δεν φτιάχτηκε εκ των υστέρων. Τι δεν μπορούν να δείξουν: ποιος ήταν στο πληκτρολόγιο ή ποιανού ήταν οι ιδέες.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Τίποτα δεν τοποθετεί αυτό το ιστορικό στον χρόνο: καμία συνεδρία γραφής δεν χρονοσημάνθηκε. Δείχνει πώς γράφτηκε το βιβλίο, όχι πότε, και ένα ιστορικό φτιαγμένο εκ των υστέρων θα έμοιαζε ίδιο.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Τοποθετημένο στον χρόνο: {n} από {all} συνεδρίες γραφής χρονοσημάνθηκαν μέσα σε μία ημέρα από το τέλος τους, οι μισές μέσα σε {soon}.",
+  "a minute": "ένα λεπτό"
 }

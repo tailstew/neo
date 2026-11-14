@@ -979,7 +979,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Pegado desde fuera de NEO: {chars} caracteres, {share} del texto actual.",
   "Text moved within the book: {chars} characters.": "Texto movido dentro del libro: {chars} caracteres.",
   "Pauses": "Pausas",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "El sello de tiempo no estaba activado, así que nada en esta exportación fija el historial en el tiempo. Muestra cómo se escribió el libro, no cuándo.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Nada fija este historial en el tiempo: ninguna sesión de escritura recibió sello de tiempo. Un historial inventado después podría pasar todas las comprobaciones de abajo.",
   "Timestamp your writing history?": "¿Poner sello de tiempo a tu historial de escritura?",
   "Reading every session…": "Leyendo todas las sesiones…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1059,7 +1059,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO no guarda historial. Las instantáneas siguen funcionando.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Cada pulsación se guarda con el libro, en este ordenador, para que puedas ver cómo se escribió y recuperar cualquier versión anterior. No se envía nada a ninguna parte.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Cada pulsación se graba y, cada hora que escribes, una huella única de la grabación (nunca tus palabras) va a dos servicios de sello de tiempo. Sus recibos prueban que tu obra se escribió a lo largo del tiempo.",
-  "Timestamps cover your writing from the day they’re turned on.": "Los sellos de tiempo cubren tu escritura desde el día en que se activan.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Los sellos de tiempo no se pueden añadir después: cubren lo que escribes desde el día en que se activan.",
   "New: your writing history": "Novedad: tu historial de escritura",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO ya puede grabar cómo escribes, pulsación a pulsación, para que puedas ver cómo se escribió y revisó cualquier capítulo y recuperar cualquier versión anterior.",
   "With timestamps, you also have proof that your work was written over time.": "Con los sellos de tiempo, además tienes pruebas de que tu obra se escribió a lo largo del tiempo.",
@@ -1113,7 +1113,7 @@
   "Undo or redo from the Edit menu: {n}.": "Deshacer o rehacer desde el menú Edición: {n}.",
   "When the text you see here was first timestamped": "Cuándo recibió por primera vez un sello de tiempo el texto que ves aquí",
   "Not typed": "Sin teclear",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "El Historial de escritura muestra cómo y cuándo se teclearon las palabras. No puede mostrar de quién eran las ideas.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Lo que esto puede mostrar: que el historial es coherente y se reproduce exactamente hasta el libro y, donde tiene sello de tiempo, que ya existía entonces y creció al ritmo que muestra, así que no se inventó después. Lo que no puede mostrar: quién estaba al teclado, ni de quién eran las ideas.",
   "How It Was Written…": "Cómo se escribió…",
   "How it was written": "Cómo se escribió",
   "{name} (joined to another chapter)": "{name} (unido a otro capítulo)",
@@ -1126,5 +1126,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Contiene cada pulsación de tecla de los capítulos que lleva: las palabras que borraste además de las que dejaste, cada pausa, y cuándo escribiste (las fechas, las horas y tu zona horaria).",
   "Device {n}": "Dispositivo {n}",
   "Older": "Anterior",
-  "Newer": "Posterior"
+  "Newer": "Posterior",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Los sellos de tiempo no se pueden añadir después, así que si quizá quieras esta prueba para un libro, actívalos antes de empezarlo.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Los sellos de tiempo no se pueden añadir después: cubren lo que escribas a partir de ahora. Lo que escribiste antes sigue en tu Historial de escritura, pero nada lo fija en el tiempo.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Fijado en el tiempo: {n} de {all} sesiones de escritura recibieron sello de tiempo en el día siguiente a su fin.",
+  "Checked, but not timestamped": "Comprobado, pero sin sello de tiempo",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Lo que pueden mostrar estas comprobaciones: que el historial es coherente y se reproduce con exactitud y, donde tiene sello de tiempo, que ya existía entonces y no se inventó después. Lo que no pueden mostrar: quién estaba al teclado, ni de quién eran las ideas.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nada fija este historial en el tiempo: ninguna sesión de escritura recibió sello de tiempo. Muestra cómo se escribió el libro, pero no cuándo, y un historial inventado después podría verse igual.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fijado en el tiempo: {n} de {all} sesiones de escritura recibieron sello de tiempo en el día siguiente a su fin, la mitad en menos de {soon}.",
+  "a minute": "un minuto"
 }

@@ -1019,7 +1019,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Lipit din afara NEO: {chars} caractere, {share} din textul actual.",
   "Text moved within the book: {chars} characters.": "Text mutat în cadrul cărții: {chars} caractere.",
   "Pauses": "Pauze",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "Marcajul temporal nu era pornit, așa că nimic din acest export nu fixează istoricul în timp. Arată cum a fost scrisă cartea, nu când.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Nimic nu fixează acest istoric în timp: nicio sesiune de scris nu a primit marcaj temporal. Un istoric inventat ulterior ar putea trece toate verificările de mai jos.",
   "Timestamp your writing history?": "Pui marcaj temporal pe istoricul scrisului?",
   "Reading every session…": "Se citesc toate sesiunile…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1102,7 +1102,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO nu păstrează istoric. Instantaneele funcționează în continuare.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Fiecare apăsare de tastă rămâne cu cartea, pe acest computer, ca să poți vedea cum a fost scrisă și să aduci înapoi orice versiune anterioară. Nimic nu este trimis nicăieri.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Fiecare tastă e înregistrată și, în fiecare oră în care scrii, o amprentă unică a înregistrării (niciodată cuvintele tale) pleacă spre două servicii de marcaj temporal. Chitanțele lor dovedesc că opera ta a fost scrisă în timp, treptat.",
-  "Timestamps cover your writing from the day they’re turned on.": "Marcajele temporale acoperă scrisul tău din ziua în care sunt pornite.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Marcajele temporale nu pot fi adăugate ulterior: acoperă ce scrii din ziua în care sunt pornite.",
   "New: your writing history": "Nou: istoricul scrisului tău",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO poate acum înregistra cum scrii, tastă cu tastă, ca să poți vedea cum a fost scris și revizuit orice capitol și să aduci înapoi orice versiune anterioară.",
   "With timestamps, you also have proof that your work was written over time.": "Cu marcajele temporale ai și dovada că opera ta a fost scrisă în timp, treptat.",
@@ -1156,7 +1156,7 @@
   "Undo or redo from the Edit menu: {n}.": "Anulare sau refacere din meniul Editare: {n}.",
   "When the text you see here was first timestamped": "Când a primit textul pe care îl vezi aici primul marcaj temporal",
   "Not typed": "Netastat",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "Istoricul scrisului arată cum și când au fost tastate cuvintele. Nu poate arăta ale cui erau ideile.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Ce poate arăta: că istoricul se leagă și se redă exact până la carte și, unde a primit marcaj temporal, că exista deja atunci și a crescut în ritmul pe care îl arată, deci nu a fost inventat ulterior. Ce nu poate arăta: cine stătea la tastatură sau ale cui erau ideile.",
   "How It Was Written…": "Cum a fost scris…",
   "How it was written": "Cum a fost scris",
   "{name} (joined to another chapter)": "{name} (unit cu alt capitol)",
@@ -1169,5 +1169,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Conține fiecare tastă apăsată în capitolele pe care le poartă: cuvintele șterse la fel ca și cele păstrate, fiecare pauză, și când ai scris (datele, orele și fusul tău orar).",
   "Device {n}": "Dispozitivul {n}",
   "Older": "Anterioară",
-  "Newer": "Următoare"
+  "Newer": "Următoare",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Marcajele temporale nu pot fi adăugate ulterior, așa că dacă s-ar putea să vrei această dovadă pentru o carte, pornește-le înainte s-o începi.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Marcajele temporale nu pot fi adăugate ulterior: acoperă ce scrii de acum înainte. Ce ai scris înainte rămâne în Istoricul scrisului, dar nimic nu îl fixează în timp.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Fixat în timp: {n} din {all} sesiuni de scris au primit marcaj temporal în ziua de după încheiere.",
+  "Checked, but not timestamped": "Verificat, dar fără marcaj temporal",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Ce pot arăta aceste verificări: că istoricul se leagă și se redă exact și, unde a primit marcaj temporal, că exista deja atunci și nu a fost inventat ulterior. Ce nu pot arăta: cine stătea la tastatură sau ale cui erau ideile.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nimic nu fixează acest istoric în timp: nicio sesiune de scris nu a primit marcaj temporal. Arată cum a fost scrisă cartea, dar nu și când, iar un istoric inventat ulterior ar putea arăta la fel.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixat în timp: {n} din {all} sesiuni de scris au primit marcaj temporal în ziua de după încheiere, jumătate dintre ele în mai puțin de {soon}.",
+  "a minute": "un minut"
 }

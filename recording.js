@@ -3431,6 +3431,55 @@
     return out;
   }
 
+  // The time cover of one device's sessions: when each was first timestamped
+  // in part (a seal over the session while it was open) and when as a whole
+  // (a seal naming its last `h`), from checked seals in any order
+  // (sealsOver: its own, and other devices' that sealed it). Sessions are
+  // { id, open, last (its last h), settled, wrote, from, to }: a seal over
+  // any `settled` h (verifyChain) covers it whole, since only the caret,
+  // focus and the clock came after; without them, only its last. A closed
+  // session that wrote, with no whole stamp or one stamped more than a day
+  // after it ended, is a gap:
+  // [{ session, from, to, firstStamped, wholeBy, open, idle, gap: 'never' | 'late' }]
+  const COVER_DAY = 24 * 3600 * 1000;
+  function timeCover(sessions, seals) {
+    const bySession = new Map();
+    for (const s of seals) {
+      const when = s.by !== null ? s.by : s.byLater || null;
+      for (const [id, h] of Object.entries(s.heads || {})) {
+        const was = bySession.get(id) || { first: null, whole: null };
+        if (when && (was.first === null || when < was.first)) was.first = when;
+        const x = sessions.find((y) => y.id === id) || {};
+        if (s.ok && when && (was.whole === null || when < was.whole) && (x.settled ? x.settled.includes(h) : h === x.last)) was.whole = when;
+        bySession.set(id, was);
+      }
+    }
+    return sessions.map((s) => {
+      const b = bySession.get(s.id) || { first: null, whole: null };
+      const c = { session: s.id, from: s.from, to: s.to, firstStamped: b.first, wholeBy: b.whole, open: !!s.open, idle: s.wrote === false };
+      if (s.wrote === false) return c;
+      if (!b.whole && !s.open) c.gap = 'never';
+      else if (b.whole && s.to !== null && b.whole - s.to > COVER_DAY) c.gap = 'late';
+      return c;
+    });
+  }
+
+  // A book's time cover in a line: of the sessions that wrote and have
+  // ended (an open one can't be judged yet), how many were timestamped
+  // whole within a day of ending, and how soon half of those were (the
+  // median, in ms). What every report puts first: without it, a history
+  // that holds together shows only that it holds together, not when it
+  // was made. Rows are timeCover's, every device's together.
+  // `stamped`: sessions timestamped at all, late or in part (one still
+  // open): none means nothing fixes the history in time.
+  function coverSummary(rows) {
+    const counted = rows.filter((c) => !c.idle && !(c.open && !c.wholeBy));
+    const within = counted.filter((c) => c.wholeBy && !c.gap);
+    const lags = within.map((c) => (Number.isFinite(c.to) ? Math.max(0, c.wholeBy - c.to) : null)).filter((x) => x !== null).sort((a, b) => a - b);
+    const stamped = rows.filter((c) => !c.idle && (c.wholeBy || c.firstStamped)).length;
+    return { sessions: counted.length, within: within.length, stamped, median: lags.length ? lags[Math.floor((lags.length - 1) / 2)] : null };
+  }
+
   // How many of a player's steps (`view`, indexes into `steps`, with `vt`
   // their moments on its clock) only say what the text was before the
   // recording saw any of it written: the chapters set whole or caught up
@@ -3520,6 +3569,7 @@
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, partDoubt, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
+    timeCover, coverSummary,
     EV_BINS, EV_GAPS, EV_RUNS, evidence, evidenceRead, evQuantile, lineChapter, keepChapters, causeChapters, CHAPTER_HASH, chapterLines, ChapterChains, chapterSeals, movedIn, sealsOver
   };
 });

@@ -340,6 +340,11 @@ test('a phone’s sessions sealed by a computer: NEO, the page and verify-record
   const v = await verifyBook(book);
   assert.equal(v.ok, true, JSON.stringify(v.devices.map((d) => d.problems)));
   assert.deepEqual(v.devices.find((d) => d.device === PHONE).sealedBy, [LAPTOP]);
+  // the book's time cover, what each puts first: the same figures in all three
+  const fromNeo = R.coverSummary(r.cover.flatMap((d) => d.cover));
+  assert.deepEqual(res.cover, fromNeo, 'the page and How It Was Written…');
+  assert.deepEqual(v.cover, fromNeo, 'verify-recording and How It Was Written…');
+  assert.ok(fromNeo.sessions > 0);
   // a phone session changed after it was sealed: the laptop's seal fails
   const zlib = require('node:zlib');
   const first = fs.readdirSync(path.join(root, PHONE)).sort()[0];

@@ -505,7 +505,9 @@ test('the whole book: the save dialog in the last export folder, named “<title
       };
     })()`);
     assert.ok(s.ok, 'checked: ' + s.checked);
-    assert.match(s.checked, /Checked$/);
+    // a book never timestamped: it holds together, and says nothing fixes it in time
+    assert.equal(s.checked, 'Checked, but not timestamped');
+    assert.match(await page.js('document.querySelector(".rx-lead.rx-unfixed").textContent'), /^Nothing fixes this history in time: no writing session was timestamped\./);
     assert.deepEqual(s.actions, ['How it was written', s.checked]);
     assert.deepEqual(s.side, ['The whole book', ...await js('book.chapterOrder.map((c) => historyChapterLabel(book, c, book.chapterOrder))')]);
     assert.ok(s.tiles >= 1);
@@ -752,7 +754,9 @@ test('the whole book with its seals: checked, each seal’s fingerprint as verif
   SEALED = await exportHistory();
   const page = await openPage(SEALED);
   try {
-    assert.match(await page.js('document.querySelector(".rx-ckbtn").textContent'), /Checked$/);
+    const lead = await page.js('document.querySelector(".rx-lead") ? document.querySelector(".rx-lead").textContent : ""');
+    assert.match(await page.js('document.querySelector(".rx-ckbtn").textContent'), /Checked$/, lead);
+    assert.match(lead, /^Fixed in time: \d+ of \d+ writing sessions were timestamped within a day of ending\.$/);
     const tbl = await page.js(`[...document.querySelectorAll('.rx-seals tr')].map((tr) => [...tr.children].map((c) => c.textContent))`);
     assert.deepEqual(tbl[0], ['Seal', 'Fingerprint', 'Made', 'After (drand)', 'Timestamped', 'Files']);
     const out = print(await verifyBook(path.join(neo.LIB, neo.book)));

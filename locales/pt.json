@@ -978,7 +978,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Colado de fora do NEO: {chars} caracteres, {share} do texto atual.",
   "Text moved within the book: {chars} characters.": "Texto movido dentro do livro: {chars} caracteres.",
   "Pauses": "Pausas",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "O carimbo de tempo não estava ligado, então nada nesta exportação fixa o histórico no tempo. Ela mostra como o livro foi escrito, não quando.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Nada fixa este histórico no tempo: nenhuma sessão de escrita recebeu carimbo de tempo. Um histórico inventado depois poderia passar em todas as verificações abaixo.",
   "Timestamp your writing history?": "Carimbar o tempo do seu histórico de escrita?",
   "Reading every session…": "Lendo todas as sessões…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1058,7 +1058,7 @@
   "NEO keeps no history. Snapshots still work.": "O NEO não guarda histórico. Os instantâneos continuam funcionando.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Cada tecla fica guardada com o livro, neste computador, para você ver como ele foi escrito e recuperar qualquer versão anterior. Nada é enviado a lugar nenhum.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Cada tecla é gravada e, a cada hora em que você escreve, uma impressão digital única da gravação (nunca suas palavras) vai para dois serviços de carimbo de tempo. Os recibos deles provam que sua obra foi escrita ao longo do tempo.",
-  "Timestamps cover your writing from the day they’re turned on.": "Os carimbos de tempo cobrem sua escrita a partir do dia em que são ligados.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Os carimbos de tempo não podem ser adicionados depois: cobrem o que você escreve a partir do dia em que são ligados.",
   "New: your writing history": "Novo: seu histórico de escrita",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "Agora o NEO pode gravar como você escreve, tecla por tecla, para você ver como qualquer capítulo foi escrito e revisado e recuperar qualquer versão anterior.",
   "With timestamps, you also have proof that your work was written over time.": "Com os carimbos de tempo, você também tem prova de que sua obra foi escrita ao longo do tempo.",
@@ -1112,7 +1112,7 @@
   "Undo or redo from the Edit menu: {n}.": "Desfazer ou refazer pelo menu Editar: {n}.",
   "When the text you see here was first timestamped": "Quando o texto que você vê aqui recebeu um carimbo de tempo pela primeira vez",
   "Not typed": "Não digitado",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "O Histórico de escrita mostra como e quando as palavras foram digitadas. Não pode mostrar de quem eram as ideias.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "O que isto pode mostrar: que o histórico é coerente e é reproduzido exatamente até o livro e, onde recebeu carimbo de tempo, que já existia então e cresceu no ritmo que mostra, portanto não foi inventado depois. O que não pode mostrar: quem estava no teclado, ou de quem eram as ideias.",
   "How It Was Written…": "Como foi escrito…",
   "How it was written": "Como foi escrito",
   "{name} (joined to another chapter)": "{name} (juntado a outro capítulo)",
@@ -1125,5 +1125,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Ela contém cada tecla pressionada nos capítulos que leva: as palavras que você apagou e as que manteve, cada pausa, e quando você escreveu (as datas, as horas e o seu fuso horário).",
   "Device {n}": "Dispositivo {n}",
   "Older": "Anterior",
-  "Newer": "Posterior"
+  "Newer": "Posterior",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Os carimbos de tempo não podem ser adicionados depois, então, se você talvez queira essa prova para um livro, ligue-os antes de começá-lo.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Os carimbos de tempo não podem ser adicionados depois: cobrem o que você escrever de agora em diante. O que você escreveu antes continua no seu Histórico de escrita, mas nada o fixa no tempo.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Fixado no tempo: {n} de {all} sessões de escrita receberam carimbo de tempo até um dia depois de terminar.",
+  "Checked, but not timestamped": "Verificado, mas sem carimbo de tempo",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "O que estas verificações podem mostrar: que o histórico é coerente e é reproduzido com exatidão e, onde recebeu carimbo de tempo, que já existia então e não foi inventado depois. O que não podem mostrar: quem estava no teclado, ou de quem eram as ideias.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nada fixa este histórico no tempo: nenhuma sessão de escrita recebeu carimbo de tempo. Ele mostra como o livro foi escrito, mas não quando, e um histórico inventado depois poderia parecer igual.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixado no tempo: {n} de {all} sessões de escrita receberam carimbo de tempo até um dia depois de terminar, metade delas em menos de {soon}.",
+  "a minute": "um minuto"
 }

@@ -980,7 +980,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Collé depuis l’extérieur de NEO : {chars} caractères, {share} du texte actuel.",
   "Text moved within the book: {chars} characters.": "Texte déplacé dans le livre : {chars} caractères.",
   "Pauses": "Pauses",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "L’horodatage n’était pas activé, donc rien dans cette exportation ne fixe l’historique dans le temps. Elle montre comment le livre a été écrit, pas quand.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Rien ne fixe cet historique dans le temps : aucune séance d’écriture n’a été horodatée. Un historique inventé après coup pourrait passer toutes les vérifications ci-dessous.",
   "Timestamp your writing history?": "Horodater votre historique d’écriture ?",
   "Reading every session…": "Lecture de toutes les séances…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1060,7 +1060,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO ne garde aucun historique. Les instantanés fonctionnent toujours.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Chaque frappe est gardée avec le livre, sur cet ordinateur, pour que vous puissiez voir comment il a été écrit et retrouver n’importe quelle version antérieure. Rien n’est envoyé nulle part.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Chaque frappe est enregistrée et, chaque heure où vous écrivez, une empreinte unique de l’enregistrement (jamais vos mots) part vers deux services d’horodatage. Leurs reçus prouvent que votre texte a été écrit au fil du temps.",
-  "Timestamps cover your writing from the day they’re turned on.": "L’horodatage couvre votre écriture à partir du jour où il est activé.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "L’horodatage ne peut pas être ajouté après coup : il couvre ce que vous écrivez à partir du jour où il est activé.",
   "New: your writing history": "Nouveau : votre historique d’écriture",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO peut désormais enregistrer votre façon d’écrire, frappe par frappe, pour que vous puissiez voir comment chaque chapitre a été écrit et révisé, et retrouver n’importe quelle version antérieure.",
   "With timestamps, you also have proof that your work was written over time.": "Avec l’horodatage, vous avez en plus la preuve que votre texte a été écrit au fil du temps.",
@@ -1114,7 +1114,7 @@
   "Undo or redo from the Edit menu: {n}.": "Annuler ou Rétablir depuis le menu Édition : {n}.",
   "When the text you see here was first timestamped": "Quand le texte que vous voyez ici a été horodaté pour la première fois",
   "Not typed": "Sans frappe",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "L’historique d’écriture montre comment et quand les mots ont été tapés. Il ne peut pas montrer de qui venaient les idées.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Ce que cela peut montrer : que l’historique est cohérent et se rejoue exactement jusqu’au livre et, là où il a été horodaté, qu’il existait déjà à ce moment et a grandi au rythme qu’il montre, donc qu’il n’a pas été inventé après coup. Ce que cela ne peut pas montrer : qui était au clavier, ni de qui venaient les idées.",
   "How It Was Written…": "Comment il a été écrit…",
   "How it was written": "Comment il a été écrit",
   "{name} (joined to another chapter)": "{name} (joint à un autre chapitre)",
@@ -1127,5 +1127,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Elle contient chaque frappe des chapitres qu’elle porte : les mots que vous avez effacés comme ceux que vous avez gardés, chaque pause, et quand vous avez écrit (les dates, les heures et votre fuseau horaire).",
   "Device {n}": "Appareil {n}",
   "Older": "Précédente",
-  "Newer": "Suivante"
+  "Newer": "Suivante",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "L’horodatage ne peut pas être ajouté après coup : si vous pourriez vouloir cette preuve pour un livre, activez-le avant de le commencer.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "L’horodatage ne peut pas être ajouté après coup : il couvre ce que vous écrirez à partir de maintenant. Ce que vous avez écrit avant reste dans votre historique d’écriture, mais rien ne le fixe dans le temps.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "Fixé dans le temps : {n} séances d’écriture sur {all} ont été horodatées dans la journée suivant leur fin.",
+  "Checked, but not timestamped": "Vérifié, mais pas horodaté",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Ce que ces vérifications peuvent montrer : que l’historique est cohérent et se rejoue exactement et, là où il a été horodaté, qu’il existait déjà à ce moment et n’a pas été inventé après coup. Ce qu’elles ne peuvent pas montrer : qui était au clavier, ni de qui venaient les idées.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Rien ne fixe cet historique dans le temps : aucune séance d’écriture n’a été horodatée. Il montre comment le livre a été écrit, mais pas quand, et un historique inventé après coup pourrait avoir le même aspect.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixé dans le temps : {n} séances d’écriture sur {all} ont été horodatées dans la journée suivant leur fin, la moitié en moins de {soon}.",
+  "a minute": "une minute"
 }

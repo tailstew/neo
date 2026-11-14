@@ -975,7 +975,7 @@
   "Pasted from outside NEO: {chars} characters, {share} of the text now.": "Geplakt van buiten NEO: {chars} tekens, {share} van de huidige tekst.",
   "Text moved within the book: {chars} characters.": "Tekst verplaatst binnen het boek: {chars} tekens.",
   "Pauses": "Pauzes",
-  "Timestamping wasn’t turned on, so nothing in this export fixes the history in time. It shows how the book was written, not when.": "Tijdstempels stonden niet aan, dus niets in deze export legt de geschiedenis vast in de tijd. Hij laat zien hoe het boek geschreven is, niet wanneer.",
+  "Nothing fixes this history in time: no writing session was timestamped. A history made up afterwards could pass every check below.": "Niets legt deze geschiedenis in de tijd vast: geen enkele schrijfsessie kreeg een tijdstempel. Een achteraf verzonnen geschiedenis zou elke controle hieronder doorstaan.",
   "Timestamp your writing history?": "Je schrijfgeschiedenis van tijdstempels voorzien?",
   "Reading every session…": "Alle sessies lezen…",
   "Played back: {bad} of {n} chapter writes don’t come out as recorded.": {
@@ -1055,7 +1055,7 @@
   "NEO keeps no history. Snapshots still work.": "NEO houdt geen geschiedenis bij. Momentopnamen werken gewoon.",
   "Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.": "Elke toetsaanslag wordt bij het boek bewaard, op deze computer, zodat je kunt zien hoe het geschreven is en elke eerdere versie kunt terughalen. Er wordt niets verstuurd.",
   "Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.": "Elke toetsaanslag wordt opgenomen, en elk uur dat je schrijft gaat er een unieke vingerafdruk van de opname (nooit je woorden) naar twee tijdstempeldiensten. Hun bewijzen tonen aan dat je werk in de loop van de tijd geschreven is.",
-  "Timestamps cover your writing from the day they’re turned on.": "Tijdstempels dekken je schrijven vanaf de dag dat je ze aanzet.",
+  "Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.": "Tijdstempels kun je niet achteraf toevoegen: ze dekken wat je schrijft vanaf de dag dat je ze aanzet.",
   "New: your writing history": "Nieuw: je schrijfgeschiedenis",
   "NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.": "NEO kan nu opnemen hoe je schrijft, toetsaanslag voor toetsaanslag, zodat je kunt zien hoe elk hoofdstuk geschreven en herschreven is en elke eerdere versie kunt terughalen.",
   "With timestamps, you also have proof that your work was written over time.": "Met tijdstempels kun je bovendien aantonen dat je werk in de loop van de tijd geschreven is.",
@@ -1109,7 +1109,7 @@
   "Undo or redo from the Edit menu: {n}.": "Ongedaan maken of Opnieuw vanuit het menu Bewerken: {n}.",
   "When the text you see here was first timestamped": "Wanneer de tekst die je hier ziet voor het eerst een tijdstempel kreeg",
   "Not typed": "Niet getypt",
-  "Writing History shows how the words were typed and when. It can’t show whose ideas they were.": "De schrijfgeschiedenis laat zien hoe en wanneer de woorden getypt zijn. Ze kan niet laten zien wiens ideeën het waren.",
+  "What this can show: that the history holds together and plays back to the book exactly, and, where it was timestamped, that it existed by then and grew at the pace it shows, so it wasn’t made up afterwards. What it can’t show: who was at the keyboard, or whose ideas the words were.": "Wat dit kan laten zien: dat de geschiedenis klopt en precies tot het boek afspeelt en, waar ze een tijdstempel kreeg, dat ze toen al bestond en groeide in het tempo dat ze laat zien, dus niet achteraf verzonnen is. Wat het niet kan laten zien: wie er achter het toetsenbord zat, of wiens ideeën het waren.",
   "How It Was Written…": "Hoe het geschreven is…",
   "How it was written": "Hoe het geschreven is",
   "{name} (joined to another chapter)": "{name} (bij een ander hoofdstuk gevoegd)",
@@ -1122,5 +1122,13 @@
   "It holds every keystroke in the chapters it carries: the words you deleted as well as the ones you kept, every pause, and when you wrote (the dates, the hours and your time zone).": "Ze bevat elke toetsaanslag in de hoofdstukken die erin zitten: de woorden die je hebt gewist en die je hebt gehouden, elke pauze, en wanneer je schreef (de datums, de uren en je tijdzone).",
   "Device {n}": "Apparaat {n}",
   "Older": "Eerder",
-  "Newer": "Later"
+  "Newer": "Later",
+  "Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.": "Tijdstempels kun je niet achteraf toevoegen, dus als je dit bewijs voor een boek misschien wilt, zet ze dan aan voordat je eraan begint.",
+  "Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.": "Tijdstempels kun je niet achteraf toevoegen: ze dekken wat je vanaf nu schrijft. Wat je eerder schreef blijft in je schrijfgeschiedenis, maar niets legt het in de tijd vast.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending.": "In de tijd vastgelegd: {n} van {all} schrijfsessies kregen binnen een dag na afloop een tijdstempel.",
+  "Checked, but not timestamped": "Gecontroleerd, maar zonder tijdstempel",
+  "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Wat deze controles kunnen laten zien: dat de geschiedenis klopt en precies afspeelt en, waar ze een tijdstempel kreeg, dat ze toen al bestond en niet achteraf verzonnen is. Wat ze niet kunnen laten zien: wie er achter het toetsenbord zat, of wiens ideeën het waren.",
+  "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Niets legt deze geschiedenis in de tijd vast: geen enkele schrijfsessie kreeg een tijdstempel. Ze laat zien hoe het boek geschreven is, maar niet wanneer, en een achteraf verzonnen geschiedenis zou er hetzelfde uit kunnen zien.",
+  "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "In de tijd vastgelegd: {n} van {all} schrijfsessies kregen binnen een dag na afloop een tijdstempel, de helft binnen {soon}.",
+  "a minute": "een minuut"
 }

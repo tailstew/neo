@@ -149,6 +149,11 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-list li.ok::before, .rx-same.ok::before { content: "✓"; color: var(--ok); }
 .rx-list li.bad::before, .rx-same.bad::before { content: "✗"; color: var(--bad); }
 .rx-list li.info::before { content: "·"; color: var(--soft); }
+/* the first line: whether anything fixes the history in time */
+.rx-list li.rx-lead { margin-bottom: 6px; padding: 6px 10px; border-left: 3px solid #6fb7a8; font-weight: 500; }
+.rx-list li.rx-lead::before { content: none; }
+.rx-list li.rx-lead.rx-unfixed { border-left-color: #d9a46b; }
+.rx-ckbtn.unfixed::before { content: "✓ "; color: #d9a46b; }
 .rx-same::before { margin-right: 8px; font-weight: 700; }
 .rx-seals { margin: 8px 0; }
 .rx-seals summary { cursor: pointer; color: var(--accent); }
@@ -166,6 +171,8 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-report th, .rx-report td { text-align: left; vertical-align: top; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); }
 .rx-report .ev-facts > tbody > tr > th { width: 120px; color: var(--soft); font-weight: 500; }
 .rx-report .ev-small { font-size: 13px; color: var(--soft); }
+.rx-report .ev-lead { margin: 6px 0 10px; padding: 8px 12px; border-left: 3px solid #6fb7a8; font-size: 15px; }
+.rx-report .ev-lead.ev-unfixed { border-left-color: #d9a46b; }
 .rx-report .ev-hist { margin: 8px 0 2px; font-size: 12px; }
 .rx-report .ev-hist caption { text-align: left; color: var(--soft); font-size: 11px; padding-bottom: 2px; }
 .rx-report .ev-hist th, .rx-report .ev-hist td { border: none; padding: 1px 8px 1px 0; }
