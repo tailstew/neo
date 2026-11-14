@@ -56,7 +56,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 ## Restore (phases 3 and 7)
 
-- [ ] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows.
+- [x] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows. *(passed 2026-11-14, df11456, A Year (novel), a paragraph from the year's start)*
 - [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
 - [x] **(phone)** Restore works on the phone; the delete button isn't there. *(2026-11-13, 69bf432, OnePlus 9: restore, Undo This Restore and the toast's Undo; no Delete in the drawer)*
 
@@ -85,7 +85,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 ## Evidence report and exported Writing History (phase 6)
 
 - [x] The time cover first: How It Was Written… opens with "Fixed in time: n of m writing sessions…" on a timestamped book (green bar) and "Nothing fixes this history in time…" on one without (amber bar), and ends with what it can and can't show. An exported page's checks start the same way, its button reads ✓ Checked, but not timestamped (amber tick) for a book without timestamps, and `verify-recording.js`'s first line says the same. The Record and timestamp card and the turn-on question say timestamps can't be added afterwards. *(the figures agreeing in all three: `npm test`, scripts/replay-page.test.js)* *(passed 2026-11-14, df11456: amber on A Year (novel) in the report and its export, green on Bad News)*
-- [ ] On a book with a year of writing, the report takes no more than half a minute, and NEO stays responsive meanwhile (you can type in another book's window, scroll History).
+- [x] On a book with a year of writing, the report takes no more than half a minute, and NEO stays responsive meanwhile (you can type in another book's window, scroll History). *(passed 2026-11-14, df11456, A Year (novel))*
 - [ ] In NEO and the exported page, on a book with several chapters: the whole book's day tiles are an 8×8 grid, each chapter a run of cells in order with a thin line where it starts; a short story's tile is a grid of small squares, not stripes. Older books' days are rebuilt once when History first opens.
 - [ ] In the exported page: within a few seconds of opening, each day tile shows the same map as that day's tile in NEO (green where words came, red where they went, gold where both); picking a chapter on the left redraws them for that chapter, as a 6×6 grid.
 - [ ] Open an exported file in Firefox, Safari and Edge, with the network off: it looks and plays as it does in Chrome, and its checks button ends "✓ Checked". *(Chrome's engine: `npm run test:export`.)*
