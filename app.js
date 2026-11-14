@@ -4185,7 +4185,8 @@ async function exportWritingHistory(bookId = book && book.id) {
     const order = meta.chapterOrder.filter((ch) => !picked.chapters || picked.chapters.includes(ch)).map((ch) => ({ id: ch, title: name(ch) }));
     const saved = await window.neo.recExport(bookId, {
       chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
-      strings: replayPageStrings(), report, order, fileName: replayFileName(title, meta.chapterOrder, picked.chapters)
+      strings: replayPageStrings(), report, order, fileName: replayFileName(title, meta.chapterOrder, picked.chapters),
+      script: meta.format === 'screenplay', underline: !!meta.underlineHeadings
     });
     if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
   } catch (err) {

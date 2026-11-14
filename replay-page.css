@@ -181,6 +181,37 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-report .ev-hist-n { width: 44px; text-align: right; color: var(--soft); }
 .rx-report .ev-chapters { display: block; overflow-x: auto; }
 
+/* a script (data.script): set as NEO sets it (styles.css, SCREENPLAYS):
+   its page, 51 letters wide in its own type size, and each line where it
+   prints; on a phone, the editor's narrow layout */
+.rx-scroll.rx-script-scroll { container-type: inline-size; }
+.rx-sheet.rx-script {
+  width: 51em; max-width: none; padding: 6em 5.7em 6em 9em;
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace; line-height: 1;
+  font-size: min(16px, calc((100cqw - 32px) / 51));
+}
+.rx-script .rx-chhead { display: none; }
+.rx-script .rx-ch + .rx-ch { margin-top: 1em; padding-top: 0; border-top: none; }
+.rx-script .rx-body p { margin: 1em 0 0; text-indent: 0; width: 36.3em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
+.rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2em; }
+.rx-script .rx-body p:is(.sp-heading, .sp-character, .sp-transition, .sp-shot) { text-transform: uppercase; }
+.rx-script .rx-body p:is(.sp-heading, .sp-shot) { font-weight: bold; }
+.rx-script.rx-uline .rx-body p.sp-heading { text-decoration: underline; }
+.rx-script .rx-body p.sp-character { margin-left: 13.2em; width: 23.1em; }
+.rx-script .rx-body p.sp-paren { margin-left: 9.6em; width: 15.3em; }
+.rx-script .rx-body p.sp-dialogue { margin-left: 6em; width: 21.3em; }
+.rx-script .rx-body p.sp-transition { text-align: right; }
+@media (max-width: 700px) {
+  .rx-sheet.rx-script { width: calc(100% - 24px); font-size: 15px; line-height: 1.3; padding: 28px 18px 40px; }
+  .rx-script .rx-body p { width: auto; margin-top: 1.3em; }
+  .rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
+  .rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2.6em; }
+  .rx-script .rx-body p.sp-character { margin-left: 6.5em; width: auto; }
+  .rx-script .rx-body p.sp-paren { margin-left: 4.5em; margin-right: 3em; width: auto; }
+  .rx-script .rx-body p.sp-dialogue { margin-left: 2.5em; margin-right: 2em; width: auto; }
+}
+
 @media (max-width: 700px) {
   .rx-top h1 { font-size: 26px; }
   .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }

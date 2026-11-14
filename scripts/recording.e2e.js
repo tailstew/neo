@@ -1726,6 +1726,51 @@ test('a script in History is set as the editor sets it: its type, its page, each
   }
   await js('historyShown(); 0');
   await tick(300);
+
+  // and the exported page, the same way
+  const { dialog } = require('electron');
+  const real = dialog.showSaveDialog;
+  const file = path.join(tmp, 'script-replay.html');
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
+  try {
+    await js("setTimeout(() => exportWritingHistory(), 0), true");
+    await waitFor('!!document.querySelector(".ex-modal")');
+    await js('document.querySelector(".ex-understood") && document.querySelector(".ex-understood").click()');
+    await js('(document.querySelector(".ex-modal .m-continue") || {}).click && document.querySelector(".ex-modal .m-continue").click()');
+    await tick(100);
+    await js('[...document.querySelectorAll(".ex-modal .m-ok")].find((b) => b.offsetParent).click()');
+    for (let i = 0; i < 300 && !fs.existsSync(file); i++) await tick(100);
+  } finally {
+    dialog.showSaveDialog = real;
+  }
+  const data = JSON.parse(/<script type="application\/json" id="rx-data">([^]*?)<\/script>/.exec(fs.readFileSync(file, 'utf8'))[1]);
+  assert.equal(data.script, true, 'the page knows it’s a script');
+  const w = new BrowserWindow({ show: false, width: 1200, height: 900, webPreferences: { offscreen: true } });
+  try {
+    await w.loadFile(file);
+    const page = (code) => w.webContents.executeJavaScript(code, true);
+    for (let i = 0; i < 300 && !(await page('!!document.querySelector(".rx-sheet .rx-body p.sp-heading")')); i++) await tick(100);
+    assert.equal(await page('document.querySelector(".rx-sheet").classList.contains("rx-script")'), true);
+    const inPage = await page(`(() => {
+      const page = document.querySelector('.rx-sheet').getBoundingClientRect();
+      const out = {};
+      for (const p of document.querySelectorAll('.rx-sheet .rx-body > p')) {
+        const k = p.className.split(' ').find((c) => c.startsWith('sp-')) || 'action';
+        if (k in out) continue;
+        const r = p.getBoundingClientRect();
+        out[k] = { left: +((r.left - page.left) / page.width).toFixed(3), upper: getComputedStyle(p).textTransform };
+      }
+      return out;
+    })()`);
+    for (const k of Object.keys(editor)) {
+      if (!inPage[k]) continue; // (the page shows the book as the last day it can play left it)
+      assert.equal(inPage[k].upper, editor[k].upper, k + ': its capitals, in the page');
+      assert.ok(Math.abs(inPage[k].left - editor[k].left) < 0.01, `${k}: ${inPage[k].left} of the page across in the export, ${editor[k].left} in the editor`);
+    }
+    assert.ok(inPage['sp-heading'] && inPage.action, 'the page shows a heading and action: ' + JSON.stringify(inPage));
+  } finally {
+    w.destroy();
+  }
 });
 
 /* ---------- runner ---------- */

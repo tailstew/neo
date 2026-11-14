@@ -691,6 +691,12 @@
     const scroll = el('div', 'rx-scroll');
     const sheet = el('div', 'rx-sheet');
     scroll.append(sheet);
+    // a script, set as NEO sets it (replay-page.css)
+    if (data.script) {
+      sheet.classList.add('rx-script');
+      if (data.underline) sheet.classList.add('rx-uline');
+      scroll.classList.add('rx-script-scroll');
+    }
     const status = el('p', 'rx-status');
     status.id = 'rx-status';
     const bottom = el('div', 'rx-bottom');

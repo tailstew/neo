@@ -68,13 +68,15 @@ const inline = (s) => String(s).replace(/<\/(script)/gi, '<\\/$1').replace(/<!--
 // writer's language (English is the key); `report`: the evidence report's
 // HTML, as NEO showed it; `evidence`: its figures (Rec.evidence), which the
 // page works out again from the sessions and compares.
-function build({ title, author = '', lang = 'en', strings = {}, report = '', evidence = null, sessions, seals = null, kept = null, chapters = [], partial = false, made = new Date().toISOString(), version = '', dir = __dirname }) {
+function build({ title, author = '', lang = 'en', strings = {}, report = '', evidence = null, sessions, seals = null, kept = null, chapters = [], partial = false, script = false, underline = false, made = new Date().toISOString(), version = '', dir = __dirname }) {
   const read = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
   // some chapters: their seals only if one reaches them
   if (partial && !sealsReach(seals, kept)) seals = null;
   const nonce = crypto.randomBytes(16).toString('base64');
   const data = {
     neoReplay: 1, title, author, made, version, partial, lang, chapters, strings, evidence,
+    // a screenplay: the page sets it as NEO does, scene headings underlined when the script has them
+    script: !!script, underline: !!(script && underline),
     sessions: sessions.map((s) => ({ id: s.id, device: s.device, name: s.name || s.device, open: !!s.open, gz: zlib.gzipSync(Buffer.from(s.text, 'utf8')).toString('base64') })),
     seals,
     roots: seals ? rootsPem(read, seals) : null
