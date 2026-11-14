@@ -87,7 +87,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [ ] In NEO and the exported page, on a book with several chapters: the whole book's day tiles are an 8×8 grid, each chapter a run of cells in order with a thin line where it starts; a short story's tile is a grid of small squares, not stripes. Older books' days are rebuilt once when History first opens.
 - [ ] In the exported page: within a few seconds of opening, each day tile shows the same map as that day's tile in NEO (green where words came, red where they went, gold where both); picking a chapter on the left redraws them for that chapter, as a 6×6 grid.
 - [ ] Open an exported file in Firefox, Safari and Edge, with the network off: it looks and plays as it does in Chrome, and its checks button ends "✓ Checked". *(Chrome's engine: `npm run test:export`.)*
-- [ ] Hover the timeline, in History and in the exported page: the tips say what's there (pastes, time away, tags, and on the timestamps' track "Timestamped …").
+- [x] Hover the timeline, in History and in the exported page: the tips say what's there (pastes, time away, tags, and on the timestamps' track "Timestamped …"). *(passed 2026-11-14, 9dd35f7, Bad News today: pastes, moved text, time away, dictation and timestamps, the same in both)*
 - [x] **(phone)** The exported page on a phone's browser (email it to yourself): no side pane, the sheet, the controls and the header's buttons fit, it plays, and there's no sideways scrolling. *(At a phone's width in Chrome's engine: `npm run test:export`.)* *(2026-11-13, 69bf432: Chrome on the OnePlus 9, the page served through `adb reverse`)*
 - [x] **(phone)** Pocket's History has neither button. *(2026-11-13, 69bf432)*
 
