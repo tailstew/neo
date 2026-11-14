@@ -1553,7 +1553,7 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
     }
   }
   const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
-  proofSealers.delete(bookId); // its seals went with the history
+  proofForget(bookId); // its seals went with the history
   clearTimeout((proofWords.get(bookId) || {}).timer);
   proofWords.delete(bookId);
   if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
@@ -1641,7 +1641,7 @@ const PROOF_HOUR = 3600 * 1000;
 const PROOF_IDLE = 5 * 60 * 1000;
 let proofOn = false;
 let proofTimer = null;
-const proofSealers = new Map(); // bookId -> { sealer, queue }
+const proofQueues = new Map(); // bookId -> its last proof job: one at a time per book
 const proofWords = new Map();   // bookId -> { since, timer }: words written since its last seal
 
 // A chunk that wrote words (a chapter or stream written, taken out, a tag,
@@ -1669,56 +1669,88 @@ function proofSetFlags(f) {
   if (proofOn && !proofTimer) {
     proofTimer = setInterval(() => {
       if (!proofOn) return;
-      for (const bookId of new Set([...proofSealers.keys(), ...proofOthers()])) proofRun(bookId, 'retry');
+      proofOthers().then((others) => { for (const bookId of new Set([...proofQueues.keys(), ...others])) proofRun(bookId, 'retry'); });
     }, 30 * 60 * 1000);
   }
 }
 
 // The books whose recording holds another device's folder: what Pocket
 // writes reaches this computer by sync, and is sealed here, open or not
-// (Pocket seals nothing itself)
+// (Pocket seals nothing itself). The library is walked by the proof worker.
 function proofOthers() {
-  const out = [];
-  let names = [];
-  try { names = fs.readdirSync(LIBRARY_DIR); } catch { return out; }
-  const me = recDevice();
-  for (const name of names) {
-    if (!name.startsWith('book-')) continue;
-    try {
-      if (fs.readdirSync(path.join(LIBRARY_DIR, name, 'recording')).some((d) => RecFiles.DEVICE.test(d) && d !== me)) out.push(name);
-    } catch { /* no recording */ }
-  }
-  return out;
+  return proofCall({ type: 'others', libraryDir: LIBRARY_DIR, me: recDevice() }).catch((err) => { logError('proof', err); return []; });
 }
 
 // This computer's signing key, Ed25519, made the first time it seals and
-// kept encrypted with safeStorage in userData, never in the library
-function proofKey() {
+// kept encrypted with safeStorage in userData, never in the library. Only
+// this process can read it; the proof worker is handed it as it starts.
+function proofKeyPem() {
   let pem = readSecret('proofKey');
   if (!pem) {
     pem = Proof.newKey();
     writeSecret('proofKey', pem);
   }
-  return Proof.keyOf(pem);
+  return pem;
 }
 
-function proofSealer(bookId) {
-  let p = proofSealers.get(bookId);
-  if (!p) {
-    const device = recDevice();
-    p = {
-      sealer: new Proof.Sealer({
-        dir: recDir(bookId, device), book: libName(bookId), device, key: proofKey(), write: writeFileDurable,
-        fetch: (...a) => globalThis.fetch(...a), // (looked up each time, so the tests can stand in for the network)
-        log: (source, err) => logError(source, err),
-        ...proofAsked(),
-        cacheFile: path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'heads.json')
-      }),
-      queue: Promise.resolve()
-    };
-    proofSealers.set(bookId, p);
-  }
-  return p;
+// The seals are made in a process of its own (proof-worker.js): a seal reads
+// the book's sessions, another device's among them, and a file iCloud won't
+// hand over held NEO's main process with it. Here it holds up only the
+// seals, and a job that overruns ends the worker (the next starts another).
+const PROOF_JOB_LIMIT_MS = 10 * 60 * 1000;
+let proofChild = null;
+let proofNext = 0;
+const proofPending = new Map(); // id -> { resolve, reject, timer }
+function proofWorker() {
+  if (proofChild) return proofChild;
+  const child = utilityProcess.fork(path.join(__dirname, 'proof-worker.js'), [], { serviceName: 'NEO proof' });
+  proofChild = child;
+  const gone = (why) => {
+    if (proofChild === child) proofChild = null;
+    for (const [id, p] of proofPending) { clearTimeout(p.timer); p.reject(new Error(why)); proofPending.delete(id); }
+  };
+  child.on('message', (m) => {
+    if (!m) return;
+    if (m.log) { logError(m.log, new Error(m.error)); return; }
+    const p = proofPending.get(m.id);
+    if (!p) return;
+    proofPending.delete(m.id);
+    clearTimeout(p.timer);
+    if (m.ok) p.resolve(m.result); else p.reject(new Error(m.error));
+  });
+  child.on('exit', (code) => gone('the proof worker stopped (' + code + ')'));
+  // (the key and the services first: messages are taken in the order sent)
+  proofSend(child, { type: 'key', pem: proofKeyPem() }).catch(() => {});
+  proofSend(child, proofServicesMsg()).catch(() => {});
+  return child;
+}
+function proofSend(child, msg) {
+  return new Promise((resolve, reject) => {
+    const id = ++proofNext;
+    const timer = setTimeout(() => {
+      proofPending.delete(id);
+      reject(new Error('proof: ' + msg.type + ' took longer than ' + PROOF_JOB_LIMIT_MS / 60000 + ' minutes, and the worker was stopped'));
+      try { child.kill(); } catch { /* gone */ }
+    }, PROOF_JOB_LIMIT_MS);
+    proofPending.set(id, { resolve, reject, timer });
+    child.postMessage({ ...msg, id });
+  });
+}
+const proofCall = (msg) => {
+  try { return proofSend(proofWorker(), msg); } catch (err) { return Promise.reject(err); }
+};
+// what a book's Sealer is made with, in the worker
+function proofSealerOpts(bookId) {
+  const device = recDevice();
+  return {
+    dir: recDir(bookId, device), book: libName(bookId), device,
+    cacheFile: path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'heads.json')
+  };
+}
+// a book whose history went: its Sealer too
+function proofForget(bookId) {
+  proofQueues.delete(bookId);
+  if (proofChild) proofSend(proofChild, { type: 'forget', bookId }).catch(() => {});
 }
 
 // The timestamp services, as the writer arranged them in Timestamp
@@ -1749,19 +1781,16 @@ function proofServices() {
   for (const t of Proof.TSAS) if (!seen.has(t.id)) out.push({ ...t, on: true, public: true });
   return out;
 }
-// what a Sealer asks, and the roots it checks their stamps against
-function proofAsked() {
+// what the worker's Sealers ask (those on), and the roots of the services
+// the writer added, which their stamps are checked against
+function proofServicesMsg() {
   const list = proofServices();
-  return {
-    tsas: list.filter((s) => s.on),
-    anchors: [...Proof.roots(), ...list.filter((s) => s.added).flatMap((s) => Proof.certsIn(s.root))]
-  };
+  return { type: 'services', tsas: list.filter((s) => s.on), added: list.filter((s) => s.added).map((s) => s.root) };
 }
 // the list in library.json, as the window last gave it (null: the defaults)
 function proofServicesUse(saved) {
   proofTsasSaved = saved;
-  const asked = proofAsked();
-  for (const p of proofSealers.values()) Object.assign(p.sealer, asked);
+  if (proofChild) proofSend(proofChild, proofServicesMsg()).catch((err) => logError('proof', err));
 }
 // A change in the dialog: kept here at once, and handed back for the window
 // to write into library.json as keep (null takes it out)
@@ -1838,25 +1867,19 @@ ipcMain.handle('proof:serviceRemove', (_e, id) => {
 // null.
 function proofRun(bookId, how) {
   if (!proofOn) return Promise.resolve(null);
-  let p;
-  try { p = proofSealer(bookId); } catch (err) { logError('proof', err); return Promise.resolve(null); }
-  const s = p.sealer;
   const w = proofWords.get(bookId);
   if (how === 'words' && !w) return Promise.resolve(null);
   if (w && (how === 'words' || how === 'now')) { clearTimeout(w.timer); proofWords.delete(bookId); }
-  const job = p.queue.then(async () => {
-    let made = null;
-    if (how === 'start' || how === 'retry') made = await s.seal({ force: how === 'start' && s.renewDue(), ifOthers: true, ifWords: how === 'start' });
-    else made = await s.seal();
+  const job = (proofQueues.get(bookId) || Promise.resolve()).then(async () => {
+    const r = await proofCall({ type: 'run', bookId, how, sealer: proofSealerOpts(bookId), now: Date.now() });
     // (a book never written on here gets this computer's folder now)
-    if (made) await recPrepare(bookId);
-    const stamped = await s.stamp();
-    if (how !== 'retry' || made || stamped.length) {
+    if (r.made) await recPrepare(bookId);
+    if (how !== 'retry' || r.made || r.stamped) {
       for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
     }
-    return made;
+    return r.made;
   }).catch((err) => { logError('proof', err); return null; });
-  p.queue = job;
+  proofQueues.set(bookId, job);
   return job;
 }
 
@@ -1869,9 +1892,9 @@ ipcMain.handle('proof:status', async (_e, bookId, settled) => {
   const st = { on: proofOn, seals: 0 };
   try {
     if (!fs.existsSync(path.join(recDir(bookId), 'seals'))) return st;
-    const p = proofSealer(libName(bookId));
-    if (settled) await p.queue;
-    return { ...st, ...p.sealer.status() };
+    bookId = libName(bookId);
+    if (settled) await proofQueues.get(bookId);
+    return { ...st, ...await proofCall({ type: 'status', bookId, sealer: proofSealerOpts(bookId), now: Date.now() }) };
   } catch (err) {
     logError('proof', err);
     return st;

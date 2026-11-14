@@ -113,16 +113,21 @@ module.exports = function e2e(name, library = {}, opts = {}) {
       const roots = path.join(tmp, 'test-roots.pem');
       fs.writeFileSync(roots, FakeTsa.rootPem);
       process.env.NEO_E2E_ROOTS = roots;
+      // (and in the proof worker, which makes the seals: the authorities by the names NEO asks for)
+      process.env.NEO_E2E_TSA_HOSTS = JSON.stringify(Object.fromEntries(Object.entries(HOSTS).map(([host, id]) => [host, neo.tsa[id].url])));
     };
     // (History's worker swapped for one that trusts the test root: if main.js
     // stops forking history-worker.js by that name, say so, rather than let
     // every timestamp in History quietly go untrusted)
-    if (!fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8').includes("'history-worker.js'")) {
-      throw new Error('e2e-neo.js: main.js no longer forks history-worker.js; update the worker swap below');
+    for (const w of ['history-worker.js', 'proof-worker.js']) {
+      if (!fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8').includes(`'${w}'`)) {
+        throw new Error(`e2e-neo.js: main.js no longer forks ${w}; update the worker swap below`);
+      }
     }
     const fork = utilityProcess.fork;
     utilityProcess.fork = function (file, args, o) {
       if (/history-worker\.js$/.test(file)) file = path.join(__dirname, 'e2e-history-worker.js');
+      if (/proof-worker\.js$/.test(file)) file = path.join(__dirname, 'e2e-proof-worker.js');
       return fork.call(this, file, args, o);
     };
     neo.sealsDir = () => path.join(neo.recDir(), 'seals');
