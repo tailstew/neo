@@ -25,7 +25,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 ## Recording, while writing
 
 - [ ] Writing feels the same with **Record Writing History** at Off and at Record Only: no lag while typing, even in a long chapter or a 100-page script.
-- [ ] Dead keys and AltGr (é, ñ, ă, ș), and the Windows emoji panel (Win+.) replay as typed.
+- [x] Dead keys and AltGr (é, ñ, ă, ș), and the Windows emoji panel (Win+.) replay as typed. *(passed 2026-11-14, ac28ec3)*
 - [ ] An input method (Microsoft Pinyin or Japanese IME): composed text replays and the chapter matches.
 - [ ] Windows voice typing (Win+H) into a chapter replays and the chapter matches.
 - [ ] Paste from Word, from a web page, and from another NEO chapter. Each replays, and the timeline marks pastes from outside and from the book differently.
