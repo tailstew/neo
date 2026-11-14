@@ -8,6 +8,8 @@
 //   node scripts/benchmark-history.js              both books, 250 writing days
 //   node scripts/benchmark-history.js script 20    one book, 20 writing days
 //   … --keep                                       keep the generated files
+//   … --from=2025-11-10                            the year's first day (2027-01-04 unless given):
+//                                                  a past year, to open the kept books in NEO
 //   … --pace=0.25                                  a writer typing a quarter as much a day
 //   … --one-splice                                 a change made all at once recorded as
 //                                                  phase 1's recorder did: one splice from
@@ -193,7 +195,7 @@ function generate(kind, days, dir, pace = 1, one = false) {
   // the writing days: `days` of the calendar days in a year's span
   const span = Math.max(days, Math.ceil(days * 365 / 250));
   const pickDays = Array.from({ length: span }, (_, i) => i).sort(() => rand() - 0.5).slice(0, days).sort((a, b) => a - b);
-  const start = Date.parse('2027-01-04T00:00:00.000Z');
+  const start = Date.parse((process.env.NEO_BENCH_FROM || '2027-01-04') + 'T00:00:00.000Z');
   // The anchors the recorder writes (Rec.baseLines): how many, what they
   // cost gzipped on their own (so a little high), and the most edits a
   // chapter needed replayed from its last full `b` when a session began
@@ -1071,6 +1073,8 @@ if (mode === '--gen') {
 } else {
   const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   const keep = process.argv.includes('--keep');
+  const from = (process.argv.find((a) => a.startsWith('--from=')) || '').slice(7);
+  if (from) { if (!/^\d{4}-\d\d-\d\d$/.test(from)) throw new Error('--from=YYYY-MM-DD'); process.env.NEO_BENCH_FROM = from; } // the generator, a child, reads it
   const real = (process.argv.find((a) => a.startsWith('--book=')) || '').slice(7);
   const kinds = real ? ['novel'] : args[0] ? [args[0]] : Object.keys(BOOKS);
   const days = real ? 20 : +args[1] || 250;
