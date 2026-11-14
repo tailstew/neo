@@ -1105,7 +1105,7 @@ test('the Darlings tab: Watch from Here in a snapshot’s band and its right-cli
 
 // In a language with long words, the dialog's buttons and labels, at the
 // window's smallest: nothing overlaps, nothing runs out of its box
-for (const lang of ['de', 'ro', 'ru']) {
+for (const lang of ['de', 'ro', 'ru', 'uk', 'vi', 'ko']) {
   test(`in ${lang}, at the smallest window, History’s controls, footer, tags and restore don’t overlap`, async () => {
     const dict = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'locales', lang + '.json'), 'utf8'));
     await js(`NeoI18n.setLocale(${JSON.stringify(lang)}, ${JSON.stringify(dict)}, {})`);
