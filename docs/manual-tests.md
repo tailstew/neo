@@ -20,7 +20,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [x] Unzip a zip made before 4g over the library (it holds `recording/` with open session folders). Opening the book doesn't close those sessions again: the stale folders go, the closed files are unchanged, and History plays as before. *(2026-10-29, d96a03b: no such zip left, so a closed session's first chunk was put back as an open folder by hand)*
 - [x] **(2 computers)** A session closed on the other computer reaches this one's `Backups/recordings/<book folder>/<its id>/` because the other computer mirrored it, and this one never writes it: in Syncthing's file info (`/rest/db/file`) its version names only the other device. *(2026-10-30, 6947c24: Chromebook session `2026-10-30T14-15-35Z-iwwz`)*
 - [ ] **(phone)** A session written on the phone (Pocket mirrors nothing) isn't in the desktop's mirror for 7 days; after that, the desktop's next start (or its hourly backup) copies it.
-- [ ] **(2 computers)** No conflict copies (`… 2.jsonl.gz`, `.sync-conflict-…`) appear in `Backups/recordings/` after a week of normal use on both. *(started 2026-10-30 with the Chromebook; look again from 2026-11-06)*
+- [x] **(2 computers)** No conflict copies (`… 2.jsonl.gz`, `.sync-conflict-…`) appear in `Backups/recordings/` after a week of normal use on both. *(started 2026-10-30 with the Chromebook; passed 2026-11-14: 490 files across 4 books from both computers, none a conflict copy or a Syncthing temp file)*
 
 ## Recording, while writing
 
