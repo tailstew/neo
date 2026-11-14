@@ -2369,7 +2369,11 @@
         if (li === 0) begin(si);
         for (; at.step < c.steps.length && c.steps[at.step].line === li + 2; at.step++) {
           const st = c.steps[at.step];
-          st.t = Math.max(T, st.t + shift[si]);
+          // a session behind the day's clock (another device's, open beside
+          // it, ran ahead of it) goes on from where the day is: its steps keep
+          // their own spacing rather than all landing on one moment
+          if (st.t + shift[si] < T) shift[si] = T - st.t;
+          st.t += shift[si];
           T = st.t;
           st.session = si;
           if (st.k === 'o') this.orders.push(this.steps.length);

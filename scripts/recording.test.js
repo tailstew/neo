@@ -568,6 +568,29 @@ test('a history’s steps keep the clock, the wall time and the causes', () => {
   assert.ok(R.parseSession(ss[0].text).lines.length < h.steps.length / 2, 'runs were in the file');
 });
 
+// Two devices open on one day (the laptop and the Chromebook, 2026-11-14):
+// the Chromebook's session ran 33 s ahead of the laptop's on the day's
+// clock, and every laptop key behind it landed on one moment
+test('a session behind another one open beside it keeps the spacing of its keys', () => {
+  const H = (id, device, startedAt) => new R.SessionWriter({ neoRec: 1, session: id, device, book: 'book-x', startedAt, prev: null });
+  const a = H('2026-11-14T10-00-00Z-aaaa', 'd-a', '2026-11-14T10:00:00.000Z');
+  a.push([0, 'b', 'ch-a', '<p>A</p>', R.digest('<p>A</p>'), 'baseline']);
+  // its clock says a minute went by, the wall clock forty seconds
+  a.push([60000, 'T', '2026-11-14T10:00:40.000Z']);
+  a.push([0, 'f', 'focus']);
+  a.push([30000, 'f', 'blur']);
+  const b = H('2026-11-14T10-00-20Z-bbbb', 'd-b', '2026-11-14T10:00:20.000Z');
+  b.push([0, 'b', 'ch-b', '<p>B</p>', R.digest('<p>B</p>'), 'baseline']);
+  b.push([25000, 'k', 'KeyX', 0]);
+  b.push([0, 'e', 4, 0, 'x', 'iT']);
+  for (const c of 'yz') { b.push([200, 'k', 'Key' + c.toUpperCase(), 0]); b.push([0, 'e', 4, 0, c, 'iT']); }
+  const h = new R.History([{ id: 'a', device: 'd-a', text: a.chunk().text }, { id: 'b', device: 'd-b', text: b.chunk().text }]);
+  const keys = h.steps.filter((st) => st.k === 'e' && st.session === 1);
+  assert.equal(keys.length, 3);
+  assert.deepEqual(keys.slice(1).map((st, i) => Math.round(st.t - keys[i].t)), [200, 200], 'typed 200 ms apart, played so');
+  for (let i = 1; i < h.steps.length; i++) assert.ok(h.steps[i].t >= h.steps[i - 1].t, 'time only moves on');
+});
+
 test('a history lists every chapter it saw, a dropped one too', () => {
   const { sessions: ss, known } = sessions(5, 3);
   const h = new R.History(ss);
