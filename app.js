@@ -3720,6 +3720,53 @@ async function recRestart(bookId) {
   await recOpenStreams(bookId);
 }
 
+// A row that scrolls sideways (History's days): a mouse drags it as a
+// finger does, the wheel scrolls it sideways, and an edge with more beyond
+// it fades out (.edge-l, .edge-r: NEO's sign of more off screen). A drag
+// that moved doesn't also click what it started on. The exported page has
+// its own copy (replay-page.js, sideScroll).
+function sideScroll(el) {
+  const edges = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle('edge-l', el.scrollLeft > 2);
+    el.classList.toggle('edge-r', max - el.scrollLeft > 2);
+  };
+  el.addEventListener('scroll', edges, { passive: true });
+  new ResizeObserver(edges).observe(el);
+  new MutationObserver(edges).observe(el, { childList: true });
+  el.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+    el.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
+  let drag = null;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return; // a finger scrolls it already
+    drag = { x: e.clientX, left: el.scrollLeft, id: e.pointerId, moved: false };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) < 6) return;
+    if (!drag.moved) { drag.moved = true; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); }
+    el.scrollLeft = drag.left - dx;
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (drag.moved) {
+      el.classList.remove('dragging');
+      // the click this drag ends with (if one comes, it comes now) isn't a pick
+      const eat = (c) => { c.stopPropagation(); c.preventDefault(); };
+      el.addEventListener('click', eat, { capture: true, once: true });
+      setTimeout(() => el.removeEventListener('click', eat, { capture: true }), 0);
+    }
+    drag = null;
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  edges();
+}
+
 /* ================================================================== */
 /*  WRITING HISTORY — the dialog and its player                        */
 /*  The recording played back: the book, or                            */
@@ -4703,7 +4750,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
           </div>
           <span class="hs-nextday"></span>
         </div>
-        <div class="hs-strip" role="listbox"></div>
+        <div class="hs-strip show-scrollbar" role="listbox"></div>
       </div>
     </div>
     <div class="hs-foot">
@@ -4753,6 +4800,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   const prevDay = $h('.hs-prevday');
   const nextDay = $h('.hs-nextday');
   const strip = $h('.hs-strip');
+  sideScroll(strip);
   const timeline = $h('.hs-timeline');
   const canvas = $h('.hs-timeline canvas');
   const headEl = $h('.hs-head');

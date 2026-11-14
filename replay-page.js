@@ -534,6 +534,51 @@
   const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e', nokey: '#a98bc9' };
   const STAMP = '#6fb7a8';
 
+  // The row of days, as NEO's (sideScroll in app.js): a mouse drags it as
+  // a finger does, the wheel scrolls it sideways, and an edge with more
+  // beyond it fades out. A drag that moved doesn't also pick a day.
+  function sideScroll(el) {
+    const win = el.ownerDocument.defaultView;
+    const edges = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      el.classList.toggle('edge-l', el.scrollLeft > 2);
+      el.classList.toggle('edge-r', max - el.scrollLeft > 2);
+    };
+    el.addEventListener('scroll', edges, { passive: true });
+    if (win.ResizeObserver) new win.ResizeObserver(edges).observe(el);
+    new win.MutationObserver(edges).observe(el, { childList: true });
+    el.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
+    let drag = null;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || e.button !== 0) return;
+      drag = { x: e.clientX, left: el.scrollLeft, id: e.pointerId, moved: false };
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) < 6) return;
+      if (!drag.moved) { drag.moved = true; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); }
+      el.scrollLeft = drag.left - dx;
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (drag.moved) {
+        el.classList.remove('dragging');
+        const eat = (c) => { c.stopPropagation(); c.preventDefault(); };
+        el.addEventListener('click', eat, { capture: true, once: true });
+        win.setTimeout(() => el.removeEventListener('click', eat, { capture: true }), 0);
+      }
+      drag = null;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    edges();
+  }
+
   // The player, laid out as NEO's Writing History: the chapters and the
   // tags down the left, the sheet, the days as tiles or a day's timeline
   // under it, with the controls, the moment shown and when it was
@@ -660,6 +705,7 @@
     strip.setAttribute('role', 'listbox');
     strip.setAttribute('aria-label', T('Days'));
     bottom.append(controls, dayline, strip);
+    sideScroll(strip);
     // a long pause, as NEO's own player says it: how long it really was
     const badge = el('div', 'rx-badge');
     badge.hidden = true;

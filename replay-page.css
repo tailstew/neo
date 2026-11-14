@@ -106,7 +106,12 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-head { position: absolute; top: 12px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
 .rx-tip { position: absolute; bottom: calc(100% + 6px); max-width: 360px; padding: 4px 8px; font-size: 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 2; }
 .rx-tip[hidden] { display: none; }
-.rx-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; }
+.rx-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scroll-padding-inline: 44px; }
+/* more days beyond an edge: it fades out (sideScroll) */
+.rx-strip.edge-l { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
+.rx-strip.edge-r { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
+.rx-strip.edge-l.edge-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
+.rx-strip.dragging, .rx-strip.dragging * { cursor: grabbing; user-select: none; }
 .rx-tile { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px; background: none; border: 1px solid var(--rule); border-radius: 6px; font-size: 11px; color: var(--soft); cursor: pointer; }
 .rx-tile:hover { color: var(--ink); }
 .rx-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }

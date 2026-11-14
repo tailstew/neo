@@ -585,7 +585,7 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-timeline canvas { display: block; width: 100%; height: 100%; }
 .hs-head { position: absolute; top: 12px; bottom: 0; width: 2px; margin-left: -1px; background: var(--paper); box-shadow: 0 0 0 1px rgba(0,0,0,0.35); pointer-events: none; }
 /* the days: a tile for each, its date and a map of where it changed the text */
-.hs-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; }
+.hs-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scroll-padding-inline: 44px; }
 .hs-strip-empty { padding: 24px 4px; font-size: 12px; color: #77736b; }
 .hs-strip-more { flex: none; align-self: center; padding: 0 8px; white-space: nowrap; animation: hs-reading 1.6s ease-in-out infinite alternate; }
 @keyframes hs-reading { from { opacity: 0.45; } to { opacity: 1; } }
@@ -1733,6 +1733,12 @@ body.bright #add-shelf-btn, body.bright #import-btn { color: #b4b4b4; border-col
 /* the thumb only paints while the pane is actively scrolling */
 .show-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.16); }
 .show-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.28); }
+/* a row that scrolls sideways (sideScroll in app.js): an edge with more
+   beyond it fades out, and a mouse dragging it shows it has hold */
+.edge-l { mask-image: linear-gradient(to right, transparent, #000 44px); }
+.edge-r { mask-image: linear-gradient(to left, transparent, #000 44px); }
+.edge-l.edge-r { mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
+.dragging, .dragging * { cursor: grabbing !important; user-select: none; }
 /* bright mode is still a dark theme — thumbs stay light, just more present */
 body.bright .show-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.26); }
 body.bright .show-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.4); }

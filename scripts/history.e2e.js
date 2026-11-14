@@ -457,6 +457,40 @@ test('one chapter picked: only the days that changed it have tiles', async () =>
   await neo.closeHistory();
 });
 
+test('the days, more than fit: a mouse drags them sideways without picking one, the wheel scrolls them, and an edge with more beyond it fades', async () => {
+  await neo.openHistory();
+  await js('historyShown.player.setMode("book")');
+  await neo.daysReady();
+  // three days in this book: a narrow strip, so they don't fit
+  await js('document.querySelector(".hs-strip").style.maxWidth = "90px"');
+  await tick(100);
+  const st = () => js(`(() => { const s = document.querySelector('.hs-strip'); return { left: Math.round(s.scrollLeft), max: s.scrollWidth - s.clientWidth, l: s.classList.contains('edge-l'), r: s.classList.contains('edge-r'), picked: document.querySelector('.hs-tile[aria-selected=true]')?.dataset.day || null, view: historyShown.player.view() }; })()`);
+  await js('document.querySelector(".hs-strip").scrollLeft = 0');
+  await tick(100);
+  let s = await st();
+  assert.ok(s.max > 0, 'it overflows');
+  assert.deepEqual([s.l, s.r], [false, true], 'at the start: more to the right only');
+  const was = s.picked;
+  const box = await js('(() => { const r = document.querySelector(".hs-strip").getBoundingClientRect(); return { x: Math.round(r.left + r.width - 10), y: Math.round(r.top + r.height / 2) }; })()');
+  neo.wc.sendInputEvent({ type: 'mouseDown', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+  for (let i = 1; i <= 6; i++) { neo.wc.sendInputEvent({ type: 'mouseMove', x: box.x - i * 10, y: box.y, button: 'left', modifiers: ['leftButtonDown'] }); await tick(20); }
+  neo.wc.sendInputEvent({ type: 'mouseUp', x: box.x - 60, y: box.y, button: 'left', clickCount: 1 });
+  await tick(200);
+  s = await st();
+  assert.ok(s.left > 0, 'dragged along: ' + s.left);
+  assert.equal(s.l, true, 'more to the left now');
+  assert.equal(s.picked, was, 'the drag picked no day');
+  assert.equal(s.view, 'days', 'and opened none');
+  // the wheel, down: on along the row
+  await js('document.querySelector(".hs-strip").scrollLeft = 0');
+  await tick(50);
+  neo.wc.sendInputEvent({ type: 'mouseWheel', x: box.x, y: box.y, deltaX: 0, deltaY: -120 });
+  await tick(200);
+  assert.ok((await st()).left > 0, 'the wheel scrolls it sideways');
+  await js('document.querySelector(".hs-strip").style.maxWidth = ""');
+  await neo.closeHistory();
+});
+
 test('the side pane lists the chapters there at the moment shown: joined, made a section, set on a card and deleted ones come and go', async () => {
   await neo.openHistory();
   await js('historyShown.player.setMode("book")');
