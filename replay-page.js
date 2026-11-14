@@ -1101,10 +1101,15 @@
         sheet.textContent = '';
         drawn.clear();
         sheet.dataset.list = want;
+        // each page a sheet of its own, set as NEO sets it (sheet.js): its
+        // kind's classes, and NEO's rules for them, which the page carries
+        const meta = { chapterKinds: data.kinds || {}, chapterOrder: list, format: data.script ? 'screenplay' : '' };
         list.forEach((ch, i) => {
-          const sec = el('section', 'rx-ch');
+          const look = NeoSheet.sheetLook(ch, meta, { script: !!data.script });
+          const sec = el('section', ['rx-ch', 'rp-chapter', ...look.sec].join(' '));
           sec.dataset.ch = ch;
-          sec.append(el('h2', 'rx-chhead', titles.get(ch) || T('Chapter {n}', { n: i + 1 })), el('div', 'rx-body'));
+          sec.dataset.kind = look.kind;
+          sec.append(el('h2', 'rx-chhead chapter-head', titles.get(ch) || T('Chapter {n}', { n: i + 1 })), el('div', ['rx-body', 'rp-body', ...look.body].join(' ')));
           sheet.append(sec);
         });
       }
@@ -1117,6 +1122,7 @@
         const body = sec.querySelector('.rx-body');
         body.innerHTML = shown || '';
         if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t in the book at this moment.') : ''));
+        else NeoSheet.markSheet(body, sec.dataset.kind);
       }
       if (follow) {
         const c = sheet.querySelector('.rx-caret');

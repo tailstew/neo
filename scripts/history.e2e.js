@@ -1145,7 +1145,7 @@ for (const lang of ['de', 'ro', 'ru']) {
   });
 }
 
-test('every kind of page is set in History as in the editor: type, size, alignment, indent, spacing, the drop cap', async () => {
+test('every kind of page is set in History and in the exported page as in the editor: type, size, alignment, indent, spacing, the drop cap', async () => {
   // a book of its own with a page of every kind, the words on each as a writer gives them
   const PAGES = {
     copyright: ['Copyright 2026 the author.', 'All rights reserved.'],
@@ -1178,7 +1178,7 @@ test('every kind of page is set in History as in the editor: type, size, alignme
   await flush();
   const ids = await neo.chapterIds();
   // each paragraph's look, its sizes as shares of its own type, its place as a share of its sheet
-  const looks = (sheet, body, attr) => js(`(() => {
+  const LOOKS = (sheet, body, attr) => `(() => {
     const out = {};
     for (const sec of document.querySelectorAll(${JSON.stringify(sheet)})) {
       const id = sec.getAttribute(${JSON.stringify(attr)});
@@ -1202,8 +1202,36 @@ test('every kind of page is set in History as in the editor: type, size, alignme
       });
     }
     return out;
-  })()`);
-  const editor = await looks('#chapters .chapter', '.chapter-body', 'data-id');
+  })()`;
+  const editor = await js(LOOKS('#chapters .chapter', '.chapter-body', 'data-id'));
+  const kinds = await js(`Object.fromEntries(book.chapterOrder.map((c) => [c, chapterKind(c)]))`);
+  assert.deepEqual(Object.values(kinds).sort(), Object.keys(PAGES).sort(), 'a page of every kind');
+  const of = (k) => Object.keys(kinds).find((c) => kinds[c] === k);
+  // every paragraph of every page as the editor sets it, or what's set differently
+  const against = (where, shown) => {
+    let compared = 0;
+    const off = [];
+    for (const id of ids) {
+      if (!editor[id]) continue;
+      assert.ok(shown[id], `${kinds[id]}: on ${where}’s sheet`);
+      assert.equal(shown[id].length, editor[id].length, `${kinds[id]}: its paragraphs in ${where}`);
+      editor[id].forEach((e, i) => {
+        const h = shown[id][i];
+        for (const k of Object.keys(e)) {
+          const near = ['left', 'width'].includes(k) ? Math.abs(h[k] - e[k]) <= 0.01 : h[k] === e[k];
+          if (!near) off.push(`${kinds[id]}, “${e.text}”: ${k} is ${JSON.stringify(h[k])} in ${where}, ${JSON.stringify(e[k])} in the editor`);
+        }
+        compared++;
+      });
+    }
+    assert.deepEqual(off, [], 'set differently in ' + where);
+    assert.ok(compared >= 20, 'paragraphs compared: ' + compared);
+    // and the case that started this: the dedication has no drop cap, a chapter has one
+    assert.equal(shown[of('dedication')][0].cap, 1, where + ': no drop cap on the dedication');
+    assert.ok(shown[of('chapter')][0].cap > 1, where + ': a chapter keeps its drop cap');
+  };
+
+  // History
   await neo.openHistory();
   await js('historyShown.player.setMode("book")');
   await neo.daysReady();
@@ -1211,33 +1239,36 @@ test('every kind of page is set in History as in the editor: type, size, alignme
   await neo.playerReady({ drawn: false });
   await waitFor(`historyShown.player.paper.querySelectorAll('.rp-chapter').length >= ${ids.length}`);
   await tick(300);
-  const shown = await looks('.hs-paper .rp-chapter', '.rp-body', 'data-ch');
-  const kinds = await js(`Object.fromEntries(book.chapterOrder.map((c) => [c, chapterKind(c)]))`);
+  const shown = await js(LOOKS('.hs-paper .rp-chapter', '.rp-body', 'data-ch'));
+  await neo.closeHistory();
+  against('History', shown);
+
+  // the exported page, in a window the size of NEO's (the page's width is NEO's, in the window's terms)
+  const { dialog, BrowserWindow } = require('electron');
+  const real = dialog.showSaveDialog;
+  const file = path.join(neo.tmp, 'every-page.html');
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
   try {
-    assert.deepEqual(Object.values(kinds).sort(), Object.keys(PAGES).sort(), 'a page of every kind');
-    let compared = 0;
-    const off = [];
-    for (const id of ids) {
-      if (!editor[id]) continue;
-      assert.ok(shown[id], kinds[id] + ': on History’s sheet');
-      assert.equal(shown[id].length, editor[id].length, kinds[id] + ': its paragraphs');
-      editor[id].forEach((e, i) => {
-        const h = shown[id][i];
-        for (const k of Object.keys(e)) {
-          const near = ['left', 'width'].includes(k) ? Math.abs(h[k] - e[k]) <= 0.01 : h[k] === e[k];
-          if (!near) off.push(`${kinds[id]}, “${e.text}”: ${k} is ${JSON.stringify(h[k])} in History, ${JSON.stringify(e[k])} in the editor`);
-        }
-        compared++;
-      });
-    }
-    assert.deepEqual(off, [], 'set differently');
-    assert.ok(compared >= 20, 'paragraphs compared: ' + compared);
-    // and the case that started this: the dedication has no drop cap, a chapter has one
-    const of = (k) => Object.keys(kinds).find((c) => kinds[c] === k);
-    assert.equal(shown[of('dedication')][0].cap, 1, 'no drop cap on the dedication');
-    assert.ok(shown[of('chapter')][0].cap > 1, 'a chapter keeps its drop cap');
+    await js('setTimeout(() => exportWritingHistory(), 0), true');
+    await waitFor('!!document.querySelector(".ex-modal")');
+    await js('document.querySelector(".ex-understood") && document.querySelector(".ex-understood").click()');
+    await js('(document.querySelector(".ex-modal .m-continue") || {}).click && document.querySelector(".ex-modal .m-continue").click()');
+    await tick(100);
+    await js('[...document.querySelectorAll(".ex-modal .m-ok")].find((b) => b.offsetParent).click()');
+    for (let i = 0; i < 300 && !fs.existsSync(file); i++) await tick(100);
   } finally {
-    await neo.closeHistory();
+    dialog.showSaveDialog = real;
+  }
+  const [w, h] = neo.win.getContentSize();
+  const win = new BrowserWindow({ show: false, width: w, height: h, useContentSize: true, webPreferences: { offscreen: true } });
+  try {
+    await win.loadFile(file);
+    const page = (code) => win.webContents.executeJavaScript(code, true);
+    for (let i = 0; i < 300 && !(await page(`document.querySelectorAll('.rx-sheet .rx-ch p[data-first]').length >= ${ids.length - 1}`)); i++) await tick(100);
+    await tick(300);
+    against('the exported page', await page(LOOKS('.rx-sheet .rx-ch', '.rx-body', 'data-ch')));
+  } finally {
+    win.destroy();
   }
 });
 

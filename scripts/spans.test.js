@@ -9,7 +9,7 @@ const { test } = require('node:test');
 // what a chapter's page saves (captureBody), run on its own
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const context = vm.createContext({});
-vm.runInContext(app.slice(app.indexOf('function captureBody('), app.indexOf('// A chapter that opens on a line of dialogue')), context);
+vm.runInContext(app.slice(app.indexOf('function captureBody('), app.indexOf('function syncChapter(')), context);
 vm.runInContext('this.api = { captureBody, dropJunkSpans };', context);
 const { captureBody, dropJunkSpans } = context.api;
 const saved = (innerHTML) => captureBody({ innerHTML });

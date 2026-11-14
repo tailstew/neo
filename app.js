@@ -58,28 +58,14 @@ const tabName = (kind) => {
 // the numbering starts, say. Prologues, epilogues and chapters (numbered or
 // not) are the story: they count toward the words. book.restartNumbering
 // starts the chapter count again at 1 after every part.
-const CHAPTER_KINDS = ['copyright', 'dedication', 'epigraph', 'contents', 'prologue', 'part', 'chapter', 'unnumbered', 'epilogue', 'acknowledgments', 'about'];
-const STORY_KINDS = ['chapter', 'unnumbered', 'prologue', 'epilogue'];
+// a sheet's kinds and how it's set are sheet.js's, shared with the exported page
+const { CHAPTER_KINDS, STORY_KINDS, ATTRIBUTED_PAGES, OPENING_DASH, isAttribution, markDialogueOpening, sheetLook, markSheet } = window.NeoSheet;
+const chapterKind = (chId, meta = book) => NeoSheet.chapterKind(chId, meta);
+const isStory = (chId, meta = book) => NeoSheet.isStory(chId, meta);
+const chapterRole = (chId, meta = book) => NeoSheet.chapterRole(chId, meta);
+const soloStory = (meta = book) => NeoSheet.soloStory(meta);
 // what comes after the story, where a new chapter never goes
 const BACK_KINDS = ['epilogue', 'acknowledgments', 'about'];
-function chapterKind(chId, meta = book) {
-  const k = meta && meta.chapterKinds && meta.chapterKinds[chId];
-  if (k && CHAPTER_KINDS.includes(k)) return k;
-  // NEO 1.0 kept a prologue and an epilogue as roles of the first and last
-  // chapters (a book not opened since reads that way until it is)
-  const order = (meta && meta.chapterOrder) || [];
-  if (order.length >= 2) {
-    if (meta.prologue === chId && order[0] === chId) return 'prologue';
-    if (meta.epilogue === chId && order[order.length - 1] === chId) return 'epilogue';
-  }
-  return 'chapter';
-}
-const isStory = (chId, meta = book) => STORY_KINDS.includes(chapterKind(chId, meta));
-// a prologue or an epilogue: story that stands outside the numbering
-function chapterRole(chId, meta = book) {
-  const k = chapterKind(chId, meta);
-  return k === 'prologue' || k === 'epilogue' ? k : null;
-}
 // a chapter's number counts chapters only; a part's, parts only
 function kindCount(chId, kind, meta = book) {
   let n = 0;
@@ -154,13 +140,6 @@ function numberedChapters(meta = book, chId = null) {
     if (k === 'chapter') { n++; total++; }
   }
   return chId && meta.restartNumbering ? n : total;
-}
-// A story of one chapter is just "the story": no heading, no number, until a
-// second chapter (or a prologue, an epilogue or a part) joins it. The pages
-// around it don't count.
-function soloStory(meta = book) {
-  const story = meta.chapterOrder.filter((c) => isStory(c, meta) || chapterKind(c, meta) === 'part');
-  return story.length === 1 && chapterKind(story[0], meta) === 'chapter' ? story[0] : null;
 }
 // NEO 1.0's roles become kinds the first time a book opens here, and a kind
 // whose entry is gone is let go
@@ -1807,8 +1786,6 @@ function sheetBackdrop(kind, label, inner) {
   return bd;
 }
 
-// the lines of a page that say who said the lines above them (a dash first)
-const ATTRIBUTED_PAGES = ['dedication', 'epigraph', 'part'];
 
 async function openPageSheet(shelf, meta, label) {
   const live = (await window.neo.readBookMeta(meta.id)) || meta;
@@ -4186,7 +4163,9 @@ async function exportWritingHistory(bookId = book && book.id) {
     const saved = await window.neo.recExport(bookId, {
       chapters: picked.chapters, title, author: meta.author || library.authorName || '', lang: NeoI18n.getLocale(),
       strings: replayPageStrings(), report, order, fileName: replayFileName(title, meta.chapterOrder, picked.chapters),
-      script: meta.format === 'screenplay', underline: !!meta.underlineHeadings
+      script: meta.format === 'screenplay', underline: !!meta.underlineHeadings,
+      // each page set as the editor sets it: its kind, and the editor's own rules for a sheet (sheetPageCss)
+      kinds: Object.fromEntries(order.map((c) => [c.id, chapterKind(c.id, meta)])), css: await sheetPageCss()
     });
     if (saved) toast(t('Exported: {file}', { file: saved.split(/[\\/]/).pop() }));
   } catch (err) {
@@ -8842,64 +8821,6 @@ function dropJunkSpans(html) {
     junk.push(drop);
     return drop ? '' : tag;
   });
-}
-
-// A chapter that opens on a line of dialogue sets no drop cap: the dash
-// itself would be the letter enlarged. That line, and one that follows a
-// scene break, keep their indent where prose is set flush, so the speech
-// lines up with the lines that answer it. The marks are never saved.
-const OPENING_DASH = /^\s*[-‐‑‒–—―]/;
-// A chapter's opening paragraph — the one with the drop cap and no indent —
-// is its first paragraph with words in it, past a blank line or a *** at the
-// top (the exports skip those too). Poetry stands apart. In an empty
-// chapter it's the paragraph waiting for the first word. Marked data-first,
-// for the screen only.
-function openingPara(body) {
-  const ps = [...body.children].filter((p) => p.tagName === 'P' && !p.classList.contains('poetry') && !p.classList.contains('scene-break') && !p.classList.contains('ghost'));
-  return ps.find((p) => p.textContent.trim() !== '') || ps[0] || null;
-}
-function markDialogueOpening(body) {
-  const first = openingPara(body);
-  for (const p of body.querySelectorAll('p[data-first]')) if (p !== first) p.removeAttribute('data-first');
-  if (first && !first.hasAttribute('data-first')) first.setAttribute('data-first', '');
-  body.classList.toggle('opens-dialogue', !!first && OPENING_DASH.test(first.textContent));
-  for (const p of body.querySelectorAll('p[data-speech]')) if (!p.matches('.scene-break + p')) p.removeAttribute('data-speech');
-  for (const p of body.querySelectorAll('p.scene-break + p')) {
-    const speech = OPENING_DASH.test(p.textContent);
-    if (p.hasAttribute('data-speech') !== speech) p.toggleAttribute('data-speech', speech);
-  }
-}
-
-// How a chapter's sheet and its text are set: the editor and History's
-// player both take it from here, so a page looks the same in each
-// (history.e2e.js compares them, a page of every kind). meta is the book
-// (History's may be one that isn't open), order the chapters at the moment
-// shown, which say whether a chapter is the book's only one.
-function sheetLook(chId, meta, { script = meta.format === 'screenplay', narrow = false, order = meta.chapterOrder } = {}) {
-  const kind = chapterKind(chId, meta);
-  const story = STORY_KINDS.includes(kind);
-  const sec = ['sheet', 'kind-' + kind];
-  if (chId === soloStory({ ...meta, chapterOrder: order })) sec.push('solo');
-  if (!story) sec.push('bookpage');
-  const role = chapterRole(chId, meta);
-  if (role) sec.push(role);
-  // a page that isn't story has no drop cap; a script's lines are set as
-  // they print (styles.css, SCREENPLAYS)
-  const body = [];
-  if (!story || script) body.push('no-cap');
-  if (script) body.push('script-body', narrow ? 'sp-narrow' : 'sp-geom');
-  return { kind, sec, body };
-}
-// the marks for the screen only that a sheet's text takes from its words:
-// the opening paragraph, and on a dedication, an epigraph or a part, a line
-// that opens with a dash set as the name of whoever said the lines above it
-function markSheet(body, kind) {
-  markDialogueOpening(body);
-  if (!ATTRIBUTED_PAGES.includes(kind)) return;
-  for (const p of body.querySelectorAll('p')) {
-    const attr = isAttribution({ text: p.textContent.trim() });
-    if (p.hasAttribute('data-attr') !== attr) p.toggleAttribute('data-attr', attr);
-  }
 }
 
 function syncChapter(body, chId, cause = 'program') {
@@ -19905,6 +19826,35 @@ const exportBodyFont = () => (getComputedStyle(document.documentElement).getProp
 // the drop cap too: its face is the page's, bundled or the computer's
 const exportDropCapFont = () => (getComputedStyle(document.documentElement).getPropertyValue('--dropcap-font').trim() || 'Georgia, serif').replace(/[<>{};]/g, '');
 const firstFamily = (stack) => stack.split(',')[0].trim().replace(/^["']|["']$/g, '');
+// The exported Writing History sets its pages with the editor's own rules:
+// every rule in styles.css written for History's sheets (.sheet,
+// .rp-chapter, .rp-body; not the dialog's own, .hs-…, nor the page
+// themes', body.night),
+// the type it sets them in (the body face and the drop cap's, bundled ones
+// inside the file), its size, and its page's width. The page puts its own
+// rules after these, and its script layout (replay-page.css).
+async function sheetPageCss() {
+  const root = getComputedStyle(document.documentElement);
+  const v = (k, or) => (root.getPropertyValue(k).trim() || or).replace(/[<>{};]/g, '');
+  const noCap = (library.fonts || {}).dropcap === 'none';
+  let css = `:root { --body-font: ${exportBodyFont()}; --dropcap-font: ${exportDropCapFont()}; --editor-size: ${v('--editor-size', '17px')}; --page-zoom: 1; --page-w: ${v('--page-w', '760px')}; }\n`;
+  for (const sheet of document.styleSheets) {
+    let rules = [];
+    try { rules = [...sheet.cssRules]; } catch { continue; }
+    for (const r of rules) {
+      // (and .sheet: a page's margins)
+      if (!(r instanceof CSSStyleRule) || !(r.selectorText === '.sheet' || /\.rp-(body|chapter)\b/.test(r.selectorText))) continue;
+      if (/\.hs-|body\.night/.test(r.selectorText)) continue;
+      // the writer's drop cap turned off: the rule that sets one isn't there
+      if (noCap && /::first-letter/.test(r.selectorText) && /no-dropcap/.test(r.selectorText)) continue;
+      css += r.cssText + '\n';
+    }
+  }
+  // the type, italic and bold italic too: the history plays every word the page ever held
+  css += await exportFontFaces({ sections: [{ kind: 'dedication', paras: [{ html: '<i><b></b></i>' }] }] });
+  return css.replace(/<\//g, '<\\/');
+}
+
 async function exportFontFaces(d) {
   const family = firstFamily(exportBodyFont());
   // the drop cap sets one letter, upright and regular
@@ -19945,9 +19895,8 @@ async function exportFontFaces(d) {
   return css;
 }
 
-// The pages of a book that aren't chapters, set the way books set them.
-// A line that opens with a dash says who said the lines above it.
-const isAttribution = (p) => /^(?:[—–]|--?\s)/.test(p.text || '');
+// The pages of a book that aren't chapters, set the way books set them
+// (a line that opens with a dash says who said the lines above it: isAttribution, sheet.js).
 // a section's heading level follows the contents: a part, the titles in
 // it, their chapters (a single book's chapters are all level 0)
 const headTag = (ch) => 'h' + Math.min(6, 2 + (ch.level || 0));

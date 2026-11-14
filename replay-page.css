@@ -77,20 +77,18 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-badge[hidden] { display: none; }
 .rx-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 0 32px; }
 .rx-sheet {
-  width: min(760px, calc(100% - 32px));
+  width: min(var(--page-w, 760px), calc(100% - 32px));
   margin: 0 auto;
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  padding: 48px clamp(16px, 7vw, 72px) 64px;
   font: 18px/1.6 Georgia, "Times New Roman", serif;
 }
-.rx-ch + .rx-ch { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--rule); }
-.rx-chhead { font: 600 15px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--soft); text-transform: uppercase; letter-spacing: 0.06em; }
-.rx-body p { margin: 0; text-indent: 1.5em; }
-.rx-body p:first-child, .rx-body p.scene-break + p { text-indent: 0; }
-.rx-body p.scene-break { text-align: center; text-indent: 0; margin: 1em 0; }
-.rx-body .ghost { display: none; }
+/* Each page is a sheet as History shows it: its margins, its text, its
+   kind's layout and the drop cap are NEO's own rules (styles.css's for
+   History's sheets, .rp-chapter and .rp-body), which the export carries in
+   the style before this one, with the writer's type (sheetPageCss in
+   app.js); these only give it this page's paper. */
+.rx-ch { background: var(--sheet); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; margin-bottom: 30px; }
+.rx-ch.sheet { min-height: 0; box-shadow: none; }
+.rx-chhead { font: 600 15px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--soft); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 1.2em; }
 .rx-body img { max-width: 100%; }
 .rx-empty { color: var(--soft); font-style: italic; }
 .rx-caret { display: inline-block; width: 0; height: 1.1em; margin-right: -1px; border-left: 2px solid var(--accent); vertical-align: text-bottom; }
@@ -189,12 +187,13 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
    prints; on a phone, the editor's narrow layout */
 .rx-scroll.rx-script-scroll { container-type: inline-size; }
 .rx-sheet.rx-script {
-  width: 51em; max-width: none; padding: 6em 5.7em 6em 9em;
+  width: 51em; max-width: none;
   font-family: 'Courier Prime', 'Courier New', Courier, monospace; line-height: 1;
   font-size: min(16px, calc((100cqw - 32px) / 51));
 }
+.rx-script .rx-ch { padding: 6em 5.7em 6em 9em; margin-bottom: 44px; }
+.rx-script .rx-body { font-family: inherit; font-size: 1em; line-height: 1; }
 .rx-script .rx-chhead { display: none; }
-.rx-script .rx-ch + .rx-ch { margin-top: 1em; padding-top: 0; border-top: none; }
 .rx-script .rx-body p { margin: 1em 0 0; text-indent: 0; width: 36.3em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
 .rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2em; }
@@ -206,7 +205,9 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-script .rx-body p.sp-dialogue { margin-left: 6em; width: 21.3em; }
 .rx-script .rx-body p.sp-transition { text-align: right; }
 @media (max-width: 700px) {
-  .rx-sheet.rx-script { width: calc(100% - 24px); font-size: 15px; line-height: 1.3; padding: 28px 18px 40px; }
+  .rx-sheet.rx-script { width: calc(100% - 24px); font-size: 15px; line-height: 1.3; }
+  .rx-script .rx-ch { padding: 28px 18px 40px; }
+  .rx-script .rx-body { line-height: 1.3; }
   .rx-script .rx-body p { width: auto; margin-top: 1.3em; }
   .rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
   .rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2.6em; }
@@ -220,7 +221,9 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
   .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }
   .rx-js .rx-side { display: none; }
   .rx-js .rx-lede { display: none; }
-  .rx-sheet { font-size: 17px; width: calc(100% - 24px); padding: 28px 16px 40px; }
+  /* the sheet as History's on a phone, as wide as the editor's page there */
+  .rx-sheet { width: calc(100% - 24px); }
+  .rx-ch { padding: 34px 26px 60px; }
   .rx-bottom { padding: 8px 12px; }
   .rx-prev, .rx-next { min-width: 0; }
 }

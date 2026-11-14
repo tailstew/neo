@@ -46,7 +46,7 @@ dialog.showSaveDialog = async (win, o) => {
 // the page's own copy of NEO's roots holds the test root too, as NEO's do here
 const pageSrc = path.join(neo.tmp, 'page-src');
 fs.mkdirSync(pageSrc, { recursive: true });
-for (const f of ['recording.js', 'replay-page.js', 'replay-page.css']) fs.copyFileSync(path.join(__dirname, '..', f), path.join(pageSrc, f));
+for (const f of ['recording.js', 'sheet.js', 'replay-page.js', 'replay-page.css']) fs.copyFileSync(path.join(__dirname, '..', f), path.join(pageSrc, f));
 fs.writeFileSync(path.join(pageSrc, 'proof-roots.pem'), fs.readFileSync(path.join(__dirname, '..', 'proof-roots.pem'), 'utf8') + '\n' + require('./fake-tsa.js').rootPem);
 const build = ReplayExport.build;
 ReplayExport.build = (o) => build({ ...o, dir: pageSrc });

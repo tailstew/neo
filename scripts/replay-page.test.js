@@ -47,10 +47,10 @@ test('the whole book’s page holds every session and its seals, and checks them
   });
   // one script per source, each carrying the nonce the policy names; the title can't end one
   const nonce = /script-src 'nonce-([^']+)'/.exec(html)[1];
-  assert.equal((html.match(/<script nonce="/g) || []).length, 2);
-  assert.equal((html.match(new RegExp(`<script nonce="${nonce.replace(/[+/=]/g, '\\$&')}">`, 'g')) || []).length, 2);
+  assert.equal((html.match(/<script nonce="/g) || []).length, 3);
+  assert.equal((html.match(new RegExp(`<script nonce="${nonce.replace(/[+/=]/g, '\\$&')}">`, 'g')) || []).length, 3);
   assert.ok(!/unsafe-inline'[^"]*script|script-src[^;"]*unsafe/.test(html));
-  assert.equal(html.split('</script>').length - 1, 3);
+  assert.equal(html.split('</script>').length - 1, 4);
   assert.ok(html.includes('The &lt;/script&gt; Book'));
   const data = dataOf(html);
   assert.equal(data.partial, false);

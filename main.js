@@ -1163,7 +1163,11 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
     title: str(opts.title, 500), author: str(opts.author, 500), lang: str(opts.lang, 20) || 'en', strings,
     report: str(opts.report, 2000000), evidence: r.evidence, sessions: r.texts, seals, kept: chapters,
     chapters: (Array.isArray(opts.order) ? opts.order : []).slice(0, 5000).map((c) => ({ id: str(c && c.id, 200), title: str(c && c.title, 500) })),
-    partial: !!chapters, script: opts.script === true, underline: opts.underline === true, version: app.getVersion()
+    partial: !!chapters, script: opts.script === true, underline: opts.underline === true, version: app.getVersion(),
+    // each page's kind, and the editor's rules for a sheet with its type (sheetPageCss in app.js)
+    kinds: Object.fromEntries(Object.entries(opts.kinds && typeof opts.kinds === 'object' ? opts.kinds : {}).slice(0, 5000)
+      .filter(([, k]) => typeof k === 'string' && /^[a-z]{1,20}$/.test(k)).map(([c, k]) => [str(c, 200), k])),
+    css: str(opts.css, 20000000)
   });
   const win = BrowserWindow.getFocusedWindow();
   const name = str(opts.fileName, 200).replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Writing History';

@@ -18,6 +18,7 @@ GITHUB-SETUP.md
 pocket/node_modules/
 pocket/www/app.js
 pocket/www/covers.js
+pocket/www/sheet.js
 pocket/www/recording.js
 pocket/www/recording-files.js
 pocket/www/history-worker.js
