@@ -2198,7 +2198,7 @@ body.night #paper.script #chapters { box-shadow: 0 4px 30px rgba(0,0,0,0.7); }
 .sp-geom > p.sp-heading, .sp-narrow > p.sp-heading,
 .sp-geom > p.sp-shot, .sp-narrow > p.sp-shot { font-weight: bold; }
 /* …and underlined too, for the studios that want it (Format menu) */
-#paper.sp-uline .sp-geom > p.sp-heading, #paper.sp-uline .sp-narrow > p.sp-heading { text-decoration: underline; }
+:is(#paper, .hs-paper).sp-uline .sp-geom > p.sp-heading, :is(#paper, .hs-paper).sp-uline .sp-narrow > p.sp-heading { text-decoration: underline; }
 /* two blank lines above a scene heading, and a shot, which is a heading
    without INT./EXT. (SP_BEFORE in app.js) */
 .sp-geom > p.sp-heading:not(:first-child), .sp-geom > p.sp-shot:not(:first-child) { margin-top: 2em; }
@@ -2263,6 +2263,17 @@ body.night #paper.script #chapters { box-shadow: 0 4px 30px rgba(0,0,0,0.7); }
 #paper.script.narrow #chapters { padding: 28px 18px 60px; box-shadow: none; }
 .sp-narrow { font-family: var(--sp-font); font-size: 1em; line-height: 1.3; --ind: 0em; }
 #paper.script .chapter-body.sp-narrow { font-size: 1em; line-height: 1.3; }
+/* a script in Writing History: its page as the editor sets it (draw()
+   in the WRITING HISTORY section toggles these), its own type size
+   scaled to the pane, Courier, the script's margins, no chapter heading */
+.hs-scroll.hs-script-scroll { container-type: inline-size; }
+.hs-paper.hs-script { width: 51em; max-width: none; font-size: min(calc(var(--page-w) / 51), calc((100cqw - 48px) / 51)); }
+.hs-paper.hs-script .sheet { padding: 6em 5.7em 6em 9em; margin-bottom: 44px; }
+.hs-paper.hs-script .chapter-head { display: none; }
+.hs-paper.hs-script .rp-body.sp-geom { font-size: 1em; line-height: 1em; }
+.hs-paper.hs-script .rp-body.sp-narrow { font-size: 1em; line-height: 1.3; }
+.hs-paper.hs-script.hs-sp-narrow { font-size: 15px; width: calc(100% - 16px); }
+.hs-paper.hs-script.hs-sp-narrow .sheet { padding: 28px 18px 60px; }
 .sp-narrow > p { margin: 1.3em 0 0; text-indent: 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; position: relative; }
 .sp-narrow > p:first-child { margin-top: 0; }
 .sp-narrow > p.sp-dialogue, .sp-narrow > p.sp-paren { margin-top: 0; }

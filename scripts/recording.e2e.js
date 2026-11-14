@@ -1695,6 +1695,39 @@ test('a script imported from Fountain: a scene card moved is recorded, and ⌘Z 
   assert.ok(lines.some((l) => l[1] === 'x' && l[2] === 'undo-structural'), 'and the undo');
 });
 
+test('a script in History is set as the editor sets it: its type, its page, each line where it prints', async () => {
+  // (the script imported just above is open) the editor's lines: where
+  // each sits across the page, as a share of the page's width
+  const across = (sheet, body) => js(`(() => {
+    const page = document.querySelector(${JSON.stringify(sheet)}).getBoundingClientRect();
+    const out = {};
+    for (const p of document.querySelectorAll(${JSON.stringify(body)} + ' > p')) {
+      const k = p.className.split(' ').find((c) => c.startsWith('sp-')) || 'action';
+      if (k in out) continue;
+      const r = p.getBoundingClientRect();
+      const cs = getComputedStyle(p);
+      out[k] = { left: +((r.left - page.left) / page.width).toFixed(3), font: cs.fontFamily.split(',')[0], upper: cs.textTransform };
+    }
+    return out;
+  })()`);
+  const editor = await across('#chapters', '#chapters .chapter-body');
+  assert.ok(editor['sp-heading'] && editor.action, 'the editor shows a heading and action: ' + JSON.stringify(editor));
+  await flush();
+  await js('openHistory()');
+  await daysReady();
+  await playLatest();
+  assert.equal(await js('historyShown.player.paper.classList.contains("hs-script")'), true);
+  const shown = await across('.hs-paper .rp-chapter', '.hs-paper .rp-body');
+  for (const k of Object.keys(editor)) {
+    assert.ok(shown[k], k + ' in History: ' + JSON.stringify(shown));
+    assert.equal(shown[k].font, editor[k].font, k + ': the script’s type');
+    assert.equal(shown[k].upper, editor[k].upper, k + ': its capitals');
+    assert.ok(Math.abs(shown[k].left - editor[k].left) < 0.01, `${k}: ${shown[k].left} of the page across in History, ${editor[k].left} in the editor`);
+  }
+  await js('historyShown(); 0');
+  await tick(300);
+});
+
 /* ---------- runner ---------- */
 
 /* ---------- deleting a book's history ---------- */

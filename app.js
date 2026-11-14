@@ -5758,6 +5758,14 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (showing.includes(sec.dataset.ch)) secs[sec.dataset.ch] = sec;
       else { sec.remove(); delete shown[sec.dataset.ch]; }
     }
+    // a script is set as the editor sets it (styles.css, SCREENPLAYS): its
+    // page, and its lines where they print, narrow on a phone as there
+    const script = meta.format === 'screenplay';
+    const spSet = narrowMq.matches ? 'sp-narrow' : 'sp-geom';
+    paper.classList.toggle('hs-script', script);
+    paper.classList.toggle('hs-sp-narrow', script && narrowMq.matches);
+    paper.classList.toggle('sp-uline', script && !!meta.underlineHeadings);
+    scroller.classList.toggle('hs-script-scroll', script);
     let prev = null;
     for (const ch of showing) {
       let sec = secs[ch];
@@ -5766,6 +5774,11 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         sec.dataset.ch = ch;
         sec.innerHTML = '<div class="chapter-head"></div><div class="rp-body"></div>';
       }
+      const rb = sec.lastElementChild;
+      rb.classList.toggle('script-body', script);
+      rb.classList.toggle('sp-geom', script && spSet === 'sp-geom');
+      rb.classList.toggle('sp-narrow', script && spSet === 'sp-narrow');
+      if (script) rb.classList.add('no-cap');
       const kind = chapterKind(ch, meta);
       sec.className = `rp-chapter sheet kind-${kind}` + (STORY_KINDS.includes(kind) ? '' : ' bookpage');
       const label = chapterLabel(ch, order);
