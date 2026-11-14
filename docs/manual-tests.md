@@ -26,7 +26,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 - [ ] Writing feels the same with **Record Writing History** at Off and at Record Only: no lag while typing, even in a long chapter or a 100-page script.
 - [x] Dead keys and AltGr (é, ñ, ă, ș), and the Windows emoji panel (Win+.) replay as typed. *(passed 2026-11-14, ac28ec3)*
-- [ ] An input method (Microsoft Pinyin or Japanese IME): composed text replays and the chapter matches.
+- [x] An input method (Microsoft Pinyin or Japanese IME): composed text replays and the chapter matches. *(passed 2026-11-14, ac28ec3, Japanese IME in hiragana mode, こんにちは twice in Bad News: each step of the composition is recorded as `insertCompositionText` with `compose`/`composed` focus lines, a mistyped こんいちは fixed mid-composition included; `verify-recording.js` replays all 51 of the laptop's chapter writes exactly. The IME starts in alphanumeric mode (A in the taskbar), which types plain letters: switch to あ with Alt+` first)*
 - [ ] Windows voice typing (Win+H) into a chapter replays and the chapter matches.
 - [ ] Paste from Word, from a web page, and from another NEO chapter. Each replays, and the timeline marks pastes from outside and from the book differently.
 - [ ] Sleep the laptop mid-session, wake it, keep writing. History shows the time away, not a burst of fast typing.
