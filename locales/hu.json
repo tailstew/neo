@@ -1066,5 +1066,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Amit ezek az ellenőrzések megmutathatnak: hogy az előzmény összefügg és pontosan visszajátszható, és ahol időbélyeget kapott, ott hogy már létezett akkor, és nem utólag találták ki. Amit nem mutathatnak meg: ki ült a billentyűzetnél, vagy kinek az ötletei voltak a szavak.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Semmi sem rögzíti időben ezt az előzményt: egyetlen írási munkamenet sem kapott időbélyeget. Megmutatja, hogyan íródott a könyv, de azt nem, hogy mikor, és egy utólag kitalált előzmény ugyanígy nézhetne ki.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Időben rögzítve: {all} írási munkamenetből {n} a vége után egy napon belül időbélyeget kapott, a felük {soon} belül.",
-  "a minute": "egy percen"
+  "a minute": "egy percen",
+  "Chapters imported": "Fejezetek importálva"
 }

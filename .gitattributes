@@ -2,3 +2,5 @@
 scripts/fixtures/*/*.jsonl -text
 # Proof fixtures: real timestamp tokens over these exact bytes
 scripts/fixtures/proof/** -text
+# Dictionaries kept as LibreOffice ships them: NOTICE.txt gives their SHA-256
+dictionaries/** -text

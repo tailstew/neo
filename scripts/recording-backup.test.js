@@ -275,7 +275,17 @@ function loadMain(userData) {
     BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
     Menu: { buildFromTemplate: (items) => items, setApplicationMenu() {} },
     dialog: {},
-    utilityProcess: { fork: () => ({ on() {}, postMessage() {} }) },
+    // the backup's own process: the real backup-worker.js, as a Node child
+    utilityProcess: {
+      fork: (file) => {
+        const child = require('node:child_process').fork(file, []);
+        return {
+          on: (ev, fn) => child.on(ev, ev === 'exit' ? (code) => fn(code || 0) : fn),
+          postMessage: (m) => child.send(m),
+          kill: () => child.kill()
+        };
+      }
+    },
     screen: {}
   };
   const context = vm.createContext({
@@ -283,7 +293,9 @@ function loadMain(userData) {
     __dirname: root,
     process: { platform: process.platform, on() {} },
     console,
-    Buffer
+    Buffer,
+    setTimeout,
+    clearTimeout
   });
   vm.runInContext(fs.readFileSync(path.join(root, 'main.js'), 'utf8'), context, { filename: path.join(root, 'main.js') });
   return context;
@@ -328,7 +340,6 @@ test('the daily zip leaves recordings out and says where they are; the mirror an
   // started again the same day: nothing more is copied, and the README stays
   const readme = path.join(backups, 'README.txt');
   const stamp = fs.statSync(readme).mtimeMs;
-  assert.equal(await main.backupRecordings(), 0);
-  await main.dailyBackup();
+  assert.equal(await main.dailyBackup(), 0, 'nothing more is copied');
   assert.equal(fs.statSync(readme).mtimeMs, stamp);
 });

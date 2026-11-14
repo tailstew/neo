@@ -1177,5 +1177,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Ce pot arăta aceste verificări: că istoricul se leagă și se redă exact și, unde a primit marcaj temporal, că exista deja atunci și nu a fost inventat ulterior. Ce nu pot arăta: cine stătea la tastatură sau ale cui erau ideile.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nimic nu fixează acest istoric în timp: nicio sesiune de scris nu a primit marcaj temporal. Arată cum a fost scrisă cartea, dar nu și când, iar un istoric inventat ulterior ar putea arăta la fel.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixat în timp: {n} din {all} sesiuni de scris au primit marcaj temporal în ziua de după încheiere, jumătate dintre ele în mai puțin de {soon}.",
-  "a minute": "un minut"
+  "a minute": "un minut",
+  "Chapters imported": "Capitole importate"
 }

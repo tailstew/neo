@@ -1213,5 +1213,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Что могут показать эти проверки: что история согласована и воспроизводится точно, а там, где есть метки времени, — что она уже существовала тогда и не придумана задним числом. Чего они показать не могут: кто сидел за клавиатурой и чьи это были идеи.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Ничто не закрепляет эту историю во времени: ни один сеанс письма не получил метку времени. Она показывает, как писалась книга, но не когда, а история, придуманная задним числом, выглядела бы так же.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Закреплено во времени: сеансов письма с меткой времени в течение суток после окончания — {n} из {all}, половина из них — в пределах {soon}.",
-  "a minute": "минуты"
+  "a minute": "минуты",
+  "Chapters imported": "Главы импортированы"
 }

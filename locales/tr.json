@@ -1048,5 +1048,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Bu denetimlerin gösterebileceği: geçmişin tutarlı olduğu ve tam olarak oynatıldığı, zaman damgası aldığı yerlerde ise o zaman zaten var olduğu ve sonradan uydurulmadığı. Gösteremeyeceği: klavyenin başında kimin olduğu ya da fikirlerin kime ait olduğu.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Hiçbir şey bu geçmişi zamanda sabitlemiyor: hiçbir yazma oturumu zaman damgası almadı. Kitabın nasıl yazıldığını gösterir ama ne zaman yazıldığını göstermez; sonradan uydurulmuş bir geçmiş de aynı görünebilirdi.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Zamanda sabitlenmiş: {all} yazma oturumunun {n} tanesi bitişinden sonraki bir gün içinde zaman damgası aldı, yarısı {soon} içinde.",
-  "a minute": "bir dakika"
+  "a minute": "bir dakika",
+  "Chapters imported": "Bölümler içe aktarıldı"
 }

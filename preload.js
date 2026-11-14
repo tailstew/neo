@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('neo', {
   duplicateBook: (bookId, title) => ipcRenderer.invoke('book:duplicate', bookId, title),
   listBooks: () => ipcRenderer.invoke('library:listBooks'),
   readBookMeta: (bookId) => ipcRenderer.invoke('book:readMeta', bookId),
-  writeBookMeta: (bookId, meta) => ipcRenderer.invoke('book:writeMeta', bookId, meta),
+  writeBookMeta: (bookId, meta, known) => ipcRenderer.invoke('book:writeMeta', bookId, meta, known),
   deleteBook: (bookId, title) => ipcRenderer.invoke('book:delete', bookId, title),
 
   readChapter: (bookId, chId) => ipcRenderer.invoke('chapter:read', bookId, chId),
@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld('neo', {
   exportSave: (payload) => ipcRenderer.invoke('export:save', payload),
   emailDraft: (payload) => ipcRenderer.invoke('email:draft', payload),
   logError: (msg) => ipcRenderer.invoke('log:error', msg),
-  importPick: () => ipcRenderer.invoke('import:pick'),
+  importPick: (opts) => ipcRenderer.invoke('import:pick', opts),
   libraryPath: () => ipcRenderer.invoke('library:path'),
   pickCover: () => ipcRenderer.invoke('cover:pick'),
   setCover: (bookId, srcPath) => ipcRenderer.invoke('cover:set', bookId, srcPath),
@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld('neo', {
   fullscreenEscape: () => ipcRenderer.invoke('fullscreen:escape'),
   fullscreenToggle: () => ipcRenderer.invoke('fullscreen:toggle'),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  pocketLibrary: () => ipcRenderer.invoke('library:pocket'),
+  usePocketLibrary: () => ipcRenderer.invoke('library:usePocket'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   spellCheckWords: (words) => ipcRenderer.invoke('spell:check', words),
   spellSuggest: (word) => ipcRenderer.invoke('spell:suggest', word),
@@ -94,10 +96,14 @@ contextBridge.exposeInMainWorld('neo', {
   flushState: (on) => ipcRenderer.send('flush:state', on),
   scriptState: (st) => ipcRenderer.send('script:state', st),
   printPaperback: (job) => ipcRenderer.invoke('print:paperback', job),
+  printManuscript: (job) => ipcRenderer.invoke('print:manuscript', job), // File → Export → Manuscript Format… as a PDF
   // sent (and waited for) as a script line is right-clicked, so the menu
   // that opens next can offer Page Break Here
   scriptContext: (st) => ipcRenderer.sendSync('script:context', st),
   typewriterState: (st) => ipcRenderer.send('typewriter:state', st),
+  nbspMarksState: (on) => ipcRenderer.send('nbspmarks:state', on),
+  pagesState: (st) => ipcRenderer.send('pages:state', st),
+  pageWidthState: (v) => ipcRenderer.send('pagewidth:state', v),
   vimState: (on) => ipcRenderer.send('vim:state', on),
   uiZoomState: (z) => ipcRenderer.send('uizoom:state', z),
   // interface language, fetched once before the page's scripts run
@@ -107,6 +113,7 @@ contextBridge.exposeInMainWorld('neo', {
   translationsOf: (key) => ipcRenderer.invoke('i18n:translations', key),
 
   writingStyleState: (st) => ipcRenderer.send('style:state', st),
+  moreState: (on) => ipcRenderer.send('more:state', on),
   viewState: (st) => ipcRenderer.send('view:state', st),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, msg) => cb(msg))
 });

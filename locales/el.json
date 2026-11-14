@@ -1071,5 +1071,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Τι μπορούν να δείξουν αυτοί οι έλεγχοι: ότι το ιστορικό στέκει και αναπαράγεται ακριβώς και, όπου χρονοσημάνθηκε, ότι υπήρχε ως τότε και δεν φτιάχτηκε εκ των υστέρων. Τι δεν μπορούν να δείξουν: ποιος ήταν στο πληκτρολόγιο ή ποιανού ήταν οι ιδέες.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Τίποτα δεν τοποθετεί αυτό το ιστορικό στον χρόνο: καμία συνεδρία γραφής δεν χρονοσημάνθηκε. Δείχνει πώς γράφτηκε το βιβλίο, όχι πότε, και ένα ιστορικό φτιαγμένο εκ των υστέρων θα έμοιαζε ίδιο.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Τοποθετημένο στον χρόνο: {n} από {all} συνεδρίες γραφής χρονοσημάνθηκαν μέσα σε μία ημέρα από το τέλος τους, οι μισές μέσα σε {soon}.",
-  "a minute": "ένα λεπτό"
+  "a minute": "ένα λεπτό",
+  "Chapters imported": "Εισαγωγή κεφαλαίων"
 }

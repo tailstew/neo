@@ -1133,5 +1133,6 @@
   "What these checks can show: that the history holds together and plays back exactly, and, where it was timestamped, that it existed by then and wasn’t made up afterwards. What they can’t show: who was at the keyboard, or whose ideas the words were.": "Cosa possono mostrare queste verifiche: che la cronologia è coerente e si riproduce esattamente e, dove ha una marca temporale, che esisteva già allora e non è stata inventata dopo. Cosa non possono mostrare: chi era alla tastiera, o di chi fossero le idee.",
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Niente fissa questa cronologia nel tempo: nessuna sessione di scrittura ha ricevuto una marca temporale. Mostra come è stato scritto il libro, ma non quando, e una cronologia inventata dopo potrebbe apparire identica.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fissata nel tempo: {n} sessioni di scrittura su {all} hanno ricevuto una marca temporale entro un giorno dalla fine, la metà entro {soon}.",
-  "a minute": "un minuto"
+  "a minute": "un minuto",
+  "Chapters imported": "Capitoli importati"
 }

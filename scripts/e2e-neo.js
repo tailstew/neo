@@ -39,7 +39,7 @@ module.exports = function e2e(name, library = {}, opts = {}) {
   app.setPath('documents', tmp);
   fs.mkdirSync(LIB);
   fs.writeFileSync(path.join(LIB, 'library.json'), JSON.stringify({
-    authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night',
+    authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
     shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }],
     ...library
   }));

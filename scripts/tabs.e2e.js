@@ -23,7 +23,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 // run from scripts/, NEO's window would look for scripts/index.html
@@ -113,6 +113,28 @@ test('the shelf ignores the shortcut', async () => {
   await press(RIGHT);
   await js(`document.getElementById('editor-view').hidden = false`);
   assert.equal(await tab(), 'manuscript');
+});
+
+// The page catches these keys (3283508): a menu accelerator would flash the menu and take AltGr input
+test('no menu item takes Ctrl/Cmd+Alt+Left or Right from the page', async () => {
+  const items = (menu) => menu.items.flatMap((i) => [i, ...(i.submenu ? items(i.submenu) : [])]);
+  const taken = items(Menu.getApplicationMenu()).filter((i) => {
+    const keys = String(i.accelerator || '').toLowerCase().split('+');
+    return i.registerAccelerator !== false
+      && keys.some((k) => ['alt', 'option', 'altgr'].includes(k))
+      && keys.some((k) => ['cmdorctrl', 'commandorcontrol', 'cmd', 'command', 'ctrl', 'control', 'meta', 'super'].includes(k))
+      && ['left', 'right'].includes(keys[keys.length - 1]);
+  });
+  assert.deepEqual(taken.map((i) => i.accelerator), []);
+});
+
+// With no menu entry for the tabs, a click on the tab is the other way to each of the four
+test('clicking a tab switches to it', async () => {
+  for (const name of ['darlings', 'outline', 'notes', 'manuscript']) {
+    await js(`document.querySelector('.tab[data-tab="${name}"]').click()`);
+    await tick(300);
+    assert.equal(await tab(), name);
+  }
 });
 
 /* ---------- runner ---------- */
