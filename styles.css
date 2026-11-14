@@ -544,7 +544,8 @@ body.night .ps-paper .ps-body.empty::before, body.night .ps-paper .tp-field:empt
 .hs-main { grid-area: main; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .hs-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 30px 0 40px; }
 .hs-paper { width: min(var(--page-w), calc(100% - 48px)); margin: 0 auto; }
-.hs-paper .sheet { min-height: 0; padding: 60px 64px 80px; margin-bottom: 30px; }
+/* the page's margins are the editor's (.sheet), so its lines break where they do there */
+.hs-paper .sheet { min-height: 0; margin-bottom: 30px; }
 .hs-paper .chapter-head { user-select: none; }
 .hs-empty { margin: 120px auto; max-width: 420px; text-align: center; color: #8a857a; font-size: 14px; line-height: 1.6; }
 /* the player's caret, the editor's own: the ink's colour, and no width of its own, so the line sets as it did */

@@ -1145,6 +1145,102 @@ for (const lang of ['de', 'ro', 'ru']) {
   });
 }
 
+test('every kind of page is set in History as in the editor: type, size, alignment, indent, spacing, the drop cap', async () => {
+  // a book of its own with a page of every kind, the words on each as a writer gives them
+  const PAGES = {
+    copyright: ['Copyright 2026 the author.', 'All rights reserved.'],
+    dedication: ['For the harbor master,', 'who kept the light.', '— the crew'],
+    epigraph: ['The sea has no memory.', '— an old sailor'],
+    prologue: ['Long before the boats, there was the quay.', 'Nobody remembers who built it.'],
+    part: ['The Water', '— a beginning'],
+    chapter: ['The morning came in grey over the harbor.', 'She tied the boat and went up.', '***', 'By noon the rain had come.'],
+    unnumbered: ['— Who goes there? the watchman said.', 'Nobody answered him.'],
+    epilogue: ['The light still turns at night.', 'Someone keeps it.'],
+    acknowledgments: ['Thanks to everyone at the harbor.'],
+    about: ['The author lives by the sea.'],
+  };
+  await js(`(async () => {
+    const pages = ${JSON.stringify(PAGES)};
+    await addImportedBooks([{ name: 'Every Page', chapters: Object.keys(pages).map((k) => ({
+      title: k === 'part' || k === 'unnumbered' ? 'The ' + k : '', paras: pages[k].map((text) => ({ text }))
+    })) }], library.shelves[0]);
+    const ids = library.shelves[0].bookIds;
+    await openBook(ids[ids.length - 1]);
+    Object.keys(pages).forEach((k, i) => setChapterKind(book.chapterOrder[i], k));
+    for (const c of book.chapterOrder) {
+      const ps = chapterHTML[c].split('<p>***</p>').join('<p class="scene-break">***</p>');
+      if (ps !== chapterHTML[c]) setChapterHTML(c, ps, 'program');
+    }
+    await saveMeta();
+    renderChapters();
+  })()`);
+  await tick(300);
+  await flush();
+  const ids = await neo.chapterIds();
+  // each paragraph's look, its sizes as shares of its own type, its place as a share of its sheet
+  const looks = (sheet, body, attr) => js(`(() => {
+    const out = {};
+    for (const sec of document.querySelectorAll(${JSON.stringify(sheet)})) {
+      const id = sec.getAttribute(${JSON.stringify(attr)});
+      const b = sec.querySelector(${JSON.stringify(body)});
+      if (!b || b.hidden) continue;
+      const page = sec.getBoundingClientRect();
+      const base = parseFloat(getComputedStyle(b).fontSize);
+      out[id] = [...b.querySelectorAll(':scope > p')].map((p) => {
+        const cs = getComputedStyle(p);
+        const fl = getComputedStyle(p, '::first-letter');
+        const em = parseFloat(cs.fontSize);
+        const r = p.getBoundingClientRect();
+        const n = (v) => Math.round((parseFloat(v) || 0) / em * 100) / 100;
+        return {
+          text: p.textContent.trim().slice(0, 20),
+          font: cs.fontFamily.split(',')[0].trim(), style: cs.fontStyle, weight: cs.fontWeight, upper: cs.textTransform, align: cs.textAlign,
+          size: Math.round(em / base * 100) / 100, indent: n(cs.textIndent), spacing: n(cs.letterSpacing), top: n(cs.marginTop), bottom: n(cs.marginBottom),
+          cap: Math.round(parseFloat(fl.fontSize) / em * 10) / 10, capFont: fl.fontFamily.split(',')[0].trim(),
+          left: Math.round((r.left - page.left) / page.width * 100) / 100, width: Math.round(r.width / page.width * 100) / 100,
+        };
+      });
+    }
+    return out;
+  })()`);
+  const editor = await looks('#chapters .chapter', '.chapter-body', 'data-id');
+  await neo.openHistory();
+  await js('historyShown.player.setMode("book")');
+  await neo.daysReady();
+  await js('historyShown.player.openPlayer(historyShown.player.days().length - 1, { at: "end", ch: "book" })');
+  await neo.playerReady({ drawn: false });
+  await waitFor(`historyShown.player.paper.querySelectorAll('.rp-chapter').length >= ${ids.length}`);
+  await tick(300);
+  const shown = await looks('.hs-paper .rp-chapter', '.rp-body', 'data-ch');
+  const kinds = await js(`Object.fromEntries(book.chapterOrder.map((c) => [c, chapterKind(c)]))`);
+  try {
+    assert.deepEqual(Object.values(kinds).sort(), Object.keys(PAGES).sort(), 'a page of every kind');
+    let compared = 0;
+    const off = [];
+    for (const id of ids) {
+      if (!editor[id]) continue;
+      assert.ok(shown[id], kinds[id] + ': on History’s sheet');
+      assert.equal(shown[id].length, editor[id].length, kinds[id] + ': its paragraphs');
+      editor[id].forEach((e, i) => {
+        const h = shown[id][i];
+        for (const k of Object.keys(e)) {
+          const near = ['left', 'width'].includes(k) ? Math.abs(h[k] - e[k]) <= 0.01 : h[k] === e[k];
+          if (!near) off.push(`${kinds[id]}, “${e.text}”: ${k} is ${JSON.stringify(h[k])} in History, ${JSON.stringify(e[k])} in the editor`);
+        }
+        compared++;
+      });
+    }
+    assert.deepEqual(off, [], 'set differently');
+    assert.ok(compared >= 20, 'paragraphs compared: ' + compared);
+    // and the case that started this: the dedication has no drop cap, a chapter has one
+    const of = (k) => Object.keys(kinds).find((c) => kinds[c] === k);
+    assert.equal(shown[of('dedication')][0].cap, 1, 'no drop cap on the dedication');
+    assert.ok(shown[of('chapter')][0].cap > 1, 'a chapter keeps its drop cap');
+  } finally {
+    await neo.closeHistory();
+  }
+});
+
 /* ---------- the book the tests start from ---------- */
 
 neo.run(async () => {

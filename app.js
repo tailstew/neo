@@ -5776,19 +5776,21 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
         sec.innerHTML = '<div class="chapter-head"></div><div class="rp-body"></div>';
       }
       const rb = sec.lastElementChild;
-      rb.classList.toggle('script-body', script);
-      rb.classList.toggle('sp-geom', script && spSet === 'sp-geom');
-      rb.classList.toggle('sp-narrow', script && spSet === 'sp-narrow');
-      if (script) rb.classList.add('no-cap');
-      const kind = chapterKind(ch, meta);
-      sec.className = `rp-chapter sheet kind-${kind}` + (STORY_KINDS.includes(kind) ? '' : ' bookpage');
+      // set as the editor sets it (sheetLook): the same classes on the sheet and its text
+      const look = sheetLook(ch, meta, { script, narrow: spSet === 'sp-narrow', order });
+      const kind = look.kind;
+      // (the opening's mark stays: markSheet sets it from the words)
+      const bodyCls = ['rp-body', ...look.body, ...(rb.classList.contains('opens-dialogue') ? ['opens-dialogue'] : [])].join(' ');
+      if (rb.className !== bodyCls) rb.className = bodyCls;
+      const secCls = ['rp-chapter', ...look.sec].join(' ');
+      if (sec.className !== secCls) sec.className = secCls;
       const label = chapterLabel(ch, order);
       const head = sec.firstElementChild;
       if (head.textContent !== label) head.textContent = label;
       const where = prev ? prev.nextSibling : paper.firstChild;
       if (where !== sec) paper.insertBefore(sec, where);
       prev = sec;
-      if (drawBody(sec.lastElementChild, ch)) markDialogueOpening(sec.lastElementChild);
+      if (drawBody(rb, ch)) markSheet(rb, kind);
     }
     // a caret line's caret, put in where the paragraph and letter say
     for (const c of paper.querySelectorAll('.rp-caret.rp-dom')) c.remove();
@@ -7383,13 +7385,13 @@ function renderChapters() {
   // at which point both appear, numbered in retrospect
   const solo = soloStory();
   book.chapterOrder.forEach((chId) => {
-    const kind = chapterKind(chId);
+    // how the sheet and its text are set, as History sets them (sheetLook)
+    const look = sheetLook(chId, book, { script: isScript(), narrow: $('#paper').classList.contains('narrow') });
+    const kind = look.kind;
     const story = STORY_KINDS.includes(kind);
     const sec = document.createElement('section');
-    sec.className = `chapter sheet kind-${kind}` + (chId === solo ? ' solo' : '') + (story ? '' : ' bookpage');
+    sec.className = 'chapter ' + look.sec.join(' ');
     sec.dataset.id = chId;
-    const role = chapterRole(chId);
-    if (role) sec.classList.add(role);
     const head = document.createElement('div');
     head.className = 'chapter-head';
     if (kind === 'unnumbered') head.classList.add('no-number');
@@ -7454,11 +7456,9 @@ function renderChapters() {
     if (chId === solo) body.setAttribute('aria-label', book.title ? shownTitle(book.title) : t('The story'));
     else body.setAttribute('aria-labelledby', head.id);
     body.spellcheck = false; // NEO runs its own spellcheck pass
-    if (!story) body.classList.add('no-cap');
-    // a script's lines are set as they print (styles.css, SCREENPLAYS)
-    if (isScript()) body.classList.add('script-body', $('#paper').classList.contains('narrow') ? 'sp-narrow' : 'sp-geom', 'no-cap');
+    body.classList.add(...look.body);
     body.innerHTML = chapterHTML[chId] || '<p><br></p>';
-    markDialogueOpening(body);
+    markSheet(body, kind);
     if (PAGE_PROMPTS[kind]) {
       body.dataset.ph = PAGE_PROMPTS[kind]();
       const blank = () => body.classList.toggle('blank', !body.textContent.trim());
@@ -7466,17 +7466,8 @@ function renderChapters() {
       body.addEventListener('input', blank);
     }
     // a line that opens with a dash is set as the name of whoever said the
-    // lines above it, as it will print
-    if (ATTRIBUTED_PAGES.includes(kind)) {
-      const settle = () => {
-        for (const p of body.querySelectorAll('p')) {
-          const attr = isAttribution({ text: p.textContent.trim() });
-          if (p.hasAttribute('data-attr') !== attr) p.toggleAttribute('data-attr', attr);
-        }
-      };
-      settle();
-      body.addEventListener('input', settle);
-    }
+    // lines above it, as it will print (markSheet), again as it's typed
+    if (ATTRIBUTED_PAGES.includes(kind)) body.addEventListener('input', () => markSheet(body, kind));
     // older marks used a "?" that read as a broken image — normalize to the flag
     body.querySelectorAll('.ph-mark').forEach((m) => { m.textContent = '⚑'; });
     // heal the engine's style-junk spans left by past merges and splits
@@ -8876,6 +8867,38 @@ function markDialogueOpening(body) {
   for (const p of body.querySelectorAll('p.scene-break + p')) {
     const speech = OPENING_DASH.test(p.textContent);
     if (p.hasAttribute('data-speech') !== speech) p.toggleAttribute('data-speech', speech);
+  }
+}
+
+// How a chapter's sheet and its text are set: the editor and History's
+// player both take it from here, so a page looks the same in each
+// (history.e2e.js compares them, a page of every kind). meta is the book
+// (History's may be one that isn't open), order the chapters at the moment
+// shown, which say whether a chapter is the book's only one.
+function sheetLook(chId, meta, { script = meta.format === 'screenplay', narrow = false, order = meta.chapterOrder } = {}) {
+  const kind = chapterKind(chId, meta);
+  const story = STORY_KINDS.includes(kind);
+  const sec = ['sheet', 'kind-' + kind];
+  if (chId === soloStory({ ...meta, chapterOrder: order })) sec.push('solo');
+  if (!story) sec.push('bookpage');
+  const role = chapterRole(chId, meta);
+  if (role) sec.push(role);
+  // a page that isn't story has no drop cap; a script's lines are set as
+  // they print (styles.css, SCREENPLAYS)
+  const body = [];
+  if (!story || script) body.push('no-cap');
+  if (script) body.push('script-body', narrow ? 'sp-narrow' : 'sp-geom');
+  return { kind, sec, body };
+}
+// the marks for the screen only that a sheet's text takes from its words:
+// the opening paragraph, and on a dedication, an epigraph or a part, a line
+// that opens with a dash set as the name of whoever said the lines above it
+function markSheet(body, kind) {
+  markDialogueOpening(body);
+  if (!ATTRIBUTED_PAGES.includes(kind)) return;
+  for (const p of body.querySelectorAll('p')) {
+    const attr = isAttribution({ text: p.textContent.trim() });
+    if (p.hasAttribute('data-attr') !== attr) p.toggleAttribute('data-attr', attr);
   }
 }
 
