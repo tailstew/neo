@@ -4225,6 +4225,7 @@ const REPLAY_PAGE_WORDS = [
   tk('Pasted from elsewhere ({n} characters)'),
   tk('Written before NEO started recording'),
   tk('Away from NEO'),
+  tk('No key pressed: dictation or handwriting ({n} characters)'),
   tk('Timestamped {when}'),
   tk('Not timestamped'),
   tk('Some checks failed'),
@@ -4270,7 +4271,10 @@ const EV_NOKEY = {
 const EV_NOKEY_NAMES = {
   program: tk('Text put in by dictation, an emoji picker or another program: {n}.'),
   autocorrect: tk('Words replaced by the system’s autocorrect or spelling: {n}.'),
-  ime: tk('Text composed with an input method (accents, Chinese, Japanese…): {n}.'),
+  // composition with no key down: an input method's own composing has a
+  // key before each step, so what's left is Windows dictation (Win+H), the
+  // handwriting panel, an emoji picked from Win+. with the mouse
+  ime: tk('Text that came composed with no key pressed (dictation, handwriting, an emoji panel): {n}.'),
   mouse: tk('Text cut or dragged with the mouse: {n}.'),
   undo: tk('Undo or redo from the Edit menu: {n}.'),
   format: tk('Formatting from a menu: {n}.'),
@@ -5379,6 +5383,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   function buildMarkers() {
     markers = [];
     let away = null;
+    const said = Rec.keylessStretches((n) => t('No key pressed: dictation or handwriting ({n} characters)', { n }));
     // a cause whose changes none reached the page has nothing to mark
     const reached = (j) => {
       for (let k = j + 1; k < steps.length; k++) {
@@ -5391,6 +5396,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     steps.forEach((i, j) => {
       const s = h.steps[i];
       const x = vt[j];
+      said.step(s, x, i, markers);
       if (s.k === 'session') markers.push({ x, kind: 'session', step: i, label: [historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · ') });
       else if (s.k === 'c' && s.what === 'paste') {
         markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', step: i, label: s.internal ? t('Moved text ({n} characters)', { n: s.len }) : t('Pasted from elsewhere ({n} characters)', { n: s.len }) });
@@ -5423,6 +5429,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (s.k === 'session' && away) { away.to = x; markers.push(away); away = null; }
     });
     if (away) { away.to = total; markers.push(away); }
+    said.end(markers);
     tagMarkers();
   }
 
@@ -5770,9 +5777,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       for (const m of stampMarks) g.fillRect(Math.round(X(m.x)) - 1, H - track, 2, track);
     }
     for (const m of markers) {
-      if (m.kind !== 'away') continue;
-      g.fillStyle = 'rgba(128,128,128,0.13)';
-      g.fillRect(X(m.x), top, Math.max(1, X(m.to) - X(m.x)), base - top);
+      if (m.kind !== 'away' && m.kind !== 'nokey') continue;
+      g.fillStyle = m.kind === 'away' ? 'rgba(128,128,128,0.13)' : 'rgba(169,139,201,0.2)';
+      g.fillRect(X(m.x), top, Math.max(2, X(m.to) - X(m.x)), base - top);
     }
     // what was written, and, faintly behind it, the caret moving around
     const bins = new Float32Array(Math.ceil(W));
@@ -5794,7 +5801,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     };
     bars(nav, 'rgba(201,168,106,0.18)');
     bars(bins, 'rgba(201,168,106,0.6)');
-    const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e' };
+    const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e', nokey: '#a98bc9' };
     let lastLabel = -1e9;
     g.font = '10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
     for (const m of markers) {
@@ -5823,7 +5830,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // what's at a point of the timeline, for the tooltip
   function describe(c) {
     const span = total / Math.max(1, timeline.clientWidth) * 5;
-    const near = markers.filter((m) => (m.kind === 'away' ? c >= m.x && c <= m.to : Math.abs(m.x - c) <= span) && m.kind !== 'session');
+    const near = markers.filter((m) => (m.to !== undefined ? c >= m.x - span && c <= m.to + span : Math.abs(m.x - c) <= span) && m.kind !== 'session');
     let lo = 0;
     let hi = steps.length;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (vt[mid] <= c) lo = mid + 1; else hi = mid; }

@@ -531,7 +531,7 @@
     'catch-up': 'Changed while NEO wasn’t recording', restore: 'Restored', unobserved: 'A change the recorder didn’t see', anchor: 'Kept whole again'
   };
   const SYNC = ['disk-adopt', 'disk-twin', 'disk-new'];
-  const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e' };
+  const COLORS = { paste: '#d9776b', 'paste-in': '#c9a86a', sync: '#7aa7d9', catch: '#9a958c', restore: '#8fc98a', move: '#a9a294', session: '#77736b', tag: '#e3c47e', nokey: '#a98bc9' };
   const STAMP = '#6fb7a8';
 
   // The player, laid out as NEO's Writing History: the chapters and the
@@ -911,6 +911,7 @@
     function buildMarkers() {
       markers = [];
       let away = null;
+      const said = Rec.keylessStretches((n) => T('No key pressed: dictation or handwriting ({n} characters)', { n }));
       const reached = (j) => {
         for (let q = j + 1; q < steps.length; q++) {
           const s = h.steps[steps[q]];
@@ -922,6 +923,7 @@
       steps.forEach((i, j) => {
         const s = h.steps[i];
         const x = vt[j];
+        said.step(s, x, i, markers);
         if (s.k === 'session') markers.push({ x, kind: 'session', step: i, label: [fmtTime(s.wall), devName(s)].filter(Boolean).join(' · ') });
         else if (s.k === 'c' && s.what === 'paste') {
           markers.push({ x, kind: s.internal ? 'paste-in' : 'paste', label: s.internal ? T('Moved text ({n} characters)', { n: s.len }) : T('Pasted from elsewhere ({n} characters)', { n: s.len }) });
@@ -943,6 +945,7 @@
         if (s.k === 'session' && away) { away.to = x; markers.push(away); away = null; }
       });
       if (away) { away.to = total; markers.push(away); }
+      said.end(markers);
       for (const tg of tags) {
         if (tg.day !== book.days[k].day) continue;
         const at = Rec.momentStep(h, tg.at);
@@ -1107,9 +1110,9 @@
         for (const m of stampMarks) g.fillRect(Math.round(X(m.x)) - 1, H - track, 2, track);
       }
       for (const m of markers) {
-        if (m.kind !== 'away') continue;
-        g.fillStyle = 'rgba(128,128,128,0.13)';
-        g.fillRect(X(m.x), top, Math.max(1, X(m.to) - X(m.x)), base - top);
+        if (m.kind !== 'away' && m.kind !== 'nokey') continue;
+        g.fillStyle = m.kind === 'away' ? 'rgba(128,128,128,0.13)' : 'rgba(169,139,201,0.2)';
+        g.fillRect(X(m.x), top, Math.max(2, X(m.to) - X(m.x)), base - top);
       }
       const bins = new Float32Array(Math.ceil(W));
       const nav = new Float32Array(Math.ceil(W));
@@ -1158,7 +1161,7 @@
     // what's at a point of the timeline, for the tooltip
     function describe(c) {
       const span = total / Math.max(1, tl.clientWidth) * 5;
-      const near = markers.filter((m) => (m.kind === 'away' ? c >= m.x && c <= m.to : Math.abs(m.x - c) <= span) && m.kind !== 'session');
+      const near = markers.filter((m) => (m.to !== undefined ? c >= m.x - span && c <= m.to + span : Math.abs(m.x - c) <= span) && m.kind !== 'session');
       const lines = near.slice(0, 3).map((m) => m.label);
       const st = stampMarks.find((m) => Math.abs(m.x - c) <= span);
       if (st) lines.push(st.by ? T('Timestamped {when}', { when: fmtTime(st.by) }) : T('Not timestamped'));

@@ -342,5 +342,7 @@
   "Chapter {to} holds text moved in from a chapter no longer in the book. Only the whole book’s export shows it being written.": "O capítulo {to} tem texto trazido de um capítulo que já não está no livro. Só a exportação do livro inteiro mostra como foi escrito.",
   "A seal’s fingerprint is the SHA-256 of its file. The whole book’s export, and verify-recording run on the book, show the same seals with the same fingerprints.": "A impressão digital de um selo é o SHA-256 do seu ficheiro. A exportação do livro inteiro, e o verify-recording executado no livro, mostram os mesmos selos com as mesmas impressões digitais.",
   "Older": "Anterior",
-  "Newer": "Posterior"
+  "Newer": "Posterior",
+  "Text that came composed with no key pressed (dictation, handwriting, an emoji panel): {n}.": "Texto composto sem nenhuma tecla premida (ditado, escrita à mão, painel de emojis): {n}.",
+  "No key pressed: dictation or handwriting ({n} characters)": "Nenhuma tecla premida: ditado ou escrita à mão ({n} caracteres)"
 }

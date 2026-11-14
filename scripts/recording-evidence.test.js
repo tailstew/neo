@@ -90,6 +90,8 @@ function writer(device, id, start, chapters = {}) {
       }
       return api;
     },
+    // a line as the recorder wrote it; an `e` is applied to the chapter
+    line(l) { w.push(l); if (l[1] === 'e') html[cur] = R.applyEdit(html[cur], l[2], l[3], l[4]); return api; },
     focus(what, dt = 0) { w.push([dt, 'f', what]); return api; },
     write() { for (const ch of Object.keys(html)) { w.push([0, 'w', R.digest(html[ch]), ch]); } return api; },
     done() {
@@ -304,4 +306,44 @@ test('a session cut down to some chapters still replays, on the same clock', () 
   const whole = R.evidence([s]).chapters.a;
   const part = R.evidence([{ ...s, text: cut }]).chapters.a;
   for (const k of ['typed', 'deleted', 'returns', 'pastes', 'nokey', 'before']) assert.equal(part[k], whole[k], k);
+});
+
+
+// Windows dictation (Win+H) as the laptop recorded it on 2026-11-14:
+// composition with no key down, a phrase at a time, a spoken "backspace"
+// typed, taken back and done; then the Japanese IME, a key before each step
+test('text composed with no key pressed is counted as such, and marked as stretches on the timeline', () => {
+  const w = writer('d-1', '2026-11-14T13-00-00Z-aaaa', '2026-11-14T13:00:00.000Z', { a: P('Begin.') }).base('a');
+  const at = 9; // after "Begin."
+  w.line([2000, 'f', 'compose'])
+    .line([1, 'e', at, 0, ' mary', 'iC', 0])
+    .line([300, 'e', at + 5, 0, ' had', 'iC', 0])
+    .line([20, 'e', at, 9, ' Mary had', 'iC', 0])
+    .line([0, 'f', 'composed'])
+    .line([1400, 'f', 'compose'])
+    .line([1, 'e', at + 9, 0, ' back', 'iC', 0])
+    .line([15, 'e', at + 14, 0, 'space', 'iC', 0])
+    .line([250, 'e', at + 9, 10, '', 'iC', 0])
+    .line([0, 'f', 'composed'])
+    .line([34, 'k', '', 0]).line([0, 'e', at + 8, 1, '', 'dB'])
+    // a key: the stretch ends
+    .type('x')
+    // the IME: each composing step comes with its key
+    .line([800, 'f', 'compose'])
+    .line([100, 'k', 'KeyK', 0]).line([0, 'e', at + 9, 0, 'ｋ', 'iC'])
+    .line([100, 'k', 'KeyO', 0]).line([0, 'e', at + 9, 1, 'こ', 'iC'])
+    .line([300, 'k', 'Enter', 0]).line([0, 'f', 'composed'])
+    // an emoji picked from the panel with the mouse: no letter, not marked
+    .line([5000, 'f', 'compose']).line([1, 'e', at + 10, 0, '😉', 'iC', 0]).line([0, 'f', 'composed']);
+  const s = w.done();
+  const e = R.evidence([s]);
+  assert.equal(e.chapters.a.nokeyKinds.insertCompositionText, 7, 'the dictation’s six and the emoji, not the IME');
+  const { steps } = R.compileSession(s.text);
+  const marks = [];
+  const said = R.keylessStretches((n) => 'said ' + n);
+  steps.forEach((st, i) => said.step(st, st.t, i, marks));
+  said.end(marks);
+  assert.deepEqual(marks.map((m) => m.label), ['said 8'], 'one stretch: " Mary ha" once its backspace is done');
+  assert.equal(marks[0].kind, 'nokey');
+  assert.ok(marks[0].to > marks[0].x);
 });

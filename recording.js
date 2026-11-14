@@ -3463,6 +3463,43 @@
     return at;
   }
 
+  // The stretches of a player's timeline where text came composed with no
+  // key pressed (dictation, handwriting), as markers { x, to, kind: 'nokey',
+  // step, label }. An input method's composing has a key before each step,
+  // so it isn't one. A stretch starts at keyless composition, takes in the
+  // keyless changes among it and the deletions (a spoken "backspace" is a
+  // Backspace that Windows sends, a `k` with no code), and ends at text
+  // put in with a key, a minute with no keyless change, or a new session;
+  // one with no letter in it (an emoji picked from the panel) isn't marked.
+  // Call step() for every step the player shows, in order, then end().
+  const KEYLESS_GAP = 60000;
+  function keylessStretches(label) {
+    let cur = null;
+    const close = (out) => {
+      if (cur && cur.letters) out.push({ x: cur.x, to: cur.to, kind: 'nokey', step: cur.step, label: label(Math.max(0, cur.n)) });
+      cur = null;
+    };
+    return {
+      step(s, x, i, out) {
+        if (s.k === 'session') { close(out); return; }
+        if (s.k !== 'e' || s.page === false) return;
+        const keyless = s.cause === 'input' && !s.key && !!s.input && s.input !== 'iFP' && s.input !== 'iFD';
+        if (keyless && cur && s.t - cur.t > KEYLESS_GAP) close(out);
+        if (keyless && (s.input === 'iC' || cur)) {
+          if (!cur) cur = { x, to: x, step: i, n: 0, letters: false, t: s.t };
+          cur.to = x;
+          cur.t = s.t;
+          cur.n += s.ins.length - s.del;
+          if (/\p{L}/u.test(s.ins)) cur.letters = true;
+        } else if (cur && s.cause === 'input' && !s.ins) {
+          cur.to = x;
+          cur.n -= s.del;
+        } else close(out);
+      },
+      end(out) { close(out); }
+    };
+  }
+
   return {
     FORMAT, READS, PLAYER, CARET_BLOCK, INPUT_TYPES, MOD, inputCode, inputName,
     STREAMS, isStream, streamTexts,
@@ -3475,7 +3512,7 @@
     replay, replayCheck, ANCHOR_CHARS, ANCHOR_TIMES, anchorDue, baseLines,
     QUIET, Page, sessionOrder,
     sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
-    textOffset, compileSession, History, leadSteps, playFrom,
+    textOffset, compileSession, History, leadSteps, playFrom, keylessStretches,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, partDoubt, findParagraphs,
     linePlayer, playInterleaved, lineWalls, htmlOf,
