@@ -28,7 +28,7 @@ app.setPath('documents', tmp);
 const libraryFile = path.join(tmp, 'NEO Library', 'library.json');
 fs.mkdirSync(path.dirname(libraryFile));
 fs.writeFileSync(libraryFile, JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, moreFeatures: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 // run from scripts/, NEO's window would look for scripts/index.html

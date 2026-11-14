@@ -5797,9 +5797,11 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       // set as the editor sets it (sheetLook): the same classes on the sheet and its text
       const look = sheetLook(ch, meta, { script, narrow: spSet === 'sp-narrow', order });
       const kind = look.kind;
-      // (the opening's mark stays: markSheet sets it from the words)
-      const bodyCls = ['rp-body', ...look.body, ...(rb.classList.contains('opens-dialogue') ? ['opens-dialogue'] : [])].join(' ');
-      if (rb.className !== bodyCls) rb.className = bodyCls;
+      // (the opening's marks stay, and the drop cap drawn beside it: markSheet
+      // sets them from the words)
+      const bodyCls = ['rp-body', ...look.body, ...['opens-dialogue', 'has-cap'].filter((c) => rb.classList.contains(c))].join(' ');
+      const restyled = rb.className !== bodyCls;
+      if (restyled) rb.className = bodyCls;
       const secCls = ['rp-chapter', ...look.sec].join(' ');
       if (sec.className !== secCls) sec.className = secCls;
       const label = chapterLabel(ch, order);
@@ -5808,7 +5810,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       const where = prev ? prev.nextSibling : paper.firstChild;
       if (where !== sec) paper.insertBefore(sec, where);
       prev = sec;
-      if (drawBody(rb, ch)) markSheet(rb, kind);
+      // (a sheet set anew, a page become another kind, is marked again too)
+      if (drawBody(rb, ch) || restyled) markSheet(rb, kind);
     }
     // a caret line's caret, put in where the paragraph and letter say
     for (const c of paper.querySelectorAll('.rp-caret.rp-dom')) c.remove();
@@ -18160,6 +18163,9 @@ function mergeRemoved(a, b) {
 function goesToo(chId, r, stamps) {
   if (chapterHTML[chId] === undefined) return true;
   if (chapterHTML[chId] !== savedHTML[chId]) return false;
+  // named only in a 1.6.5 book.json's removedChapters: no fingerprint, no
+  // time of its own, so its rule: saved here, it goes
+  if (r.listed) return true;
   if (r.hash === textHash(String(chapterHTML[chId]))) return true;
   if (!stamps) return false;
   if (!(chId in stamps)) return true; // its file is gone here too
@@ -18333,7 +18339,7 @@ async function refreshFromDisk() {
       const theirRemoved = new Set(Array.isArray(meta.removedChapters) ? meta.removedChapters : []);
       const myRemoved = new Set(Array.isArray(book.removedChapters) ? book.removedChapters : []);
       const listed = {};
-      for (const id of theirRemoved) if (typeof id === 'string' && !(meta.removed && meta.removed[id])) listed[id] = { at: Date.parse(meta.modified) || 0 };
+      for (const id of theirRemoved) if (typeof id === 'string' && !(meta.removed && meta.removed[id])) listed[id] = { at: Date.parse(meta.modified) || 0, listed: true };
       const removed = mergeRemoved(mergeRemoved(book.removed, meta.removed), listed);
       const j = mine
         ? joinStructure(book, meta, removed, stamps, (chId) => /[^\s]/.test(String(incoming[chId] || '').replace(/<[^>]*>/g, '')))
@@ -21709,7 +21715,7 @@ async function sheetPageCss() {
   const root = getComputedStyle(document.documentElement);
   const v = (k, or) => (root.getPropertyValue(k).trim() || or).replace(/[<>{};]/g, '');
   const noCap = (library.fonts || {}).dropcap === 'none';
-  let css = `:root { --body-font: ${exportBodyFont()}; --dropcap-font: ${exportDropCapFont()}; --editor-size: ${v('--editor-size', '17px')}; --page-zoom: 1; --page-w: ${v('--page-w', '760px')}; }\n`;
+  let css = `:root { --body-font: ${exportBodyFont()}; --dropcap-font: ${exportDropCapFont()}; --editor-size: ${v('--editor-size', '17px')}; --page-zoom: 1; --page-w: ${v('--page-w', '760px')}; --page-pad-x: ${v('--page-pad-x', '72px')}; }\n`;
   for (const sheet of document.styleSheets) {
     let rules = [];
     try { rules = [...sheet.cssRules]; } catch { continue; }

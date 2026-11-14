@@ -1188,7 +1188,9 @@ test('every kind of page is set in History and in the exported page as in the ed
       const base = parseFloat(getComputedStyle(b).fontSize);
       out[id] = [...b.querySelectorAll(':scope > p')].map((p) => {
         const cs = getComputedStyle(p);
-        const fl = getComputedStyle(p, '::first-letter');
+        // the drop cap: drawn as the paragraph's ::before (sheet.js); 1 where there's none
+        const before = getComputedStyle(p, '::before');
+        const fl = before.content && before.content !== 'none' && before.content !== 'normal' ? before : getComputedStyle(p, '::first-letter');
         const em = parseFloat(cs.fontSize);
         const r = p.getBoundingClientRect();
         const n = (v) => Math.round((parseFloat(v) || 0) / em * 100) / 100;

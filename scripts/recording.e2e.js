@@ -305,6 +305,9 @@ function writesOf(lines) {
 
 test('notes typed in the Notes tab are recorded as typing', async () => {
   await js('switchTab(\'notes\')');
+  await tick(300);
+  // Notes opens on the chapter's own page: the book's, notes.html, is the one recorded
+  await js('openNotesPage(\'book\')');
   await tick(500);
   await js(`(() => {
     const ed = document.getElementById('aux-editor');
