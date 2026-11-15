@@ -145,7 +145,7 @@ describe('filesystem', { concurrency: 1 }, () => {
     }
   });
 
-  test("a sync program's conflict copies of a chapter are found, and only those move to sync-conflicts/", () => {
+  test("a sync program's conflict copies of a chapter are found, and those taken in already aren't read", () => {
     const dir = tempLibrary();
     try {
       const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
@@ -161,22 +161,22 @@ describe('filesystem', { concurrency: 1 }, () => {
       fs.writeFileSync(path.join(chapters, 'ch-a1-b2.html.tmp'), '<p>half</p>');
       const found = main.call('chapter:conflicts', book.id);
       assert.equal(JSON.stringify(found.map((c) => [c.file, c.chapterId]).sort()), JSON.stringify(Object.entries(copies).sort()));
-      assert.ok(found.every((c) => c.html === '<p>there</p>'));
+      assert.ok(found.every((c) => c.html === '<p>there</p>' && !c.taken));
 
-      assert.equal(main.call('chapter:conflictDone', book.id, 'ch-a1-b2.html'), false, 'a chapter is no copy');
-      assert.throws(() => main.call('chapter:conflictDone', book.id, '../x.sync-conflict-20261030-144927-Q7EGGF3.html'), /Invalid library name/);
-      for (const name of Object.keys(copies)) assert.equal(main.call('chapter:conflictDone', book.id, name), true);
-      assert.deepEqual(fs.readdirSync(chapters).sort(), ['ch-a1-b2.html', 'ch-a1-b2.html.tmp']);
-      const kept = path.join(dir, book.id, 'sync-conflicts');
-      assert.deepEqual(fs.readdirSync(kept).sort(), Object.keys(copies).sort());
-      for (const name of Object.keys(copies)) assert.equal(fs.readFileSync(path.join(kept, name), 'utf8'), '<p>there</p>', 'as it was');
-      assert.equal(main.call('chapter:conflicts', book.id).length, 0);
+      const skip = ['ch-a1-b2 2.html', 'ch-a1-b2.sync-conflict-20261030-144927-Q7EGGF3.html'];
+      const again = main.call('chapter:conflicts', book.id, skip);
+      assert.equal(again.length, 4, 'every copy still listed');
+      for (const c of again) {
+        if (skip.includes(c.file)) assert.equal(JSON.stringify(c), JSON.stringify({ file: c.file, chapterId: 'ch-a1-b2', taken: true }), 'unread');
+        else assert.equal(c.html, '<p>there</p>');
+      }
+      assert.deepEqual(fs.readdirSync(chapters).sort(), ['ch-a1-b2.html', 'ch-a1-b2.html.tmp', ...Object.keys(copies)].sort(), 'nothing moved');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test("a sync program's conflict copies of book.json are found, read, and move to sync-conflicts/", () => {
+  test("a sync program's conflict copies of book.json are found and read, and those taken in already aren't", () => {
     const dir = tempLibrary();
     try {
       const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
@@ -193,15 +193,15 @@ describe('filesystem', { concurrency: 1 }, () => {
       assert.equal(JSON.stringify(found.map((c) => [c.file, c.meta && c.meta.chapterOrder]).sort()), JSON.stringify([
         ["book (Ada's conflicted copy 2026-10-30).json", ['b']],
         ['book 2.json', null], // half there
-        ['book.json.sync-conflict-20261030-155358-ZJR4MCC.bak', null], // a backup: moved, not read
+        ['book.json.sync-conflict-20261030-155358-ZJR4MCC.bak', null], // a backup: listed, not read
         ['book.sync-conflict-20261030-155357-ZJR4MCC.json', ['a']]
       ]));
-      assert.equal(main.call('book:conflictDone', book.id, 'book.json'), false);
-      assert.equal(main.call('book:conflictDone', book.id, 'notes.sync-conflict-20261030-155357-ZJR4MCC.html'), false);
-      for (const name of Object.keys(copies)) assert.equal(main.call('book:conflictDone', book.id, name), true);
-      assert.deepEqual(fs.readdirSync(path.join(folder, 'sync-conflicts')).sort(), Object.keys(copies).sort());
-      assert.equal(main.call('book:conflicts', book.id).length, 0);
-      assert.equal(fs.existsSync(path.join(folder, 'book.json')), true);
+      const again = main.call('book:conflicts', book.id, ['book.sync-conflict-20261030-155357-ZJR4MCC.json']);
+      assert.equal(JSON.stringify(again.find((c) => c.file === 'book.sync-conflict-20261030-155357-ZJR4MCC.json')),
+        JSON.stringify({ file: 'book.sync-conflict-20261030-155357-ZJR4MCC.json', meta: null, taken: true }));
+      assert.equal(JSON.stringify(again.find((c) => c.file === "book (Ada's conflicted copy 2026-10-30).json").meta.chapterOrder), '["b"]');
+      for (const name of Object.keys(copies)) assert.equal(fs.existsSync(path.join(folder, name)), true, 'nothing moved');
+      assert.equal(fs.existsSync(path.join(folder, 'sync-conflicts')), false);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

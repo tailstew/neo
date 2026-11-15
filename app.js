@@ -17231,10 +17231,14 @@ async function keepOtherDeviceVersion(bookId, chId, disk, twinId) {
 // chapter:conflicts), which NEO would never show: each device saved its own
 // words, then simply adopted the file it was handed. The copy's words become
 // the chapter after, as a version NEO finds itself does, and once that
-// chapter reads back from disk the copy moves to the book's sync-conflicts/
-// folder (chapter:conflictDone), kept, never deleted. Its id
+// chapter reads back from disk this device notes the copy as taken in
+// (conflictTaken) and never reads it again. The copy stays where the sync
+// program left it: NEO never moves or rewrites it, because two devices
+// moving the same copy at once write one file twice, and Syncthing's
+// encrypted peers can't settle that and wait on it forever. Its id
 // comes from the copy's name, so two devices taking in the same copy make
-// one chapter, not two. A copy of a chapter no longer in the book stays.
+// one chapter, not two. A copy of a chapter no longer in the book stays,
+// untaken.
 function conflictTwinId(file) {
   let h = 0x811c9dc5;
   for (let i = 0; i < file.length; i++) h = Math.imul(h ^ file.charCodeAt(i), 0x01000193) >>> 0;
@@ -17251,11 +17255,14 @@ function conflictTwinId(file) {
 // there with words in it (a chapter just made on the other device), goes
 // back in after the chapter before it there, with what the copy held for it
 // (its title, kind, notes); so does a loose card with words this book
-// lacks. The rest of the copy gives way, and the copy is kept as it was in
-// sync-conflicts/.
+// lacks. The rest of the copy gives way, and the copy stays as it was,
+// noted as taken in on this device.
 async function takeBookConflictCopies(bookId) {
-  for (const c of await window.neo.bookConflicts(bookId)) {
+  const all = await window.neo.bookConflicts(bookId, conflictsTaken(bookId, 'book'));
+  conflictsPresent(bookId, 'book', all);
+  for (const c of all) {
     if (!book || book.id !== bookId) return;
+    if (c.taken) continue;
     const meta = c.meta;
     let back = 0;
     let noted = false; // only its removals were news: saved, with nothing to show
@@ -17312,8 +17319,40 @@ async function takeBookConflictCopies(bookId) {
       scheduleNavRefresh();
       toast(t('Updated from your other device'));
     }
-    await window.neo.bookConflictDone(bookId, c.file);
+    conflictTaken(bookId, 'book', c.file);
   }
+}
+
+// The copies this device has taken in, by book, in its own localStorage (a
+// copy is a file every device sees; what each has done with it is its own).
+// 'book' lists book.json's copies, 'chapters' the chapters'. Lost storage
+// only means a copy is looked at again, and taking one in twice changes
+// nothing: its chapter's id comes from its name.
+const CONFLICTS_KEY = 'neo.conflictsTaken';
+function conflictsKept() {
+  try { const v = JSON.parse(localStorage.getItem(CONFLICTS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+}
+function conflictsTaken(bookId, kind) {
+  const list = (conflictsKept()[bookId] || {})[kind];
+  return Array.isArray(list) ? list : [];
+}
+function conflictsWrite(bookId, kind, list) {
+  const all = conflictsKept();
+  const mine = all[bookId] = all[bookId] || {};
+  if (list.length) mine[kind] = list; else delete mine[kind];
+  if (!Object.keys(mine).length) delete all[bookId];
+  try { localStorage.setItem(CONFLICTS_KEY, JSON.stringify(all)); } catch { /* storage can be off */ }
+}
+function conflictTaken(bookId, kind, file) {
+  const list = conflictsTaken(bookId, kind);
+  if (!list.includes(file)) conflictsWrite(bookId, kind, [...list, file]);
+}
+// forget the ones no longer in the folder (someone tidied them away)
+function conflictsPresent(bookId, kind, found) {
+  const list = conflictsTaken(bookId, kind);
+  const here = new Set(found.map((c) => c.file));
+  const keep = list.filter((f) => here.has(f));
+  if (keep.length !== list.length) conflictsWrite(bookId, kind, keep);
 }
 
 let takingConflicts = false;
@@ -17322,15 +17361,17 @@ async function takeConflictCopies(bookId) {
   takingConflicts = true;
   try {
     if (window.neo.bookConflicts) await takeBookConflictCopies(bookId);
-    for (const c of await window.neo.chapterConflicts(bookId)) {
+    const all = await window.neo.chapterConflicts(bookId, conflictsTaken(bookId, 'chapters'));
+    conflictsPresent(bookId, 'chapters', all);
+    for (const c of all) {
       if (!book || book.id !== bookId) return;
-      if (!book.chapterOrder.includes(c.chapterId)) continue;
+      if (c.taken || !book.chapterOrder.includes(c.chapterId)) continue;
       const twinId = conflictTwinId(c.file);
       if (!book.chapterOrder.includes(twinId) && wordsBeyond(c.html, chapterHTML[c.chapterId])) {
         await keepOtherDeviceVersion(bookId, c.chapterId, c.html, twinId);
         if ((await window.neo.readChapter(bookId, twinId)) !== c.html) continue; // not on disk yet: next look
       }
-      await window.neo.chapterConflictDone(bookId, c.file);
+      conflictTaken(bookId, 'chapters', c.file);
     }
   } catch (err) {
     window.neo.logError('conflict copies: ' + ((err && err.message) || err));
