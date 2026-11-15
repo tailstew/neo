@@ -42,6 +42,19 @@ fs.writeFileSync(path.join(LIB, 'library.json'), JSON.stringify({
   authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
+// Seals are made in the proof worker: the test one, which reaches no
+// network, answers drand from NEO_E2E_DRAND and logs every request to
+// NEO_E2E_NET_LOG, for the proof test below
+process.env.NEO_E2E_DRAND = path.join(tmp, 'drand.json');
+process.env.NEO_E2E_NET_LOG = path.join(tmp, 'sent.jsonl');
+{
+  const { utilityProcess } = require('electron');
+  const fork = utilityProcess.fork;
+  utilityProcess.fork = function (file, args, o) {
+    if (/proof-worker\.js$/.test(file)) file = path.join(__dirname, 'e2e-proof-worker.js');
+    return fork.call(this, file, args, o);
+  };
+}
 const loadFile = BrowserWindow.prototype.loadFile;
 BrowserWindow.prototype.loadFile = function (file, opts) {
   return loadFile.call(this, path.resolve(__dirname, '..', file), opts);
@@ -1823,12 +1836,13 @@ test('proof turned on seals the session being written; a named tag seals it agai
   const sig = crypto.randomBytes(48).toString('hex');
   const randomness = crypto.createHash('sha256').update(Buffer.from(sig, 'hex')).digest('hex');
   const round = Math.floor((Date.now() / 1000 - 1692803367) / 3) + 1; // quicknet's, now
-  const sent = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, opts = {}) => {
-    sent.push({ url: String(url), body: opts.body ? Buffer.from(opts.body) : null });
-    if (String(url).includes('/public/latest')) return new Response(JSON.stringify({ round, signature: sig, randomness }), { status: 200 });
-    throw new Error('offline (the test)');
+  // (the proof worker's network: drand answers with this, the authorities don't)
+  fs.writeFileSync(process.env.NEO_E2E_DRAND, JSON.stringify({ round, signature: sig, randomness }));
+  fs.rmSync(process.env.NEO_E2E_NET_LOG, { force: true });
+  const sentNow = () => {
+    let lines = [];
+    try { lines = fs.readFileSync(process.env.NEO_E2E_NET_LOG, 'utf8').split('\n').filter(Boolean); } catch { /* nothing asked yet */ }
+    return lines.map((l) => JSON.parse(l)).map((x) => ({ url: x.url, body: x.body ? Buffer.from(x.body, 'base64') : null }));
   };
   const sealsDir = () => path.join(recDirOf(), 'seals');
   const seal = (n) => JSON.parse(fs.readFileSync(path.join(sealsDir(), String(n).padStart(6, '0') + '.json'), 'utf8'));
@@ -1841,7 +1855,7 @@ test('proof turned on seals the session being written; a named tag seals it agai
     await js('setHistoryLevel("timestamp").then((on) => { window.__proved = on; }); 0');
     const asked = await confirmShown();
     assert.ok(asked.points.some((x) => /never your words/.test(x)));
-    assert.equal(sent.length, 0, 'nothing sent while asking');
+    assert.equal(sentNow().length, 0, 'nothing sent while asking');
     await answer(true);
     await waitFor('window.__proved === "timestamp"');
     assert.equal(await js('library.proveWriting'), true);
@@ -1867,6 +1881,7 @@ test('proof turned on seals the session being written; a named tag seals it agai
 
     // what left the computer: drand asked, and seal fingerprints, never a word
     const words = Buffer.from('Proven');
+    const sent = sentNow();
     for (const s of sent) assert.ok(!s.body || (s.body.length <= 70 && !s.body.includes(words)), 'only fingerprints: ' + s.url);
     assert.ok(sent.some((s) => /timestamp\.digicert\.com/.test(s.url)) && sent.some((s) => /timestamp\.sectigo\.com/.test(s.url)), 'both authorities asked');
     assert.deepEqual(fs.readdirSync(sealsDir()).sort(), ['000001.json', '000002.json'], 'nothing stamped while offline');
@@ -1887,7 +1902,7 @@ test('proof turned on seals the session being written; a named tag seals it agai
     for (const s of mine.seals.seals) assert.equal(s.ok, true, s.problems.join('; '));
   } finally {
     await js('setHistoryLevel("record"); 0');
-    globalThis.fetch = realFetch;
+    fs.rmSync(process.env.NEO_E2E_DRAND, { force: true });
   }
   assert.equal(await js('library.proveWriting'), false);
 });
