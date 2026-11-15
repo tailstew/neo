@@ -203,7 +203,7 @@ function sealer(dir, net, more = {}) {
   let clock = Date.parse('2026-11-01T10:00:00Z');
   const s = new P.Sealer({
     dir, book: 'book-x', device: DEV, key: P.keyOf(P.newKey()), now: () => new Date(clock), fetch: net.fetch,
-    write: put, tsas: TSAS, check: fakeCheck, ...more
+    write: put, tsas: TSAS, check: fakeCheck, settle: 0, ...more
   });
   s.tick = (ms) => { clock += ms; };
   return s;
@@ -561,6 +561,28 @@ test('writing here alone is no reason to seal with ifOthers; a phone head anothe
   const next = await s.seal({ ifOthers: true });
   assert.deepEqual(Object.keys(next.others[PHONE]), [path.basename(phoneOpen)]);
   assert.deepEqual(Object.keys(next.heads), [path.basename(open)]);
+});
+
+test('another computer’s session that arrived a moment before its first seal isn’t sealed here; a phone’s is, once it has stood ten minutes', async () => {
+  const { dir, phone, closedPhone } = withPhone();
+  // a laptop new to this book: its first session here, its seal not yet
+  const laptop = path.join(path.dirname(dir), LAPTOP);
+  fs.mkdirSync(laptop);
+  fs.copyFileSync(path.join(phone, closedPhone + '.jsonl.gz'), path.join(laptop, closedPhone + '.jsonl.gz'));
+  // (the clock where the files were written: they've only just arrived)
+  let clock = Date.now();
+  const s = sealer(dir, network(), { settle: undefined, now: () => new Date(clock) });
+  const first = await s.seal();
+  assert.equal(first.others, undefined, 'nobody’s sessions yet: they’ve only just come');
+  // the laptop's seal arrives: it seals its own
+  const l = sealer(laptop, network(), { settle: undefined, now: () => new Date(clock) });
+  l.device = LAPTOP;
+  await l.seal();
+  assert.ok(fs.existsSync(path.join(laptop, 'seals', '000001.json')));
+  // ten minutes on: the phone's, never the laptop's
+  clock += 11 * 60 * 1000;
+  const next = await s.seal({ ifOthers: true });
+  assert.deepEqual(Object.keys(next.others), [PHONE]);
 });
 
 test('a phone session still arriving isn’t remembered as closed, and an unreadable seal is read again', async () => {

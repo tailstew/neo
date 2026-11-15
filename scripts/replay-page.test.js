@@ -360,7 +360,7 @@ test('a phone’s sessions sealed by a computer: NEO, the page and verify-record
   const round = { round: 33000000, signature: 'ab'.repeat(48) };
   round.randomness = crypto.createHash('sha256').update(Buffer.from(round.signature, 'hex')).digest('hex');
   const sealer = new P.Sealer({
-    dir: path.join(root, LAPTOP), book: 'book-x', device: LAPTOP, key: P.keyOf(P.newKey()), now: () => new Date('2026-11-01T10:00:00Z'),
+    dir: path.join(root, LAPTOP), book: 'book-x', device: LAPTOP, key: P.keyOf(P.newKey()), now: () => new Date('2026-11-01T10:00:00Z'), settle: 0,
     fetch: async () => ({ ok: true, status: 200, json: async () => round }), tsas: [],
     write: (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data); }
   });

@@ -539,10 +539,17 @@ const asked = new Map();
 // (outside the library) remembers the heads of closed sessions, which never
 // change. One at a time per book: NEO queues the calls. (`check` is
 // checkToken; the tests hand in their own.)
+// How long another device's session stands, unchanged, before a seal here
+// takes it as `others`: a computer that seals its own seals within five
+// minutes of its writing stopping, and its seal reaches this one by sync a
+// moment after the session does. In a book new to it, nothing here says
+// yet that it seals its own, so without the wait both would seal it.
+const OTHERS_SETTLE = 10 * 60 * 1000;
+
 class Sealer {
   constructor({ dir, book, device, key, now = () => new Date(), fetch = globalThis.fetch, write, log = () => {},
-    tsas = TSAS, anchors = null, cacheFile = null, check = checkToken }) {
-    Object.assign(this, { dir, book, device, key, now, fetch, log, tsas, cacheFile, check });
+    tsas = TSAS, anchors = null, cacheFile = null, check = checkToken, settle = OTHERS_SETTLE }) {
+    Object.assign(this, { dir, book, device, key, now, fetch, log, tsas, cacheFile, check, settle });
     this.root = path.dirname(dir);
     this.anchors = anchors;
     this.put = (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); write(file, data); };
@@ -708,11 +715,25 @@ class Sealer {
     return n;
   }
 
+  // When another device's session last changed here: its closed file's, or
+  // the newest part's of one still open (a sync program keeps the time the
+  // device wrote it). 0 when it can't be read, so it isn't held back.
+  changedAt(dir, session) {
+    const stat = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
+    const closed = stat(path.join(dir, session + '.jsonl.gz'));
+    if (closed) return closed;
+    let parts = [];
+    try { parts = fs.readdirSync(path.join(dir, session)); } catch { return 0; }
+    return Math.max(0, ...parts.map((p) => stat(path.join(dir, session, p))));
+  }
+
   // The heads of other devices' sessions that no seal names yet:
   // { <device>: { <session>: h } }. Only of devices that seal nothing
   // themselves (Pocket; a computer recording without timestamps): one that
   // seals its own does so once its writing stops, and sealing it here too
-  // would only ask the authorities twice.
+  // would only ask the authorities twice. A session changed in the last
+  // `settle` waits, so such a device's first seal in a book has time to
+  // arrive and say so (OTHERS_SETTLE).
   async others() {
     const named = this.sealsNamed();
     const out = {};
@@ -723,7 +744,12 @@ class Sealer {
       if (await this.headsIn(path.join(this.root, d), this.knownHeads(d), heads)) learnt = true;
       const done = named.heads.get(d) || new Set();
       const changed = {};
-      for (const [s, h] of heads) if (!done.has(s + ' ' + h)) changed[s] = h;
+      const now = this.now().getTime();
+      for (const [s, h] of heads) {
+        if (done.has(s + ' ' + h)) continue;
+        if (this.settle > 0 && now - this.changedAt(path.join(this.root, d), s) < this.settle) continue;
+        changed[s] = h;
+      }
       if (Object.keys(changed).length) out[d] = changed;
     }
     if (learnt) this.keepHeads();
