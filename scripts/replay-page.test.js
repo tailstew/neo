@@ -273,6 +273,53 @@ test('a page of some chapters shows only the days and tags where they changed, a
   assert.equal(Page.tagsShown(tags, all).length, 4);
 });
 
+test('History’s days: a chapter picked shows only the days it was written on, and the whole book leaves out days with nothing written, in NEO and the page alike', () => {
+  const DEVICE = 'd-1';
+  const html = { a: '<p>A.</p>', b: '<p>B.</p>' };
+  const day = (date, chs) => {
+    const id = date + 'T09-00-00Z-aaaa';
+    const w = new R.SessionWriter({ neoRec: 1, session: id, device: DEVICE, book: 'b', day: date, startedAt: date + 'T09:00:00.000Z', tz: 'UTC', prev: null });
+    for (const ch of chs) {
+      w.push([0, 'b', ch, html[ch], R.digest(html[ch]), 'baseline']);
+      const at = html[ch].length - 4;
+      w.push([1000, 'e', at, 0, 'x', 'iT']);
+      html[ch] = R.applyEdit(html[ch], at, 0, 'x');
+      w.push([0, 'w', R.digest(html[ch]), ch]);
+    }
+    return w.chunk().text;
+  };
+  // a day with nothing written: NEO open, the window focused, and another
+  // device's words taken in from disk, as on a day after a sync
+  const quiet = (date) => {
+    const id = date + 'T09-00-00Z-bbbb';
+    const w = new R.SessionWriter({ neoRec: 1, session: id, device: DEVICE, book: 'b', day: date, startedAt: date + 'T09:00:00.000Z', tz: 'UTC', prev: null });
+    w.push([0, 'f', 'visible']);
+    w.push([10, 'b', 'b', null, R.digest(html.b), 'continue']);
+    w.push([1, 'x', 'disk-adopt']);
+    const at = html.b.length - 4;
+    w.push([0, 'e', at, 0, 'y']);
+    html.b = R.applyEdit(html.b, at, 0, 'y');
+    w.push([0, 'w', R.digest(html.b), 'b']);
+    return w.chunk().text;
+  };
+  const texts = [day('2026-10-01', ['a', 'b']), day('2026-10-02', ['b']), quiet('2026-10-03'), day('2026-10-04', ['a']), quiet('2026-10-05')];
+  const pg = new R.Page();
+  const stats = texts.map((text) => [R.playSession(text, null, { page: pg, device: DEVICE })]);
+  assert.equal(R.dayShows(stats[2]), false, 'nothing written on the 3rd');
+  assert.equal(R.dayShows(stats[1]), true);
+  // the whole book: the days with something to see, and the last, which ends as the book is
+  assert.deepEqual(Page.daysFor(stats, ''), [0, 1, 3, 4]);
+  assert.deepEqual(Page.daysFor(stats, 'a'), [0, 3]);
+  assert.deepEqual(Page.daysFor(stats, 'b'), [0, 1]);
+  // a day not worked out yet is shown until it is
+  assert.deepEqual(Page.daysFor([stats[0], null, stats[2], stats[3], stats[4]], 'b'), [0, 1]);
+  assert.deepEqual(Page.daysFor([stats[0], stats[1], null, stats[3], stats[4]], ''), [0, 1, 2, 3, 4]);
+  // a chapter written on no day: every day, as NEO goes back to the whole book
+  assert.deepEqual(Page.daysFor(stats, 'gone'), [0, 1, 2, 3, 4]);
+  // a tag is something to see
+  assert.equal(R.dayShows([{ chapters: {}, lost: [], tags: [{ id: 't' }] }]), true);
+});
+
 test('a token’s time is its TSTInfo’s genTime', () => {
   const tok = fs.readFileSync(path.join(SEALS, '000001.sectigo.tsr'));
   const digest = crypto.createHash('sha256').update(fs.readFileSync(path.join(SEALS, '000001.json'))).digest();

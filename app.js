@@ -5119,8 +5119,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     return x ? S.sessions.findIndex((s) => s.id === x.id && s.device === x.device) : -1;
   }
 
-  // the days a chapter was written on (all of them for the book)
-  const dayFits = (d) => mode === 'book' || d.stats.chapters.includes(mode);
+  // the days a chapter was written on; for the book, the days with
+  // something to see (Rec.dayShows), and the last, which ends as the book is
+  const dayFits = (d) => (mode === 'book' ? d === S.days[S.days.length - 1] || Rec.dayShows(d.list.map((s) => s.stats)) : d.stats.chapters.includes(mode));
   const fitting = () => S.days.map((d, di) => (dayFits(d) ? di : -1)).filter((di) => di >= 0);
   // the day on the sheet: the player's, or the one the days show
   const curDay = () => (view === 'player' && h ? S.days.findIndex((d) => d.day === h.day) : dsel);

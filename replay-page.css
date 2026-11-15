@@ -114,6 +114,7 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-strip.edge-l.edge-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
 .rx-strip.dragging, .rx-strip.dragging * { cursor: grabbing; user-select: none; }
 .rx-tile { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px; background: none; border: 1px solid var(--rule); border-radius: 6px; font-size: 11px; color: var(--soft); cursor: pointer; }
+.rx-tile[hidden] { display: none; }
 .rx-tile:hover { color: var(--ink); }
 .rx-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
 .rx-tile.rx-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }

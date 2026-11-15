@@ -428,6 +428,20 @@
     return out;
   }
 
+  // The days a chapter was written on, as NEO's days show them (app.js,
+  // dayFits): with a chapter picked, only the days whose sessions changed
+  // it; for the whole book (''), the days with something to see
+  // (Rec.dayShows), and the last, which ends as the book is. `stats` holds
+  // each day's sessions as Rec.playSession says them, null for a day not
+  // worked out yet, which is shown until it is. A chapter written on no day
+  // shows every day, as NEO goes back to the whole book.
+  function daysFor(stats, ch) {
+    const wrote = (i) => !stats[i] || (ch ? stats[i].some((st) => !!(st && st.chapters && st.chapters[ch])) : i === stats.length - 1 || Rec.dayShows(stats[i]));
+    const out = [];
+    for (let i = 0; i < stats.length; i++) if (wrote(i)) out.push(i);
+    return out.length ? out : stats.map((_, i) => i);
+  }
+
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -661,7 +675,16 @@
       const b = el('button', 'rx-chbtn', label);
       b.dataset.ch = id;
       b.setAttribute('role', 'option');
-      b.addEventListener('click', () => { mode = id; markMode(); drawTiles(); if (!h) return; rebuild(); if (view === 'days') seek(steps.length); });
+      b.addEventListener('click', () => {
+        mode = id;
+        markMode();
+        drawTiles();
+        if (!h) return;
+        // in the days, a day the chapter wasn't written on gives way to its last
+        if (view === 'days' && !shownDays.includes(k)) { showDay(shownDays[shownDays.length - 1]); return; }
+        rebuild();
+        if (view === 'days') seek(steps.length);
+      });
       chList.append(b);
     };
     chButton('', T('The whole book'));
@@ -841,7 +864,28 @@
       for (const q of starts.slice(1)) if (q < n) g.fillRect((q % side) * cs - (q % side ? 1 : 0), Math.floor(q / side) * cs, 1.5, cs - gap);
       g.globalAlpha = 1;
     }
-    const drawTiles = () => book.days.forEach((_, i) => drawTile(i));
+    // the days the chapter picked was written on (all of them for the whole
+    // book): the others' tiles hidden, and ‹ › and ← → pass over them
+    let shownDays = book.days.map((_, i) => i);
+    const nearDay = (i, dir) => {
+      const j = dir > 0 ? shownDays.find((x) => x > i) : [...shownDays].reverse().find((x) => x < i);
+      return j === undefined ? -1 : j;
+    };
+    function markNav() {
+      if (k < 0) return;
+      const p = nearDay(k, -1);
+      const n = nearDay(k, 1);
+      prevBtn.disabled = p < 0;
+      nextBtn.disabled = n < 0;
+      prevBtn.textContent = p >= 0 ? '‹ ' + fmtShort(book.days[p].day) : '‹';
+      nextBtn.textContent = n >= 0 ? fmtShort(book.days[n].day) + ' ›' : '›';
+    }
+    function placeTiles() {
+      shownDays = daysFor(dayStats, mode);
+      for (const b of strip.children) b.hidden = !shownDays.includes(+b.dataset.k);
+      markNav();
+    }
+    const drawTiles = () => { placeTiles(); book.days.forEach((_, i) => drawTile(i)); };
     drawTiles();
     (async () => {
       const pg = new Rec.Page();
@@ -853,6 +897,7 @@
         }
         dayStats[i] = out;
         for (const [ch, c] of Object.entries(pg.doc)) if (c && !Rec.isStream(ch)) dayLens[i][ch] = c.length;
+        placeTiles();
         drawTile(i);
       }
     })();
@@ -876,10 +921,7 @@
       status.textContent = '';
       if (h !== day) { h = day; k = i; drawn.clear(); }
       for (const b of strip.children) b.setAttribute('aria-selected', String(+b.dataset.k === k));
-      prevBtn.disabled = k === 0;
-      nextBtn.disabled = k === book.days.length - 1;
-      prevBtn.textContent = k > 0 ? '‹ ' + fmtShort(book.days[k - 1].day) : '‹';
-      nextBtn.textContent = k < book.days.length - 1 ? fmtShort(book.days[k + 1].day) + ' ›' : '›';
+      markNav();
       rebuild(false);
       return true;
     }
@@ -1250,7 +1292,7 @@
       const dt = Math.min(250, now - last);
       last = now;
       if (pos >= steps.length) {
-        if (k < book.days.length - 1) { openPlayer(k + 1, { play: true }); return; }
+        if (nearDay(k, 1) >= 0) { openPlayer(nearDay(k, 1), { play: true }); return; }
         setPlaying(false);
         return;
       }
@@ -1296,8 +1338,8 @@
     playBtn.addEventListener('click', () => play(false));
     fastBtn.addEventListener('click', () => play(true));
     backBtn.addEventListener('click', () => showDay(k));
-    prevBtn.addEventListener('click', () => openPlayer(k - 1));
-    nextBtn.addEventListener('click', () => openPlayer(k + 1));
+    prevBtn.addEventListener('click', () => { if (nearDay(k, -1) >= 0) openPlayer(nearDay(k, -1)); });
+    nextBtn.addEventListener('click', () => { if (nearDay(k, 1) >= 0) openPlayer(nearDay(k, 1)); });
 
     // the timeline: a click or a drag goes there, a hover says what's there
     let dragging = false;
@@ -1337,8 +1379,8 @@
       else if (e.key === 'Escape' && view === 'player') { e.preventDefault(); showDay(k); }
       else if (view === 'days' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target && e.target.tagName === 'BUTTON' && !e.target.classList.contains('rx-tile'))) {
         e.preventDefault();
-        const i = k + (e.key === 'ArrowRight' ? 1 : -1);
-        if (i >= 0 && i < book.days.length) { showDay(i); strip.children[i].scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+        const i = nearDay(k, e.key === 'ArrowRight' ? 1 : -1);
+        if (i >= 0) { showDay(i); strip.children[i].scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
       }
     });
     new ResizeObserver(() => drawTimeline()).observe(tl);
@@ -1596,5 +1638,5 @@
     return box;
   }
 
-  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, chapterChains, keptOf, tagsIn, tagsShown, stampsOf, Book };
+  return { start, fail, serve, runChecks, canonical, genTime, gunzip, digest, loadSessions, checkChains, checkReplay, checkSeals, checkEvidence, heads, chapterChains, keptOf, tagsIn, tagsShown, daysFor, stampsOf, Book };
 });

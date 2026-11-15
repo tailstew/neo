@@ -1604,6 +1604,16 @@
     return out;
   }
 
+  // Whether a day has something for History's days to show, from its
+  // sessions' stats: a chapter changed or taken out, one the recording lost
+  // track of, or a tag. Changes in QUIET (a catch-up, another device's words
+  // taken in from disk) are nobody's writing: a day of only those, or of
+  // caret moves, focus and notes, has nothing to see. The book's last day
+  // shows whatever it holds (the caller's), since it ends as the book is.
+  function dayShows(stats) {
+    return stats.some((s) => !!s && (Object.keys(s.chapters || {}).length > 0 || (s.lost || []).length > 0 || (s.tags || []).length > 0));
+  }
+
   // The tags of a history, from its sessions' stats ({ id, device, day,
   // stats }, every device's): the last line for each id is the tag, and
   // one whose last line has label false was removed. A tag's moment (at) is
@@ -3564,7 +3574,7 @@
     parseSession, splitLines, joinParts, verifyChain,
     replay, replayCheck, ANCHOR_CHARS, ANCHOR_TIMES, anchorDue, baseLines,
     QUIET, Page, sessionOrder,
-    sessionDay, binsFor, playSession, dayStats, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
+    sessionDay, binsFor, playSession, dayStats, dayShows, tagsOf, momentStep, sessionSkip, DayBuilder, dayState, pageState,
     textOffset, compileSession, History, leadSteps, playFrom, keylessStretches,
     normMap, normText, phraseIn, phraseQuery, PhraseTally, phraseDays, phraseSessions, phraseFindings, phraseEvents, phrasePick,
     partThrough, partSplices, partMove, partNext, partPrev, PART_GAP, partDays, partDoubt, findParagraphs,
