@@ -1537,6 +1537,15 @@ ipcMain.handle('rec:track', (_e, bookId, day, part, from) => {
 ipcMain.handle('rec:delete', async (_e, bookId) => {
   const { shell } = require('electron');
   const win = BrowserWindow.getFocusedWindow();
+  // the seal the session's close asked for, and its stamps, finish first:
+  // made after the folder went, it would land in the new history and name
+  // sessions that are in the trash (at most 20 s, so a slow authority
+  // can't hold the delete up)
+  const id = libName(bookId);
+  clearTimeout((proofWords.get(id) || {}).timer);
+  proofWords.delete(id);
+  const job = proofQueues.get(id);
+  if (job) await Promise.race([job, new Promise((resolve) => setTimeout(resolve, 20000))]);
   for (const dir of [recRoot(bookId), recMirror(bookId)]) {
     if (!fs.existsSync(dir)) continue;
     try { await shell.trashItem(dir); } catch (err) {

@@ -549,6 +549,39 @@ test('the history deleted on another computer while this one records: a new sess
   await openIt(neo.book);
 });
 
+test('Delete this book’s history… with timestamping on and words not yet sealed: the seal the close asks for is done first, so the new history’s first seal names only what’s in it', async () => {
+  const until = async (fn, what) => {
+    for (const end = Date.now() + 20000; !fn(); await tick(200)) if (Date.now() > end) throw new Error('never: ' + what);
+  };
+  assert.equal(await js('historyLevel()'), 'timestamp');
+  const dev = await js('rec.device');
+  const mine = path.join(neo.LIB, neo.book, 'recording', dev);
+  const seals = () => { try { return fs.readdirSync(path.join(mine, 'seals')).filter((n) => /^\d{6}\.json$/.test(n)).sort(); } catch { return []; } };
+  await caretAt(0, 0, -1);
+  await type(' Unsealed words.');
+  await flush();
+  await neo.openHistory();
+  await js('document.querySelector(".hs-delete").click()');
+  await waitFor('!!document.querySelector(".confirm-modal input")');
+  await js(`(() => { const i = document.querySelector('.confirm-modal input'); i.value = 'delete history'; i.dispatchEvent(new Event('input')); })()`);
+  await js('document.querySelector(".confirm-modal .m-ok").click()');
+  await waitFor('/in the trash/.test($("#hint").textContent)', 30000);
+  await neo.closeHistory();
+  await type(' Written since.');
+  await flush();
+  await js('void rec.tag("Since the delete")');
+  await until(() => seals().length > 0, 'the new history’s first seal');
+  const first = JSON.parse(fs.readFileSync(path.join(mine, 'seals', seals()[0]), 'utf8'));
+  assert.equal(first.seq, 1);
+  const there = new Set(fs.readdirSync(mine).map((n) => n.replace(/\.jsonl\.gz$/, '')));
+  for (const s of Object.keys(first.heads || {})) assert.ok(there.has(s), 'a session in the new history: ' + s);
+  await js('backToShelf()');
+  await tick(1500);
+  const v = await verifyBook(path.join(neo.LIB, neo.book));
+  assert.ok(v.ok, print(v));
+  await openIt(neo.book);
+});
+
 /* ---------- a book an earlier build recorded ---------- */
 
 test('a book recorded by an earlier build (no day in its sessions, no notes or titles recorded): every session plays on its day; the first session now starts the notes and titles from a baseline and carries the chapters on', async () => {

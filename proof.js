@@ -777,11 +777,22 @@ class Sealer {
     const chapters = await this.chapters(changed, others, st);
     const tokens = {};
     for (const f of this.files()) {
-      if (TOKEN.test(f) && !st.covered.has(f)) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
+      const t = TOKEN.exec(f);
+      // (a stamp whose seal isn't there is no stamp of this history's)
+      if (t && !st.covered.has(f) && fs.existsSync(path.join(this.sealsDir, t[1] + '.json'))) tokens[f] = sha256hex(fs.readFileSync(path.join(this.sealsDir, f)));
     }
+    const was = st.seals[st.seals.length - 1] || null;
     // what nobody knew before: asked first, so the seal comes after it
     const after = [];
     try { after.push(await drandRound(this.fetch)); } catch (err) { this.log('proof drand', err); }
+    // the history deleted while that was asked (here, or on another
+    // computer by sync): what was read is of a history that's gone
+    const gone = (session) => !fs.existsSync(path.join(this.dir, session + '.jsonl.gz')) && !fs.existsSync(path.join(this.dir, session));
+    if ((was && !fs.existsSync(path.join(this.sealsDir, was.file))) || Object.keys(changed).some(gone)) {
+      this.state = null;
+      this.named = null;
+      return null;
+    }
     const prev = this.last();
     const body = {
       neoSeal: 1,
@@ -841,6 +852,9 @@ class Sealer {
         const c = this.check(reply, { digest, nonce, anchors: this.anchors || undefined });
         if (!c.ok) throw new Error(tsa.name + '’s stamp: ' + c.problems.join('; '));
         if (!c.trusted) this.log('proof', new Error(tsa.name + '’s stamp: ' + c.problems.join('; ')));
+        // the seal gone while the authority answered (its history deleted):
+        // its stamp would only stand in the new one's folder
+        if (!fs.existsSync(path.join(this.sealsDir, seal.file))) { this.state = null; this.named = null; break; }
         // a service the writer added: its root beside the seals first,
         // once, so anyone reading the book can check its stamps
         if (tsa.root) {

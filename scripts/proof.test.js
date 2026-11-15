@@ -917,3 +917,39 @@ test('the history deleted, here or on another computer: the seals start again fr
   assert.ok(!next.prev, 'naming no seal before it');
   assert.deepEqual(next.tokens || {}, {}, 'and no stamps of the seals that went');
 });
+
+test('the history deleted while a seal asks drand, or while an authority stamps it: nothing of it lands in the new history', async () => {
+  // deleted while drand is asked: no seal
+  const { dir } = deviceFolder();
+  const net = network({ tsa: { one: 'ok', two: 'ok' } });
+  let wipe = false;
+  const fetch = async (url, opts) => {
+    if (wipe && url.includes('/public/')) { wipe = false; fs.rmSync(dir, { recursive: true, force: true }); }
+    return net.fetch(url, opts);
+  };
+  const s = sealer(dir, { fetch });
+  assert.equal((await s.seal()).seq, 1);
+  wipe = true;
+  // (writing here goes on: a session still open, that the delete took)
+  assert.equal(await s.seal({ force: true }), null, 'no seal of a history that went while it was made');
+  assert.equal(fs.existsSync(path.join(dir, 'seals', '000002.json')), false);
+
+  // deleted while an authority answers: its stamp isn't written
+  const b = deviceFolder();
+  let wipeSeals = false;
+  const fetch2 = async (url, opts) => {
+    const r = await net.fetch(url, opts);
+    if (wipeSeals && url.includes('one.test')) { wipeSeals = false; fs.rmSync(path.join(b.dir, 'seals'), { recursive: true, force: true }); }
+    return r;
+  };
+  const s2 = sealer(b.dir, { fetch: fetch2 });
+  await s2.seal();
+  wipeSeals = true;
+  await s2.stamp();
+  assert.deepEqual(fs.existsSync(path.join(b.dir, 'seals')) ? fs.readdirSync(path.join(b.dir, 'seals')) : [], [], 'no stamp left behind');
+  // and a stamp whose seal isn't there is no one's to cover
+  put(path.join(b.dir, 'seals', '000007.one.tsr'), 'TOKEN:stray');
+  const next = await s2.seal({ force: true });
+  assert.equal(next.seq, 1);
+  assert.equal(next.tokens, undefined);
+});
