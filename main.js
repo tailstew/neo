@@ -1415,10 +1415,17 @@ ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
   // sync program took its start from under it, so its lines go nowhere.
   // What's left of it goes, with what this computer kept of the history, and
   // the window starts again from the book as it is (rec.lost).
-  const folder = path.join(recDir(bookId), recSession(session));
   if (await RecFiles.cutShort(recIO, recDir(bookId), recSession(session), first)) {
+    // A sync program deletes a file at a time, so what's left of this
+    // device's part (its sessions, its seals, its copy in Backups) goes to
+    // the trash now, with the rest: a new history mustn't start from the
+    // old one's leftovers. (A folder the trash won't take is left, as it is.)
+    const { shell } = require('electron');
+    for (const dir of [recDir(bookId), path.join(recMirror(bookId), libName(recDevice()))]) {
+      if (!fs.existsSync(dir)) continue;
+      try { await shell.trashItem(dir); } catch (err) { logError('trash', err); }
+    }
     await recForget(bookId);
-    fs.rmSync(folder, { recursive: true, force: true });
     return { lost: true };
   }
   const dir = await recPrepare(bookId);

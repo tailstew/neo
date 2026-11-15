@@ -524,20 +524,23 @@ test('the history deleted on another computer while this one records: a new sess
   await until(() => seals().length > 0, 'a seal before the delete');
   const was = await js('rec.session.id');
   // another computer deletes the history, and its sync program takes the
-  // folder from under this one, which is still recording (and its copy in
-  // Backups, which goes to the trash with it): all it had received, which
-  // needn't be this open session's chunks, so they stay
+  // folder from under this one, which is still recording, a file at a
+  // time: so far only this device's device.json and the README, and none
+  // of its sessions, seals or copy in Backups
   await flush();
   const rec = path.join(neo.LIB, neo.book, 'recording');
-  for (const d of fs.readdirSync(rec)) {
-    if (d !== dev) { fs.rmSync(path.join(rec, d), { recursive: true, force: true }); continue; }
-    for (const n of fs.readdirSync(path.join(rec, d))) if (n !== was) fs.rmSync(path.join(rec, d, n), { recursive: true, force: true });
-  }
-  assert.ok(fs.existsSync(path.join(mine, was)), 'the open session left where it was');
-  fs.rmSync(path.join(neo.LIB, 'Backups', 'recordings', neo.book), { recursive: true, force: true });
+  const copy = path.join(neo.LIB, 'Backups', 'recordings', neo.book, dev);
+  for (const d of fs.readdirSync(rec)) if (d !== dev && d !== 'README.txt') fs.rmSync(path.join(rec, d), { recursive: true, force: true });
+  fs.rmSync(path.join(rec, 'README.txt'), { force: true });
+  fs.rmSync(path.join(mine, 'device.json'));
+  assert.ok(fs.existsSync(path.join(mine, was)) && seals().length > 0, 'the open session and the old seals left where they were');
+  const from = neo.trashed.length;
   await type(' After the delete.');
   await flush();
   await waitFor(`rec.on && rec.session.id !== ${JSON.stringify(was)}`, 15000);
+  // what was left of this device's part went to the trash, its copy in Backups too
+  assert.ok(neo.trashed.slice(from).some((x) => x.from === mine), 'this device’s leftovers in the trash');
+  if (fs.existsSync(copy)) assert.ok(neo.trashed.slice(from).some((x) => x.from === copy), 'and its copy in Backups');
   await type(' And on.');
   await flush();
   await js('void rec.tag("After the delete")');
