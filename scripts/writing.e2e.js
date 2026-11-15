@@ -524,9 +524,16 @@ test('the history deleted on another computer while this one records: a new sess
   await until(() => seals().length > 0, 'a seal before the delete');
   const was = await js('rec.session.id');
   // another computer deletes the history, and its sync program takes the
-  // folder from under this one, which is still recording
-  // (and its copy in Backups, which goes to the trash with it)
-  fs.rmSync(path.join(neo.LIB, neo.book, 'recording'), { recursive: true, force: true });
+  // folder from under this one, which is still recording (and its copy in
+  // Backups, which goes to the trash with it): all it had received, which
+  // needn't be this open session's chunks, so they stay
+  await flush();
+  const rec = path.join(neo.LIB, neo.book, 'recording');
+  for (const d of fs.readdirSync(rec)) {
+    if (d !== dev) { fs.rmSync(path.join(rec, d), { recursive: true, force: true }); continue; }
+    for (const n of fs.readdirSync(path.join(rec, d))) if (n !== was) fs.rmSync(path.join(rec, d, n), { recursive: true, force: true });
+  }
+  assert.ok(fs.existsSync(path.join(mine, was)), 'the open session left where it was');
   fs.rmSync(path.join(neo.LIB, 'Backups', 'recordings', neo.book), { recursive: true, force: true });
   await type(' After the delete.');
   await flush();

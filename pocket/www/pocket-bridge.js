@@ -742,7 +742,7 @@
         // the history deleted on another device while this session was open
         // (rec:chunk in main.js): its lines go nowhere, and the page starts again
         const folder = p(recBook(bookId), await recDevice(), recSession(session));
-        if (first > 1 && !(await Files.hasStart(recIO, folder))) {
+        if (await Files.cutShort(recIO, p(recBook(bookId), await recDevice()), recSession(session), first)) {
           try { await recIO.remove(folder); } catch { /* gone already */ }
           return { lost: true };
         }

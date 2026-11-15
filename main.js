@@ -1416,7 +1416,7 @@ ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
   // What's left of it goes, with what this computer kept of the history, and
   // the window starts again from the book as it is (rec.lost).
   const folder = path.join(recDir(bookId), recSession(session));
-  if (first > 1 && !(await RecFiles.hasStart(recIO, folder))) {
+  if (await RecFiles.cutShort(recIO, recDir(bookId), recSession(session), first)) {
     await recForget(bookId);
     fs.rmSync(folder, { recursive: true, force: true });
     return { lost: true };

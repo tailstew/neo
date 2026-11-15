@@ -244,6 +244,18 @@
     return false;
   }
 
+  // Whether the book's history was deleted (on another device, the folder
+  // taken by a sync program) while this device's session `session` was
+  // part-way through (`first` its next line): its device.json, written with
+  // the first chunk and taken by every delete, has gone, or the session's
+  // own start has. Either alone can stay behind: a sync program deletes
+  // only what the other device had already received.
+  async function cutShort(io, dir, session, first) {
+    if (first <= 1) return false;
+    if (!(await io.exists(io.join(dir, 'device.json')))) return true;
+    return !(await hasStart(io, io.join(dir, session)));
+  }
+
   async function chunk(io, dir, session, first, text) {
     if (!SESSION.test(session) || !Number.isInteger(first) || first < 1 || typeof text !== 'string') throw new Error('Invalid recording chunk');
     await io.write(io.join(dir, session, `c-${pad(first)}.jsonl`), text);
@@ -399,5 +411,5 @@
     };
   }
 
-  return { DEVICE, SESSION, CHUNK, ROLLUP, closedName, readParts, readClosed, closedNames, rollup, closeSession, known, start, prepare, hasStart, chunk, list, read, mirrorDevice, sweep, nodeIO };
+  return { DEVICE, SESSION, CHUNK, ROLLUP, closedName, readParts, readClosed, closedNames, rollup, closeSession, known, start, prepare, hasStart, cutShort, chunk, list, read, mirrorDevice, sweep, nodeIO };
 });

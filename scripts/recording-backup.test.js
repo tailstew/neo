@@ -357,3 +357,20 @@ test('an open session’s start: a chunk or a rollup from line 1; gone once a sy
   fs.rmSync(path.join(folder, 's-000001-000001.jsonl.gz'));
   assert.equal(await Files.hasStart(io, folder), false, 'only what came after the delete');
 });
+
+test('a session cut short by a delete elsewhere: its device.json gone, or its own start; neither, it goes on', async () => {
+  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'neo-cut-')), DEV);
+  const s = '2026-11-15T09-00-00Z-abcd';
+  fs.mkdirSync(path.join(dir, s), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'device.json'), '{}');
+  fs.writeFileSync(path.join(dir, s, 'c-000001.jsonl'), '{}\n');
+  assert.equal(await Files.cutShort(io, dir, s, 12), false, 'all there');
+  assert.equal(await Files.cutShort(io, dir, s, 1), false, 'a session’s first chunk is never cut short');
+  // the delete took only what the other device had: device.json, not this session's chunks
+  fs.rmSync(path.join(dir, 'device.json'));
+  assert.equal(await Files.cutShort(io, dir, s, 12), true, 'device.json gone');
+  // or it took the session's start, and device.json was written again since
+  fs.writeFileSync(path.join(dir, 'device.json'), '{}');
+  fs.rmSync(path.join(dir, s, 'c-000001.jsonl'));
+  assert.equal(await Files.cutShort(io, dir, s, 12), true, 'its start gone');
+});
