@@ -512,6 +512,7 @@ test('the whole book: the save dialog in the last export folder, named “<title
     assert.deepEqual(s.side, ['The whole book', ...await js('book.chapterOrder.map((c) => historyChapterLabel(book, c, book.chapterOrder))')]);
     assert.ok(s.tiles >= 1);
     assert.equal(s.footer, false);
+    assert.equal(await page.js('getComputedStyle(document.querySelector(".rx-menu")).display'), 'none', 'no ☰ beside the side pane');
     assert.ok(s.headerRight, 'the buttons at the right of the header');
     assert.ok(s.controlsAboveStrip, 'the controls above the tiles');
     // the controls stay on screen at a low window
@@ -624,7 +625,7 @@ test('the exported file with JavaScript off is the report on a plain page', asyn
   assert.match(src, /<main id="rx-player" class="rx-player" hidden>/);
 });
 
-test('the exported file at a phone’s width: no side pane, nothing wider than the screen', async () => {
+test('the exported file at a phone’s width: the side pane a drawer behind ☰ (a pick, a tap beside it or Esc puts it away), nothing wider than the screen', async () => {
   const page = await openPage(WHOLE, { width: 390, height: 844 });
   try {
     const s = await page.js(`({ side: getComputedStyle(document.getElementById('rx-side')).display, wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -632,6 +633,28 @@ test('the exported file at a phone’s width: no side pane, nothing wider than t
     assert.equal(s.side, 'none');
     assert.ok(s.wide <= 0, 'sideways scrolling: ' + s.wide);
     assert.deepEqual(s.out, []);
+    // the drawer: ☰ brings the chapters over the page, inside the screen
+    const drawer = () => page.js(`(() => { const r = document.getElementById('rx-side').getBoundingClientRect(); return { shown: getComputedStyle(document.getElementById('rx-side')).display !== 'none', left: r.left, right: r.right, expanded: document.querySelector('.rx-menu').getAttribute('aria-expanded') }; })()`);
+    assert.equal(await page.js('getComputedStyle(document.querySelector(".rx-menu")).display !== "none"'), true, '☰ shown');
+    await page.js('document.querySelector(".rx-menu").click()');
+    let d = await drawer();
+    assert.ok(d.shown && d.left >= 0 && d.right <= 390, 'the drawer on screen: ' + JSON.stringify(d));
+    assert.equal(d.expanded, 'true');
+    // a chapter picked: picked, and the drawer goes
+    await page.js('document.querySelectorAll(".rx-chbtn")[1].click()');
+    d = await drawer();
+    assert.equal(d.shown, false, 'a pick puts it away');
+    assert.equal(await page.js('document.querySelectorAll(".rx-chbtn")[1].getAttribute("aria-selected")'), 'true');
+    // a tap beside it, and Esc
+    await page.js('document.querySelector(".rx-menu").click()');
+    await page.js('document.querySelector(".rx-scrim").click()');
+    assert.equal((await drawer()).shown, false, 'a tap beside it puts it away');
+    await page.js('document.querySelector(".rx-menu").click()');
+    page.win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    page.win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    await tick(200);
+    assert.equal((await drawer()).shown, false, 'Esc puts it away');
+    await page.js('document.querySelectorAll(".rx-chbtn")[0].click()');
     await page.js('document.querySelector(".rx-tile").click()');
     await tick(800);
     await page.js('document.querySelector(".rx-play").click()');

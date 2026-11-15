@@ -52,6 +52,8 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-js .rx-top { grid-area: top; max-width: none; margin: 0; padding: 12px 18px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .rx-js .rx-top h1 { font-size: 22px; margin: 0; }
 .rx-js .rx-by { margin: 0; }
+.rx-menu, .rx-scrim { display: none; }
+.rx-menu { align-self: center; align-items: center; justify-content: center; width: 34px; height: 34px; margin-right: 2px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: none; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; }
 .rx-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
 .rx-actions[hidden] { display: none; }
 .rx-js .rx-lede { flex-basis: 100%; font-size: 13px; color: var(--soft); margin: 0; }
@@ -221,6 +223,10 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
   .rx-top h1 { font-size: 26px; }
   .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }
   .rx-js .rx-side { display: none; }
+  /* the side as a drawer: ☰ brings it over the page */
+  .rx-js .rx-menu { display: inline-flex; }
+  .rx-js.rx-drawer .rx-side { display: block; position: fixed; top: 0; bottom: 0; left: 0; width: min(300px, 85vw); z-index: 30; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+  .rx-js.rx-drawer .rx-scrim { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(0,0,0,0.35); }
   .rx-js .rx-lede { display: none; }
   /* the sheet as History's on a phone, as wide as the editor's page there */
   .rx-sheet { width: calc(100% - 24px); }

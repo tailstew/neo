@@ -617,6 +617,32 @@
     box.hidden = false;
     side.hidden = false;
     actions.hidden = false;
+    // On a phone the side is a drawer, as History's is there: ☰ at the
+    // header's left brings it over the page, and a pick in it, a tap
+    // beside it or Esc puts it away.
+    const menuBtn = el('button', 'rx-menu', '☰');
+    menuBtn.setAttribute('aria-label', T('Chapters'));
+    menuBtn.setAttribute('aria-controls', 'rx-side');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    const scrim = el('div', 'rx-scrim');
+    const drawer = (open) => {
+      doc.body.classList.toggle('rx-drawer', open);
+      menuBtn.setAttribute('aria-expanded', String(open));
+      if (open) { const b = side.querySelector('[aria-selected="true"]') || side.querySelector('button'); if (b) b.focus(); }
+    };
+    menuBtn.addEventListener('click', () => drawer(!doc.body.classList.contains('rx-drawer')));
+    scrim.addEventListener('click', () => drawer(false));
+    side.addEventListener('click', (e) => { if (e.target.closest('button')) drawer(false); });
+    doc.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !doc.body.classList.contains('rx-drawer')) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      drawer(false);
+      menuBtn.focus();
+    }, true);
+    const top = doc.querySelector('.rx-top');
+    if (top) top.prepend(menuBtn);
+    side.after(scrim);
     const titles = new Map((data.chapters || []).map((c) => [c.id, c.title]));
     const typed = new Map();
     for (const s of (data.evidence && data.evidence.sessions) || []) typed.set(s.device + '/' + s.id, s.typed);
