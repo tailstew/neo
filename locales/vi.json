@@ -1200,6 +1200,7 @@
   "This book’s Writing History is in the trash. The book is untouched.": "Lịch sử viết của cuốn sách này đang ở trong thùng rác. Cuốn sách không bị ảnh hưởng.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Trình duyệt này không kiểm tra được chữ ký Ed25519; Chrome, Firefox hoặc Safari bản mới có thể.",
   "this browser is too old to read it": "trình duyệt này quá cũ để đọc nó",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "nó được mở từ một địa chỉ không an toàn (http://): hãy mở chính tệp đó, hoặc một địa chỉ https://",
   "This chapter doesn’t exist yet at this moment.": "Vào lúc này chương này chưa tồn tại.",
   "This chapter is already as it was then.": "Chương này đã giống như lúc đó.",
   "This chapter isn’t in the book at this moment.": "Vào lúc này chương này không có trong sách.",

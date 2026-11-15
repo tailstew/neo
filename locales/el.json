@@ -957,6 +957,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Οι υπηρεσίες που προσθέσατε αφαιρούνται. Οι χρονοσημάνσεις τους που υπάρχουν ήδη στα βιβλία σας μένουν εκεί και μπορούν ακόμη να ελεγχθούν.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Αυτό το πρόγραμμα περιήγησης δεν μπορεί να ελέγξει υπογραφές Ed25519· ένα πρόσφατο Chrome, Firefox ή Safari μπορεί.",
   "this browser is too old to read it": "αυτό το πρόγραμμα περιήγησης είναι πολύ παλιό για να τη διαβάσει",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "άνοιξε από διεύθυνση που δεν είναι ασφαλής (http://): ανοίξτε το ίδιο το αρχείο ή μια διεύθυνση https://",
   "This chapter isn’t in the book at this moment.": "Αυτό το κεφάλαιο δεν είναι στο βιβλίο αυτή τη στιγμή.",
   "This chapter’s evidence": "Ενδείξεις αυτού του κεφαλαίου",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Αυτή η εξαγωγή αναπαράγει πώς γράφτηκε αυτό το βιβλίο, πλήκτρο προς πλήκτρο, όπως το κατέγραψε το NEO.",

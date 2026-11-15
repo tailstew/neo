@@ -1295,6 +1295,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Se quitan los servicios que añadiste. Sus sellos que ya están en tus libros se quedan allí y se pueden seguir comprobando.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Este navegador no puede comprobar firmas Ed25519; un Chrome, Firefox o Safari reciente sí puede.",
   "this browser is too old to read it": "este navegador es demasiado antiguo para leerla",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "se abrió desde una dirección que no es segura (http://): abre el archivo directamente, o una dirección https://",
   "This chapter isn’t in the book at this moment.": "Este capítulo no está en el libro en este momento.",
   "This chapter’s evidence": "Indicios de este capítulo",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Esta exportación reproduce cómo se escribió este libro, pulsación a pulsación, tal como lo grabó NEO.",

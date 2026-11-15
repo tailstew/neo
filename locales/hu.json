@@ -781,6 +781,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Az általad hozzáadott szolgáltatások kikerülnek. A bélyegeik, amelyek már a könyveidben vannak, ott maradnak, és továbbra is ellenőrizhetők.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Ez a böngésző nem tud Ed25519-aláírást ellenőrizni; egy friss Chrome, Firefox vagy Safari igen.",
   "this browser is too old to read it": "ez a böngésző túl régi az olvasásához",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "nem biztonságos címről (http://) nyitották meg: nyisd meg magát a fájlt, vagy egy https:// címet",
   "This chapter isn’t in the book at this moment.": "Ez a fejezet ebben a pillanatban nincs a könyvben.",
   "This chapter’s evidence": "A fejezet bizonyítékai",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Ez az export visszajátssza, hogyan íródott ez a könyv, leütésről leütésre, ahogy a NEO rögzítette.",

@@ -1062,6 +1062,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Serviciile adăugate de tine sunt scoase. Marcajele lor aflate deja în cărțile tale rămân acolo și pot fi verificate în continuare.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Acest browser nu poate verifica semnături Ed25519; un Chrome, Firefox sau Safari recent poate.",
   "this browser is too old to read it": "acest browser e prea vechi ca s-o citească",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "a fost deschis de la o adresă nesigură (http://): deschide fișierul însuși sau o adresă https://",
   "This chapter isn’t in the book at this moment.": "Acest capitol nu e în carte în acest moment.",
   "This chapter’s evidence": "Indiciile acestui capitol",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Acest export redă cum a fost scrisă această carte, tastă cu tastă, așa cum a înregistrat-o NEO.",

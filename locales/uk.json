@@ -1415,6 +1415,7 @@
   "This book’s Writing History is in the trash. The book is untouched.": "Історія письма цієї книги в кошику. Книга недоторкана.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Цей оглядач не може перевіряти підписи Ed25519; це вміють сучасні Chrome, Firefox і Safari.",
   "this browser is too old to read it": "цей оглядач застарий, щоб його прочитати",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "його відкрито з незахищеної адреси (http://): відкрийте сам файл або адресу https://",
   "This chapter doesn’t exist yet at this moment.": "Цього розділу в цю мить ще не існує.",
   "This chapter is already as it was then.": "Цей розділ уже такий, яким був тоді.",
   "This chapter isn’t in the book at this moment.": "Цього розділу в цю мить немає в книзі.",

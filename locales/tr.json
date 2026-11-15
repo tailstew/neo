@@ -937,6 +937,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Eklediğiniz hizmetler çıkarılır. Kitaplarınızda zaten bulunan damgaları orada kalır ve denetlenmeye devam edebilir.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Bu tarayıcı Ed25519 imzalarını denetleyemiyor; güncel bir Chrome, Firefox ya da Safari denetleyebilir.",
   "this browser is too old to read it": "bu tarayıcı onu okumak için fazla eski",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "güvenli olmayan bir adresten (http://) açıldı: dosyanın kendisini ya da bir https:// adresini açın",
   "This chapter isn’t in the book at this moment.": "Bu bölüm şu anda kitapta değil.",
   "This chapter’s evidence": "Bu bölümün kanıtları",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Bu dışa aktarım, bu kitabın nasıl yazıldığını NEO’nun kaydettiği gibi tuş tuş oynatır.",

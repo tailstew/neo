@@ -464,7 +464,10 @@
     const data = JSON.parse(doc.getElementById('rx-data').textContent);
     words = { ...(data.strings || {}), $lang: data.lang };
     if (typeof DecompressionStream === 'undefined' || !crypto.subtle) {
-      fail(doc, T('this browser is too old to read it'));
+      // WebCrypto is only given to a secure page (a file, or https), so a
+      // page put on a plain http:// address can't check itself in any browser
+      const insecure = !!doc.defaultView && doc.defaultView.isSecureContext === false;
+      fail(doc, insecure ? T('it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address') : T('this browser is too old to read it'));
       return;
     }
     const sessions = await loadSessions(data);

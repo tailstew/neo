@@ -142,7 +142,7 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-popbar { flex: none; display: flex; justify-content: flex-end; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
 .rx-close { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
 .rx-close:hover { border-color: var(--accent); color: var(--accent); }
-.rx-pop .rx-popbody { flex: 1; min-height: 0; overflow-y: auto; max-width: none; margin: 0; padding: 20px 26px 26px; font-size: 14px; }
+.rx-pop .rx-popbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; max-width: none; margin: 0; padding: 20px 26px 26px; font-size: 14px; }
 
 /* the checks */
 .rx-list { list-style: none; padding: 0; margin: 0 0 12px; }

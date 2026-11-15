@@ -4256,6 +4256,7 @@ const REPLAY_PAGE_WORDS = [
   tk('a timestamp token stamps something else'),
   tk('This export couldn’t read its history: {why}'),
   tk('this browser is too old to read it'),
+  tk('it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address'),
   tk('Nothing was recorded.'),
   tk('The whole book'),
   tk('Untitled chapter'),

@@ -1016,6 +1016,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "De diensten die je toevoegde worden eruit gehaald. Hun stempels die al in je boeken staan blijven daar, en zijn nog steeds te controleren.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Deze browser kan geen Ed25519-handtekeningen controleren; een recente Chrome, Firefox of Safari wel.",
   "this browser is too old to read it": "deze browser is te oud om het te lezen",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "deze is geopend vanaf een onbeveiligd adres (http://): open het bestand zelf, of een https://-adres",
   "This chapter isn’t in the book at this moment.": "Dit hoofdstuk staat op dit moment niet in het boek.",
   "This chapter’s evidence": "Aanwijzingen voor dit hoofdstuk",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Deze export speelt af hoe dit boek geschreven is, toetsaanslag voor toetsaanslag, zoals NEO het opnam.",

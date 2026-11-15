@@ -1097,6 +1097,7 @@
   "The services you added are taken out. Their stamps already in your books stay there, and can still be checked.": "Добавленные вами службы будут убраны. Их метки, уже стоящие в ваших книгах, останутся там, и их по-прежнему можно проверить.",
   "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Этот браузер не умеет проверять подписи Ed25519; свежие Chrome, Firefox или Safari умеют.",
   "this browser is too old to read it": "этот браузер слишком стар, чтобы прочитать её",
+  "it was opened from an address that isn’t secure (http://): open the file itself, or an https:// address": "он открыт по незащищённому адресу (http://): откройте сам файл или адрес https://",
   "This chapter isn’t in the book at this moment.": "В этот момент этой главы в книге нет.",
   "This chapter’s evidence": "Свидетельства по этой главе",
   "This export plays back how this book was written, keystroke by keystroke, as NEO recorded it.": "Этот экспорт воспроизводит, как писалась эта книга, нажатие за нажатием, так, как это записал NEO.",
