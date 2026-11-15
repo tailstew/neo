@@ -78,7 +78,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 ### Timestamp services…
 
-- [ ] **(2 computers)** Move GlobalSign first and add freetsa.org on one; once the library has synced, open Timestamp services… on the other: the same order, freetsa.org there with its note, without checking it again. Its next seal is stamped in that order.
+- [x] **(2 computers)** Move GlobalSign first and add freetsa.org on one; once the library has synced, open Timestamp services… on the other: the same order, freetsa.org there with its note, without checking it again. Its next seal is stamped in that order. *(2026-11-15, a0250de: set on the laptop; the Chromebook showed the same order with freetsa.org, and its seal 000005 was stamped GlobalSign then DigiCert)*
 - [ ] **(2 computers)** With the other on the shelf, change the order on the first: once the shelf picks up the library (within 30 s, or on focus), a book opened there seals in the new order.
 - [x] **(phone)** Pocket opens and saves the library without dropping `proofTsas`, also when it saves (a book open, so it hadn't re-read the shelf) a minute after the desktop changed them: it merges (`writeLibrary`), and the sync program makes no conflict copy. *(2026-11-13, 69bf432; failed first: the phone's save undid the laptop's change, and Syncthing set it aside)*
 
