@@ -232,6 +232,18 @@
     return dir;
   }
 
+  // Whether an open session's folder still holds its start, a chunk or a
+  // rollup from line 1. Not once the book's history was deleted on another
+  // device while this one recorded, and a sync program took the folder from
+  // under it: the lines after can't be played without the ones before.
+  async function hasStart(io, folder) {
+    for (const n of await names(io, folder)) {
+      const m = CHUNK.exec(n) || ROLLUP.exec(n);
+      if (m && +m[1] === 1) return true;
+    }
+    return false;
+  }
+
   async function chunk(io, dir, session, first, text) {
     if (!SESSION.test(session) || !Number.isInteger(first) || first < 1 || typeof text !== 'string') throw new Error('Invalid recording chunk');
     await io.write(io.join(dir, session, `c-${pad(first)}.jsonl`), text);
@@ -387,5 +399,5 @@
     };
   }
 
-  return { DEVICE, SESSION, CHUNK, ROLLUP, closedName, readParts, readClosed, closedNames, rollup, closeSession, known, start, prepare, chunk, list, read, mirrorDevice, sweep, nodeIO };
+  return { DEVICE, SESSION, CHUNK, ROLLUP, closedName, readParts, readClosed, closedNames, rollup, closeSession, known, start, prepare, hasStart, chunk, list, read, mirrorDevice, sweep, nodeIO };
 });

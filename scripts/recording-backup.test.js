@@ -343,3 +343,17 @@ test('the daily zip leaves recordings out and says where they are; the mirror an
   assert.equal(await main.dailyBackup(), 0, 'nothing more is copied');
   assert.equal(fs.statSync(readme).mtimeMs, stamp);
 });
+
+test('an open session’s start: a chunk or a rollup from line 1; gone once a sync program took the folder from under it', async () => {
+  const folder = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'neo-start-')), '2026-11-15T09-00-00Z-abcd');
+  assert.equal(await Files.hasStart(io, folder), false, 'no folder at all');
+  fs.mkdirSync(folder);
+  fs.writeFileSync(path.join(folder, 'c-000001.jsonl'), '{}\n');
+  fs.writeFileSync(path.join(folder, 'c-000002.jsonl'), '[0,"T","x"]\n');
+  assert.equal(await Files.hasStart(io, folder), true, 'its first chunk');
+  fs.rmSync(path.join(folder, 'c-000001.jsonl'));
+  fs.writeFileSync(path.join(folder, 's-000001-000001.jsonl.gz'), zlib.gzipSync('{}\n'));
+  assert.equal(await Files.hasStart(io, folder), true, 'a rollup from line 1');
+  fs.rmSync(path.join(folder, 's-000001-000001.jsonl.gz'));
+  assert.equal(await Files.hasStart(io, folder), false, 'only what came after the delete');
+});

@@ -1411,6 +1411,16 @@ const recPrepare = (bookId) => RecFiles.prepare(recIO, recRoot(bookId), libName(
   { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
 
 ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
+  // The history deleted on another computer while this session was open: a
+  // sync program took its start from under it, so its lines go nowhere.
+  // What's left of it goes, with what this computer kept of the history, and
+  // the window starts again from the book as it is (rec.lost).
+  const folder = path.join(recDir(bookId), recSession(session));
+  if (first > 1 && !(await RecFiles.hasStart(recIO, folder))) {
+    await recForget(bookId);
+    fs.rmSync(folder, { recursive: true, force: true });
+    return { lost: true };
+  }
   const dir = await recPrepare(bookId);
   await RecFiles.chunk(recIO, dir, recSession(session), first, text);
   proofWrote(bookId, text);
@@ -1539,6 +1549,13 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
       return false;
     }
   }
+  await recForget(bookId);
+  return true;
+});
+
+// What this computer keeps of a book's history outside the book, dropped
+// once the history is deleted (here, or on another computer: rec:chunk)
+async function recForget(bookId) {
   const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
   proofForget(bookId); // its seals went with the history
   clearTimeout((proofWords.get(bookId) || {}).timer);
@@ -1546,8 +1563,7 @@ ipcMain.handle('rec:delete', async (_e, bookId) => {
   if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
   historyCleaned.delete(cache);
   fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
-  return true;
-});
+}
 
 // The evidence report (docs/neo-recording-plan.md, part 2): its figures over
 // every session (or only some chapters' lines), worked out in the history

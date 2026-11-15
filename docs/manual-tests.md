@@ -57,7 +57,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 ## Restore (phases 3 and 7)
 
 - [x] Restore a paragraph from months ago that has been edited many times since: it's found, and it replaces the right paragraph. Note how long "Finding them…" shows. *(passed 2026-11-14, df11456, A Year (novel), a paragraph from the year's start)*
-- [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on.
+- [ ] **(2 computers)** Delete the history on one while the other has the book open; on the other, keep writing. No words lost, and History on either shows the writing from then on. *(2026-11-15, a0250de: no words lost, but the Chromebook, recording through the delete, went on with `continue` lines its deleted history held the start of, seal 8 naming seal 7, and no device.json: verify-recording failed. Fixed: it notices and starts again; retest)*
 - [x] **(phone)** Restore works on the phone; the delete button isn't there. *(2026-11-13, 69bf432, OnePlus 9: restore, Undo This Restore and the toast's Undo; no Delete in the drawer)*
 
 ## Tags and snapshots (phase 7)

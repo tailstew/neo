@@ -3208,7 +3208,11 @@ const rec = {
     const { bookId } = this;
     const id = this.session.id;
     const send = (part) => {
-      const sent = window.neo.recChunk(bookId, id, part.first, part.text).then(() => { this.chunks++; return true; }, (err) => {
+      const sent = window.neo.recChunk(bookId, id, part.first, part.text).then((r) => {
+        if (r && r.lost) { this.lost(bookId, id); return false; }
+        this.chunks++;
+        return true;
+      }, (err) => {
         window.neo.logError('recording chunk: ' + (err && err.message || err));
         if (this.session && this.session.id === id) this.retry.push(part); // tried again with the next
         return false;
@@ -3220,6 +3224,21 @@ const rec = {
     };
     for (const part of this.retry.splice(0)) send(part);
     return { chunk: c, saved: send(c) };
+  },
+
+  // The book's history was deleted on another device while this session
+  // was open (rec:chunk found its start gone): it ends, and a new one starts
+  // from the book as it is, as after a delete here. Nothing is said: the
+  // words are all on the page, and the new session's baselines hold them.
+  lost(bookId, id) {
+    if (!this.on || this.bookId !== bookId || !this.session || this.session.id !== id || this.losing) return;
+    this.losing = true;
+    this.retry = [];
+    window.neo.logError('recording: this book’s history was deleted on another device; starting again');
+    Promise.resolve(this.end()).catch(() => {}).then(() => {
+      this.losing = false;
+      if (book && book.id === bookId && recordingWanted()) return recRestart(bookId);
+    }).catch((err) => window.neo.logError('recording restart: ' + (err && err.message || err)));
   },
 
   rollup() {

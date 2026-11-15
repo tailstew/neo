@@ -739,6 +739,13 @@
         return { device, app: POCKET_VERSION, ...r };
       },
       recChunk: async (bookId, session, first, text) => {
+        // the history deleted on another device while this session was open
+        // (rec:chunk in main.js): its lines go nowhere, and the page starts again
+        const folder = p(recBook(bookId), await recDevice(), recSession(session));
+        if (first > 1 && !(await Files.hasStart(recIO, folder))) {
+          try { await recIO.remove(folder); } catch { /* gone already */ }
+          return { lost: true };
+        }
         const dir = await Files.prepare(recIO, recBook(bookId), await recDevice(), recReadme(),
           { name: deviceName(), created: new Date().toISOString(), app: POCKET_VERSION });
         await Files.chunk(recIO, dir, recSession(session), first, text);

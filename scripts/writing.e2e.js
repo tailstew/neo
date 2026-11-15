@@ -17,6 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
+const { verifyBook, print } = require('./verify-recording.js');
 
 // this computer is the one that recorded the frozen v1 sessions
 // (scripts/fixtures/recording-v1/), as if it had been upgraded
@@ -502,6 +503,50 @@ test('both folders put back from the trash, NEO closed: the old history plays ag
   await neo.openHistory();
   assert.ok(await js('historyShown.player.sessions().length') >= all - 1);
   await neo.closeHistory();
+});
+
+test('the history deleted on another computer while this one records: a new session from the book as it is, seals from 1 again, nothing lost', async () => {
+  const until = async (fn, what) => {
+    for (const end = Date.now() + 20000; !fn(); await tick(200)) if (Date.now() > end) throw new Error('never: ' + what);
+  };
+  if (await js('historyLevel()') !== 'timestamp') {
+    level('Record and Timestamp');
+    await waitFor('!!document.querySelector(".confirm-modal")');
+    await js('document.querySelector(".confirm-modal .m-ok").click()');
+    await waitFor('historyLevel() === "timestamp"');
+  }
+  const dev = await js('rec.device');
+  const mine = path.join(neo.LIB, neo.book, 'recording', dev);
+  const seals = () => { try { return fs.readdirSync(path.join(mine, 'seals')).filter((n) => /^\d{6}\.json$/.test(n)).sort(); } catch { return []; } };
+  await caretAt(0, 0, -1);
+  await type(' Before the delete.');
+  await js('void rec.tag("Before the delete")'); // (a named tag is sealed at once)
+  await until(() => seals().length > 0, 'a seal before the delete');
+  const was = await js('rec.session.id');
+  // another computer deletes the history, and its sync program takes the
+  // folder from under this one, which is still recording
+  // (and its copy in Backups, which goes to the trash with it)
+  fs.rmSync(path.join(neo.LIB, neo.book, 'recording'), { recursive: true, force: true });
+  fs.rmSync(path.join(neo.LIB, 'Backups', 'recordings', neo.book), { recursive: true, force: true });
+  await type(' After the delete.');
+  await flush();
+  await waitFor(`rec.on && rec.session.id !== ${JSON.stringify(was)}`, 15000);
+  await type(' And on.');
+  await flush();
+  await js('void rec.tag("After the delete")');
+  await until(() => seals().length > 0, 'a seal after the delete');
+  const seal = JSON.parse(fs.readFileSync(path.join(mine, 'seals', seals()[0]), 'utf8'));
+  assert.equal(seal.seq, 1, 'the seals start again');
+  assert.ok(!seal.prev, 'naming no seal before it');
+  assert.ok(fs.existsSync(path.join(mine, 'device.json')), 'the folder names this computer again');
+  const words = Object.values(await neo.bookNow()).join('');
+  assert.match(words, /Before the delete\. After the delete\. And on\./, 'nothing lost');
+  await js('backToShelf()');
+  await tick(1500);
+  assert.ok(!fs.readdirSync(mine).some((n) => n.startsWith(was)), 'nothing left of the session the delete cut short');
+  const v = await verifyBook(path.join(neo.LIB, neo.book));
+  assert.ok(v.ok, print(v));
+  await openIt(neo.book);
 });
 
 /* ---------- a book an earlier build recorded ---------- */

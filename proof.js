@@ -565,6 +565,10 @@ class Sealer {
   // What the seals so far say: the last head sealed for each session, the
   // stamps already under a seal, and the newest seal
   load() {
+    // the newest seal gone from disk: the history was deleted, here or on
+    // another computer that shares the book, and the seals start again
+    const was = this.state && this.state.seals[this.state.seals.length - 1];
+    if (was && !fs.existsSync(path.join(this.sealsDir, was.file))) { this.state = null; this.named = null; }
     if (this.state) return this.state;
     const st = { seals: [], sealed: new Map(), covered: new Set(), chapterN: new Map() };
     for (const f of this.files()) {

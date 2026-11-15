@@ -901,3 +901,19 @@ test('NEO’s third authority is GlobalSign’s R45 address', () => {
   assert.deepEqual(P.TSAS.map((t) => t.id), ['digicert', 'sectigo', 'globalsign']);
   assert.equal(P.TSAS[2].url, 'http://timestamp.globalsign.com/tsa/r45standard');
 });
+
+test('the history deleted, here or on another computer: the seals start again from 1, naming none before', async () => {
+  const { dir } = deviceFolder();
+  const s = sealer(dir, network());
+  const first = await s.seal();
+  assert.equal(first.seq, 1);
+  s.tick(60 * 1000);
+  // the history goes (its seals with it), and writing starts again
+  const again = deviceFolder(); // (the same sessions, written afresh elsewhere)
+  fs.rmSync(path.dirname(dir), { recursive: true, force: true });
+  fs.cpSync(path.dirname(again.dir), path.dirname(dir), { recursive: true });
+  const next = await s.seal();
+  assert.equal(next.seq, 1, 'from 1 again');
+  assert.ok(!next.prev, 'naming no seal before it');
+  assert.deepEqual(next.tokens || {}, {}, 'and no stamps of the seals that went');
+});
