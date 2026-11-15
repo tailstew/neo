@@ -24,7 +24,7 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 ## Recording, while writing
 
-- [ ] Writing feels the same with **Record Writing History** at Off and at Record Only: no lag while typing, even in a long chapter or a 100-page script.
+- [x] Writing feels the same with **Record Writing History** at Off and at Record Only: no lag while typing, even in a long chapter or a 100-page script. *(2026-11-15, 9ff4657: benchmark-history’s year, a 13,000-word chapter and a 300 KB script, at Off and at Record Only)*
 - [x] Dead keys and AltGr (é, ñ, ă, ș), and the Windows emoji panel (Win+.) replay as typed. *(passed 2026-11-14, ac28ec3)*
 - [x] An input method (Microsoft Pinyin or Japanese IME): composed text replays and the chapter matches. *(passed 2026-11-14, ac28ec3, Japanese IME in hiragana mode, こんにちは twice in Bad News: each step of the composition is recorded as `insertCompositionText` with `compose`/`composed` focus lines, a mistyped こんいちは fixed mid-composition included; `verify-recording.js` replays all 51 of the laptop's chapter writes exactly. The IME starts in alphanumeric mode (A in the taskbar), which types plain letters: switch to あ with Alt+` first)*
 - [x] Windows voice typing (Win+H) into a chapter replays and the chapter matches. *(passed 2026-11-14, ac28ec3, Bad News chapter 3: dictation arrives as composition (`insertCompositionText` between `compose` and `composed`), "full stop" as its `.`, and each spoken "backspace" as a `deleteContentBackward` after its own composition was taken back; "delete" was typed as a word, which is Windows voice typing, not NEO. `verify-recording.js`: all 56 of the laptop's chapter writes replayed exactly)*
