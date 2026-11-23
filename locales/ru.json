@@ -1215,5 +1215,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Ничто не закрепляет эту историю во времени: ни один сеанс письма не получил метку времени. Она показывает, как писалась книга, но не когда, а история, придуманная задним числом, выглядела бы так же.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Закреплено во времени: сеансов письма с меткой времени в течение суток после окончания — {n} из {all}, половина из них — в пределах {soon}.",
   "a minute": "минуты",
-  "Chapters imported": "Главы импортированы"
+  "Chapters imported": "Главы импортированы",
+  "Note (optional)": "Заметка (необязательно)",
+  "Note": "Заметка",
+  "Copied.": "Скопировано.",
+  "Read All": "Читать целиком",
+  "This tag has a note": "У этой метки есть заметка",
+  "Edit Note…": "Изменить заметку…",
+  "Add a Note…": "Добавить заметку…",
+  "Feedback · {app}": "Отзыв · {app}",
+  "Note · {app}": "Заметка · {app}",
+  "As given by {app}": "В том виде, как передал {app}",
+  "As given by {app}, {when}": "В том виде, как передал {app}, {when}",
+  "Model: {model}": "Модель: {model}",
+  "Pasted in by the writer": "Вставлено автором",
+  "About {chapter}": "О главе: {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Когда NEO это записал, глава уже изменилась."
 }

@@ -27,11 +27,14 @@
 //                                            chapter it put back)
 //   w   hash[, chapter]                      the chapter as it went to disk (chapter: when not the current one)
 //   d   chapter, cause                       the chapter left the book
-//   tag id, label, at[, made]                a name on a moment of the history (tagsOf): label
+//   tag id, label, at[, made[, note]]        a name on a moment of the history (tagsOf): label
 //                                            null for one NEO made (named when shown), false to
 //                                            remove it; at null for this moment, or [session, line,
 //                                            device, iso] for an earlier one; made: { snapshot:
-//                                            folder } or { restore: the moment restored to, as at }
+//                                            folder }, { restore: the moment restored to, as at },
+//                                            { from: { app, kind, at, … } } for a note another
+//                                            program left, or null; note: a longer text beside the
+//                                            name (an older NEO ignores it and shows the tag)
 //   o   [chapter…]                           the book's chapter order
 //   f   what                                 focus, blur, hidden, visible, idle, tab:…
 //   T   iso                                  wall-clock checkpoint
@@ -1546,7 +1549,10 @@
       order(list) { out.order = list.slice(); },
       // (only a session with tags has the field, so the stats of one without are as they were)
       tag(line, t, i) {
-        (out.tags || (out.tags = [])).push({ id: line[2], label: line[3], at: line[4] || null, made: line[5] || null, wall: wallAt === null ? null : wallAt + t - wallT, line: i + 2 });
+        const x = { id: line[2], label: line[3], at: line[4] || null, made: line[5] || null, wall: wallAt === null ? null : wallAt + t - wallT, line: i + 2 };
+        // (only a line with a note gives its tag the key, so older stats stay as they were)
+        if (typeof line[6] === 'string') x.note = line[6];
+        (out.tags || (out.tags = [])).push(x);
       },
       key(t) { out.keys++; active(t); },
       wall(ms, t) { if (Number.isFinite(ms)) { wallAt = ms; wallT = t; } }
@@ -1619,7 +1625,7 @@
   // one whose last line has label false was removed. A tag's moment (at) is
   // [session, line, device]: its own line, or the earlier moment it names.
   // Tags whose moment is in a session the history doesn't hold are left
-  // out. Oldest moment first: { id, label (null: NEO's own), made, at,
+  // out. Oldest moment first: { id, label (null: NEO's own), made, note, at,
   // when (the moment's time), day, session (index into sessions), madeAt }
   function tagsOf(sessions) {
     const where = new Map(sessions.map((s, i) => [(s.device || '') + '/' + s.id, i]));
@@ -1639,7 +1645,7 @@
       if (k === undefined || !Number.isInteger(at[1])) continue;
       const when = past ? Date.parse(x.at[3]) : x.wall;
       out.push({
-        id: x.id, label: typeof x.label === 'string' ? x.label : null, made: x.made || null, at,
+        id: x.id, label: typeof x.label === 'string' ? x.label : null, made: x.made || null, note: typeof x.note === 'string' ? x.note : null, at,
         when: Number.isFinite(when) ? when : null, day: sessions[k].day, session: k, madeAt: Number.isFinite(x.wall) ? x.wall : null
       });
     }

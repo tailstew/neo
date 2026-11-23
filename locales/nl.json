@@ -1132,5 +1132,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Niets legt deze geschiedenis in de tijd vast: geen enkele schrijfsessie kreeg een tijdstempel. Ze laat zien hoe het boek geschreven is, maar niet wanneer, en een achteraf verzonnen geschiedenis zou er hetzelfde uit kunnen zien.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "In de tijd vastgelegd: {n} van {all} schrijfsessies kregen binnen een dag na afloop een tijdstempel, de helft binnen {soon}.",
   "a minute": "een minuut",
-  "Chapters imported": "Hoofdstukken geïmporteerd"
+  "Chapters imported": "Hoofdstukken geïmporteerd",
+  "Note (optional)": "Notitie (niet verplicht)",
+  "Note": "Notitie",
+  "Copied.": "Gekopieerd.",
+  "Read All": "Helemaal lezen",
+  "This tag has a note": "Deze markering heeft een notitie",
+  "Edit Note…": "Notitie bewerken…",
+  "Add a Note…": "Notitie toevoegen…",
+  "Feedback · {app}": "Feedback · {app}",
+  "Note · {app}": "Notitie · {app}",
+  "As given by {app}": "Zoals aangeleverd door {app}",
+  "As given by {app}, {when}": "Zoals aangeleverd door {app}, {when}",
+  "Model: {model}": "Model: {model}",
+  "Pasted in by the writer": "Geplakt door de schrijver",
+  "About {chapter}": "Over {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Toen NEO dit vastlegde, was het hoofdstuk al veranderd."
 }

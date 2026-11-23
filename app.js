@@ -495,6 +495,79 @@ function askInput(title, placeholder, value = '') {
   });
 }
 
+// A tag's name and, below it, a longer note (Writing History's tags). With
+// `named` false only the note is asked. Enter in the name saves, Enter in
+// the note is a new line (⌘/Ctrl+Enter there saves), Esc cancels. Resolves
+// { name, note } (trimmed; note '' for none) or null.
+function askTagNote({ title, named = true, name = '', namePlaceholder = '', note = '' }) {
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop tag-note-modal';
+    bd.innerHTML = `
+      <div class="modal">
+        <h2 style="font-size:16px"></h2>
+        <input class="tn-name" type="text" spellcheck="false">
+        <label class="tn-label"><span></span><textarea class="tn-note" rows="6" spellcheck="false"></textarea></label>
+        <div style="text-align:right;margin-top:14px">
+          <button class="m-cancel btn-quiet" style="margin-right:10px">${escHtml(t('Cancel'))}</button>
+          <button class="m-ok btn-gold">${escHtml(t('OK'))}</button>
+        </div>
+      </div>`;
+    bd.querySelector('h2').textContent = title;
+    const nameEl = bd.querySelector('.tn-name');
+    const noteEl = bd.querySelector('.tn-note');
+    bd.querySelector('.tn-label span').textContent = named ? t('Note (optional)') : t('Note');
+    nameEl.hidden = !named;
+    nameEl.value = name;
+    nameEl.placeholder = namePlaceholder;
+    nameEl.setAttribute('aria-label', t('Name'));
+    noteEl.value = note;
+    document.body.appendChild(bd);
+    if (named) { nameEl.focus(); nameEl.select(); } else noteEl.focus();
+    const done = (val) => { bd.remove(); resolve(val); };
+    const ok = () => done({ name: nameEl.value.trim(), note: noteEl.value.trim() });
+    bd.querySelector('.m-ok').onclick = ok;
+    bd.querySelector('.m-cancel').onclick = () => done(null);
+    bd.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      // gone by the time Esc bubbles up: without this the History dialog
+      // behind it, or the editor, takes the Esc too
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(null); return; }
+      if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
+      if (e.target === nameEl || e.metaKey || e.ctrlKey) { e.preventDefault(); ok(); }
+    });
+  });
+}
+
+// A note read whole, as plain text: a tag's in Writing History. `head`
+// lines go above it, in gray.
+function showNoteModal(title, head, note) {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop tag-note-modal';
+  bd.innerHTML = `
+    <div class="modal">
+      <h2 style="font-size:16px"></h2>
+      <div class="tn-head"></div>
+      <div class="tn-read" tabindex="0"></div>
+      <div style="text-align:right;margin-top:14px">
+        <button class="tn-copy btn-quiet" style="margin-right:10px">${escHtml(t('Copy'))}</button>
+        <button class="m-ok btn-gold">${escHtml(t('Close'))}</button>
+      </div>
+    </div>`;
+  bd.querySelector('h2').textContent = title;
+  const headEl = bd.querySelector('.tn-head');
+  for (const line of head) { const p = document.createElement('p'); p.textContent = line; headEl.appendChild(p); }
+  headEl.hidden = !head.length;
+  bd.querySelector('.tn-read').textContent = note;
+  const done = () => bd.remove();
+  bd.querySelector('.m-ok').onclick = done;
+  bd.querySelector('.tn-copy').onclick = () => { navigator.clipboard.writeText(note).then(() => toast(t('Copied.')), () => {}); };
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(); });
+  bd.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(); } });
+  document.body.appendChild(bd);
+  bd.querySelector('.m-ok').focus();
+}
+
 // A yes or no that says, point by point, what will happen. With `phrase`,
 // the writer types it before the button works: for what can't be taken
 // back from inside NEO. True on yes.
@@ -3175,25 +3248,29 @@ const rec = {
   // A tag: a name on a moment of the history (Rec.tagsOf). `label` null is
   // one NEO makes for its own reasons (`made`), named when shown; `at` null
   // is this moment, else [session, line, device, iso]. It goes to disk at
-  // once. Returns null when nothing is recording, else { ref: the moment
-  // the tag is on, saved: true once it's on disk, false if it couldn't be }.
-  tag(label, at = null, made = null, id = 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)) {
+  // once. `note`, a longer text beside the name, goes in only when there is
+  // one (an older NEO ignores it). Returns null when nothing is recording,
+  // else { ref: the moment the tag is on, saved: true once it's on disk,
+  // false if it couldn't be }.
+  tag(label, at = null, made = null, id = 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), note = null) {
     if (!this.on || !this.w) return null;
     this.tick();
     this.baseUnseen();
     this.live = true;
     this.order();
     const line = ['tag', id, label, at];
-    if (made) line.push(made);
+    if (typeof note === 'string' && note) line.push(made || null, note);
+    else if (made) line.push(made);
     this.event(line);
     const c = this.flush();
     if (!c) return null;
     // the tag's own line, counted as History counts lines (the header is 1)
     const k = c.chunk.text.split('\n').findIndex((s) => s.includes('"tag"') && s.includes(JSON.stringify(id)));
-    // with proof on, a tag the writer named is sealed at once, not at the
-    // next hour, so "Sent to my agent" is timestamped minutes after it's said
+    // with proof on, a tag the writer named, or a note another program left
+    // (feedback), is sealed at once, not at the next hour, so "Sent to my
+    // agent" is timestamped minutes after it's said
     const bookId = this.bookId;
-    if (typeof label === 'string' && proofFlags().on) c.saved.then((ok) => ok && window.neo.proofSeal(bookId)).catch(() => {});
+    if ((typeof label === 'string' || (made && made.from)) && proofFlags().on) c.saved.then((ok) => ok && window.neo.proofSeal(bookId)).catch(() => {});
     return { id, ref: [this.session.id, c.chunk.first + k, this.device], saved: c.saved };
   },
 
@@ -3778,6 +3855,7 @@ async function recRestart(bookId) {
   if (!book || book.id !== bookId) return;
   for (const [chId, html] of Object.entries(chapterHTML)) rec.change(chId, html, 'open');
   await recOpenStreams(bookId);
+  takeHistoryNotes(bookId); // notes left while nothing recorded
 }
 
 // A row that scrolls sideways (History's days): a mouse drags it as a
@@ -4260,6 +4338,9 @@ async function exportWritingHistory(bookId = book && book.id) {
 // their English: every T('…') there is here (scripts/replay-page.test.js
 // checks it), and goes into the page in the writer's language
 const REPLAY_PAGE_WORDS = [
+  tk('This tag has a note'), tk('Note'),
+  tk('Feedback · {app}'), tk('Note · {app}'), tk('As given by {app}'), tk('As given by {app}, {when}'), tk('Model: {model}'),
+  tk('Pasted in by the writer'), tk('About {chapter}'), tk('The chapter had changed by the time NEO recorded this.'),
   tk('paused {n} h'), tk('paused {n} min'), tk('paused {n} s'),
   tk('it can’t be read'),
   tk('seals before it are missing'),
@@ -4805,6 +4886,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     <div class="hs-scrim"></div>
     <div class="hs-main">
       <div class="hs-undo-bar" hidden><span class="hs-undo-said"></span><button class="hs-undo-last" type="button"></button></div>
+      <div class="hs-note-bar" hidden><div class="hs-note-text"><div class="hs-note-head"></div><div class="hs-note-body"></div></div><button class="hs-note-all" type="button"></button><button class="hs-note-x" type="button">✕</button></div>
       <div class="hs-scroll"><div class="hs-paper"></div>
         <div class="hs-part" hidden><button class="hs-part-prev" type="button">‹</button><button class="hs-part-restore" type="button"></button></div>
         <div class="hs-part hs-part-r" hidden><button class="hs-part-next" type="button">›</button></div>
@@ -5196,7 +5278,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     controls.hidden = v !== 'player';
     dayline.hidden = v !== 'player';
     strip.hidden = v !== 'days';
-    if (v === 'days') badgeEl.hidden = true;
+    if (v === 'days') { badgeEl.hidden = true; hideTagNote(); }
     renderPart();
     drawWhen();
   }
@@ -6552,7 +6634,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     };
     const q = Rec.normText(find.phrase.text);
     for (const tg of tags.slice().reverse()) {
-      if (!Rec.normText(tagName(tg)).includes(q)) continue;
+      if (!Rec.normText(tagName(tg)).includes(q) && !(tg.note && Rec.normText(tg.note).includes(q))) continue;
       const b = document.createElement('button');
       b.className = 'hs-ch hs-hit';
       b.innerHTML = '<span class="hs-ch-name"></span><span class="hs-ch-when"></span>';
@@ -7023,17 +7105,21 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       return s && snapWhy(s.kind) ? t('Snapshot · {why}', { why: snapWhy(s.kind) }) : t('Snapshot');
     }
     if (Array.isArray(m.restore)) return historyRestoreTag(Date.parse(m.restore[3]));
+    if (m.from) return m.from.kind === 'feedback' ? t('Feedback · {app}', { app: String(m.from.app) }) : t('Note · {app}', { app: String(m.from.app) });
     return t('Tagged');
   }
   const tagWhen = (tg) => (tg.when !== null ? snapWhen(tg.when) : historyWhen(historyDayMs(tg.day), HISTORY_DATE));
   const tagMoment = (tg) => [...tg.at, new Date(tg.when !== null ? tg.when : historyDayMs(tg.day)).toISOString()];
 
   // A line for a tag, written now, and seen at once
-  function writeTag(label, at, made, id) {
-    const tg = rec.tag(label, at, made, id);
+  function writeTag(label, at, made, id, note = null) {
+    const tg = rec.tag(label, at, made, id, note);
     if (!tg) return null;
-    localTags.push({ id: tg.id, label, at, made: made || null, wall: Date.now(), line: tg.ref[1] });
+    const x = { id: tg.id, label, at, made: made || null, wall: Date.now(), line: tg.ref[1] };
+    if (typeof note === 'string' && note) x.note = note;
+    localTags.push(x);
     computeTags();
+    if (noteShown) { const now = tags.find((y) => y.id === noteShown); if (now && now.note) showTagNote(now); else hideTagNote(); }
     renderList();
     renderStrip();
     if (view === 'player' && h) { buildMarkers(); drawTimeline(); renderDayline(); }
@@ -7056,12 +7142,13 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     }
     const { ref, wall } = momentRef();
     tagAsking = true;
-    const name = await askInput(escHtml(t('Tag this moment')), escHtml(t('Draft 2, Sent to my agent…')));
+    const said = await askTagNote({ title: t('Tag this moment'), namePlaceholder: t('Draft 2, Sent to my agent…') });
     tagAsking = false;
     if (!bd.isConnected) return;
     bd.focus();
+    const name = said && said.name;
     if (!name) return;
-    const tg = writeTag(name, [...ref, new Date(wall).toISOString()], null);
+    const tg = writeTag(name, [...ref, new Date(wall).toISOString()], null, undefined, said.note || null);
     if (!tg) { toast(t('NEO couldn’t tag this moment.')); return; }
     toast((await tg.saved) ? t('Tagged “{name}”, {when}.', { name, when: snapWhen(wall) }) : t('NEO couldn’t save the tag yet. It tries again with the next save.'), 4000);
   }
@@ -7091,7 +7178,45 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     while (p < steps.length && steps[p] < n) p++;
     seek(p);
     renderList();
+    if (tg.note) showTagNote(tg); else hideTagNote();
   }
+
+  // A tag's note, in a bar above the sheet once the tag is picked: its
+  // first lines, and Read All for the whole of it. Always plain text.
+  const noteBar = $h('.hs-note-bar');
+  let noteShown = null; // the id of the tag whose note is in the bar
+  // above a note another program left: who it's from, as that program
+  // says (NEO doesn't vouch for it), and what it's about
+  const noteHead = (tg) => {
+    const f = tg.made && tg.made.from;
+    if (!f) return [];
+    const at = Date.parse(f.at);
+    const out = [Number.isFinite(at) ? t('As given by {app}, {when}', { app: String(f.app), when: snapWhen(at) }) : t('As given by {app}', { app: String(f.app) })];
+    if (f.model) out.push(t('Model: {model}', { model: String(f.model) }));
+    if (f.pasted) out.push(t('Pasted in by the writer'));
+    if (f.chapter && meta.chapterOrder.includes(f.chapter)) out.push(t('About {chapter}', { chapter: chapterName(f.chapter, meta) }));
+    if (f.since) out.push(t('The chapter had changed by the time NEO recorded this.'));
+    return out;
+  };
+  function showTagNote(tg) {
+    noteShown = tg.id;
+    const head = noteHead(tg);
+    $h('.hs-note-head').textContent = [tagName(tg), ...head].join(' · ');
+    $h('.hs-note-body').textContent = tg.note;
+    noteBar.hidden = false;
+  }
+  function hideTagNote() { noteShown = null; noteBar.hidden = true; }
+  $h('.hs-note-all').textContent = t('Read All');
+  $h('.hs-note-x').title = t('Close');
+  $h('.hs-note-x').setAttribute('aria-label', t('Close'));
+  $h('.hs-note-x').addEventListener('click', () => hideTagNote());
+  $h('.hs-note-all').addEventListener('click', () => {
+    const tg = tags.find((x) => x.id === noteShown);
+    if (tg && tg.note) showNoteModal(tagName(tg), noteHead(tg), tg.note);
+  });
+  // a note another program left (Draft Sleuth's feedback) is its file's:
+  // renamed or removed in History, never edited
+  const noteFromOutside = (tg) => !!(tg.made && tg.made.from);
 
   // the tags in the side pane, newest first: each a way to its moment, and
   // its right-click menu renames or removes it
@@ -7104,20 +7229,27 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     for (const tg of tags.slice().reverse()) {
       const b = item(tagName(tg), [tagWhen(tg), deviceName(tg.at[2])].filter(Boolean).join(' · '), false, () => goTag(tg));
       b.classList.add('hs-tag-item');
-      b.title = canTag() ? t('Right-click to rename or remove it') : '';
+      // a tag with a note: a mark before its name (styles.css)
+      b.classList.toggle('hs-has-note', !!tg.note);
+      b.title = [tg.note ? t('This tag has a note') : '', canTag() ? t('Right-click to rename or remove it') : ''].filter(Boolean).join('. ');
       b.addEventListener('contextmenu', async (e) => {
         e.preventDefault();
         const choice = await popMenu(e.clientX, e.clientY, [
           { label: t('Go to This Moment'), value: 'go' },
           '-',
           { label: tg.label ? t('Rename…') : t('Name…'), value: 'rename', disabled: !canTag() },
+          ...(noteFromOutside(tg) ? [] : [{ label: tg.note ? t('Edit Note…') : t('Add a Note…'), value: 'note', disabled: !canTag() }]),
           { label: t('Remove Tag'), value: 'remove', disabled: !canTag(), danger: true }
         ], { title: tagName(tg) });
         if (choice === 'go') goTag(tg);
         else if (choice === 'rename') {
           const name = await askInput(escHtml(t('Name this tag')), escHtml(tagName(tg)), tg.label || '');
           bd.focus();
-          if (name && name !== tg.label && !writeTag(name, tagMoment(tg), tg.made, tg.id)) toast(t('NEO couldn’t tag this moment.'));
+          if (name && name !== tg.label && !writeTag(name, tagMoment(tg), tg.made, tg.id, tg.note)) toast(t('NEO couldn’t tag this moment.'));
+        } else if (choice === 'note') {
+          const said = await askTagNote({ title: tagName(tg), named: false, note: tg.note || '' });
+          bd.focus();
+          if (said && said.note !== (tg.note || '') && !writeTag(tg.label, tagMoment(tg), tg.made, tg.id, said.note || null)) toast(t('NEO couldn’t tag this moment.'));
         } else if (choice === 'remove') {
           if (!writeTag(false, tagMoment(tg), tg.made, tg.id)) toast(t('NEO couldn’t tag this moment.'));
           // (a snapshot keeps its files: only its name in History goes)
@@ -7398,6 +7530,7 @@ async function openBook(bookId) {
   wordsFromDisk(); // what the book holds is not today's writing (#345)
   renderStickies();
   takeConflictCopies(bookId); // what a sync program set aside while the book was closed
+  takeHistoryNotes(bookId);   // notes another program left for Writing History
   migrateDarlingAnchors(); // sweep legacy invisible markers out of the prose
   reconcileMarks();        // re-adopt any note marks orphaned by cut/paste
   updateCounters();
@@ -17399,6 +17532,45 @@ async function takeConflictCopies(bookId) {
   }
 }
 
+// Notes another program left for Writing History (book-…/history-notes/,
+// Draft Sleuth's feedback on a chapter): each becomes a tag on this moment,
+// id 'n-' + the note's id (so two devices that both take it in make one
+// tag), named when shown (tagName), with the note's text as its note and
+// where it came from as `made.from`. Only while this book is open and
+// recording: otherwise they wait. A note is marked taken (as conflict
+// copies are, in this device's localStorage) once its tag is on disk.
+// NEO never moves, rewrites or deletes the file, and says nothing.
+let takingNotes = false;
+async function takeHistoryNotes(bookId) {
+  if (takingNotes || !window.neo.bookNotes) return; // Pocket: the desktop takes them in
+  const recording = () => rec.on && rec.bookId === bookId && book && book.id === bookId;
+  if (!recording()) return;
+  takingNotes = true;
+  try {
+    const all = await window.neo.bookNotes(bookId, conflictsTaken(bookId, 'notes'));
+    conflictsPresent(bookId, 'notes', all);
+    for (const { file, note, taken } of all) {
+      if (taken || !note) continue;
+      if (!recording()) return;
+      const from = { app: note.app, kind: note.kind, at: note.at };
+      if (note.chapter) from.chapter = note.chapter;
+      if (note.model) from.model = note.model;
+      if (note.pasted) from.pasted = true;
+      // the chapter changed since the note was made: it hashes to neither
+      // what's on the page nor what was last saved
+      const ch = note.chapter;
+      if (ch && note.hash && chapterHTML[ch] !== undefined
+        && Rec.digest(chapterHTML[ch]) !== note.hash && (savedHTML[ch] === undefined || Rec.digest(savedHTML[ch]) !== note.hash)) from.since = true;
+      const tg = rec.tag(null, null, { from }, 'n-' + note.id, note.text);
+      if (tg && (await tg.saved)) conflictTaken(bookId, 'notes', file);
+    }
+  } catch (err) {
+    window.neo.logError('history notes: ' + ((err && err.message) || err));
+  } finally {
+    takingNotes = false;
+  }
+}
+
 function scheduleChapterSave(chId) {
   maybeDailySnapshot(); // SNAPSHOTS: the first change of the day keeps the day's start
   clearTimeout(saveTimers[chId]);
@@ -18585,6 +18757,7 @@ async function refreshFromDisk() {
     }
 
     await takeConflictCopies(bookId);
+    await takeHistoryNotes(bookId);
 
     // The writer moved on to the other device since last touching this one:
     // the caret goes where they left off there. (Its chapter's words may

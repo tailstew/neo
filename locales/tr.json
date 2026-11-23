@@ -1050,5 +1050,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Hiçbir şey bu geçmişi zamanda sabitlemiyor: hiçbir yazma oturumu zaman damgası almadı. Kitabın nasıl yazıldığını gösterir ama ne zaman yazıldığını göstermez; sonradan uydurulmuş bir geçmiş de aynı görünebilirdi.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Zamanda sabitlenmiş: {all} yazma oturumunun {n} tanesi bitişinden sonraki bir gün içinde zaman damgası aldı, yarısı {soon} içinde.",
   "a minute": "bir dakika",
-  "Chapters imported": "Bölümler içe aktarıldı"
+  "Chapters imported": "Bölümler içe aktarıldı",
+  "Note (optional)": "Not (isteğe bağlı)",
+  "Note": "Not",
+  "Copied.": "Kopyalandı.",
+  "Read All": "Tümünü Oku",
+  "This tag has a note": "Bu etiketin bir notu var",
+  "Edit Note…": "Notu Düzenle…",
+  "Add a Note…": "Not Ekle…",
+  "Feedback · {app}": "Geri bildirim · {app}",
+  "Note · {app}": "Not · {app}",
+  "As given by {app}": "{app} tarafından verildiği gibi",
+  "As given by {app}, {when}": "{app} tarafından verildiği gibi, {when}",
+  "Model: {model}": "Model: {model}",
+  "Pasted in by the writer": "Yazar tarafından yapıştırıldı",
+  "About {chapter}": "Konu: {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "NEO bunu kaydettiğinde bölüm zaten değişmişti."
 }

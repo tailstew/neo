@@ -67,6 +67,11 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [x] **(2 computers)** Tag on one computer, rename the tag on the other: once both have synced, History on each shows the newer name. *(2026-11-15, a0250de: tagged on the laptop, renamed on the Chromebook, the new name once on both)*
 - [x] In German and Russian, the tag dialog and the restore toasts read right and fit. *(History's controls, footer and side pane, Tags among them, at the smallest window in German, Romanian, Russian, Ukrainian, Vietnamese and Korean: `npm run test:history`.)* *(2026-11-15, 9ff4657)*
 - [x] **(phone)** A tag made on the desktop shows on the phone, and the phone can tag a moment, which shows on the desktop. *(2026-11-13, ad0e872 / desktop 28a0c7f, OnePlus 9 by Syncthing: each way in about 30 s)*
+- [ ] **(phone)** A tag with a note, made on the desktop, reads right in Pocket: the ¶ mark in Tags (in the ☰ drawer), the note's bar above the sheet when it's picked, upright and on its side, and Read All's dialog fits the screen. Tag This Moment… on the phone asks a name and a note, and the note box takes new lines from the on-screen keyboard.
+- [ ] **(2 computers)** A note added to a tag on one computer, and the tag renamed on the other: once both have synced, each shows the newer line's name and note (a line carries both).
+- [ ] An older NEO (before notes) opening a book with a noted tag shows the tag by its name, and plays as before.
+- [ ] **(2 computers)** A note left in `history-notes/` on one computer (Draft Sleuth's Chapter Feedback…, or a file put there by hand) reaches the other by sync: it's taken in once between them, one "Feedback · Draft Sleuth" tag in History on both, and the file on both is as it was written.
+- [ ] **(phone)** A note taken in on the desktop reads right in Pocket ("As given by Draft Sleuth" above it); a note left while only the phone has the book open waits for the desktop.
 
 ## Proof of when I wrote (phase 5)
 
@@ -174,6 +179,10 @@ The timestamp services in `test:proof`, `test:export` and `test:writing` are `sc
 - A tag picked opens the player at its moment. `test:recording`
 - Rename… and Remove Tag from a tag's right-click menu, kept after History is opened again. `test:history`
 - Search finds a tag by its name, first. `test:history`, `test:recording`
+- A tag with a note: Tag This Moment… asks a name and a note (Enter in the note is a new line), the line is `['tag', id, label, at, null, note]`, Tags marks it ¶, picking it shows the note in a bar above the sheet as plain text, Read All shows the whole of it (Esc closes only that), Edit Note… changes it, a rename keeps it, search finds it by the note's words, and the days put the bar away. `test:history`
+- A tag's note in the session stats only when the line has one (stats of old sessions unchanged), through `tagsOf`, a rename and a later line, and in the exported page's `tagsIn`. `npm test`
+- A note left in `history-notes/` becomes one tag, "Feedback · Draft Sleuth", with its note and `made.from` (unknown fields left out), the file byte for byte unchanged and nothing else written there; a second look makes no second tag; History shows "As given by …", the model and the chapter above it, and offers no Edit Note…; a chapter changed since gives `since`; pasted and plain notes; broken, oversized, misnamed, wrong-version and over-long files are skipped and stay; with recording off nothing is taken, and it is once recording is on; a book opened takes in what was left while it was closed, and a file tidied away loses its mark; Duplicate leaves `history-notes/` out. `test:history-notes`
+- With Record and Timestamp, a note taken in is sealed and stamped within seconds, not at the next hour. `test:proof`
 - Ctrl+S's snapshot is a tag "Snapshot · Taken by you", which can be named and removed, the snapshot staying. `test:history`, `test:recording`
 - The writer's day (ending at 4am: 1am and 3am the day before), and a day's first change taking one start-of-day snapshot. `test:history`
 - Tag This Moment… is dimmed, saying why, with recording off and from the shelf; Ctrl+S then tags nothing. `test:history`

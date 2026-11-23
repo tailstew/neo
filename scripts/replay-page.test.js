@@ -345,6 +345,20 @@ test('the page places each timestamp where NEO’s own player does, and finds th
   assert.deepEqual(tags.map((t) => [t.id, t.label, t.at, t.day]), R.tagsOf(stats).map((t) => [t.id, t.label, t.at, t.day]));
 });
 
+test('the page’s tags carry a tag’s note, as NEO’s own do', () => {
+  const w = new R.SessionWriter({ neoRec: 1, session: 's-note', device: 'd-1', book: 'book-x', startedAt: '2026-10-08T09:00:00.000Z', prev: null });
+  const html = '<p>Rain.</p>';
+  w.push([0, 'b', 'c1', html, R.digest(html), 'baseline']);
+  w.push([100, 'tag', 't1', 'Draft 2', null, null, 'A note\nover two lines']);
+  w.push([100, 'tag', 't2', 'Plain', null]);
+  w.push([100, 'w', R.digest(html)]);
+  const sessions = [{ id: 's-note', device: 'd-1', day: '2026-10-08', text: w.chunk().text }];
+  const tags = Page.tagsIn(sessions);
+  assert.deepEqual(tags.map((x) => [x.id, x.note]), [['t1', 'A note\nover two lines'], ['t2', null]]);
+  const stats = sessions.map((x) => ({ id: x.id, device: x.device, day: x.day, stats: R.playSession(x.text, {}) }));
+  assert.deepEqual(tags.map((x) => x.note), R.tagsOf(stats).map((x) => x.note));
+});
+
 test('a phone’s sessions sealed by a computer: NEO, the page and verify-recording all count them covered', async () => {
   const { verifyBook } = require('./verify-recording.js');
   const PHONE = 'd-00000000000000aa';

@@ -1135,5 +1135,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nada fixa este histórico no tempo: nenhuma sessão de escrita recebeu carimbo de tempo. Ele mostra como o livro foi escrito, mas não quando, e um histórico inventado depois poderia parecer igual.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixado no tempo: {n} de {all} sessões de escrita receberam carimbo de tempo até um dia depois de terminar, metade delas em menos de {soon}.",
   "a minute": "um minuto",
-  "Chapters imported": "Capítulos importados"
+  "Chapters imported": "Capítulos importados",
+  "Note (optional)": "Nota (opcional)",
+  "Note": "Nota",
+  "Copied.": "Copiado.",
+  "Read All": "Ler tudo",
+  "This tag has a note": "Este marcador tem uma nota",
+  "Edit Note…": "Editar nota…",
+  "Add a Note…": "Adicionar nota…",
+  "Feedback · {app}": "Comentários · {app}",
+  "Note · {app}": "Nota · {app}",
+  "As given by {app}": "Tal como enviado por {app}",
+  "As given by {app}, {when}": "Tal como enviado por {app}, {when}",
+  "Model: {model}": "Modelo: {model}",
+  "Pasted in by the writer": "Colado por quem escreve",
+  "About {chapter}": "Sobre {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Quando o NEO registrou isto, o capítulo já tinha mudado."
 }

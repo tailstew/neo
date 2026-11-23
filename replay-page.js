@@ -485,7 +485,7 @@
       if (p.known) {
         const { walls } = Rec.lineWalls(p.header, p.lines);
         p.lines.forEach((line, i) => {
-          if (Array.isArray(line) && line[1] === 'tag') tags.push({ id: line[2], label: line[3], at: line[4] || null, made: line[5] || null, wall: Number.isFinite(walls[i]) ? walls[i] : null, line: i + 2 });
+          if (Array.isArray(line) && line[1] === 'tag') tags.push({ id: line[2], label: line[3], at: line[4] || null, made: line[5] || null, note: typeof line[6] === 'string' ? line[6] : null, wall: Number.isFinite(walls[i]) ? walls[i] : null, line: i + 2 });
         });
       }
       return { id: s.id, device: s.device, day: s.day, stats: { tags } };
@@ -725,6 +725,7 @@
       const m = tg.made || {};
       if (m.snapshot) return T('Snapshot');
       if (Array.isArray(m.restore)) return T('Before restoring to {when}', { when: fmtTime(Date.parse(m.restore[3])) });
+      if (m.from) return m.from.kind === 'feedback' ? T('Feedback · {app}', { app: String(m.from.app) }) : T('Note · {app}', { app: String(m.from.app) });
       return T('Tagged');
     };
     if (tags.length) {
@@ -732,8 +733,16 @@
       const tl = el('div', 'rx-tags');
       for (const tg of tags) {
         const b = el('button', 'rx-tagbtn');
-        b.append(el('span', 'rx-tagname', tagName(tg)), el('span', 'rx-tagwhen', tg.when !== null ? fmtTime(tg.when) : fmtDay(tg.day)));
-        b.addEventListener('click', () => openTag(tg));
+        const name = el('span', 'rx-tagname', tagName(tg));
+        // a tag with a note: a mark, and the note shown when it's picked
+        if (tg.note) {
+          b.classList.add('rx-hasnote');
+          const mark = el('span', 'rx-notemark', '¶');
+          mark.title = T('This tag has a note');
+          name.append(mark);
+        }
+        b.append(name, el('span', 'rx-tagwhen', tg.when !== null ? fmtTime(tg.when) : fmtDay(tg.day)));
+        b.addEventListener('click', () => { openTag(tg); if (tg.note) showNote(tg); });
         tl.append(b);
       }
       side.append(tl);
@@ -802,6 +811,35 @@
     evBtn.addEventListener('click', () => { setPlaying(false); evPop.showModal(); report.scrollTop = 0; });
     const ckPop = pop(doc.getElementById('rx-checks'), T('What this export checks'));
     ckBtn.addEventListener('click', () => { setPlaying(false); ckPop.showModal(); });
+    // a tag's note, read whole, as plain text (never as HTML)
+    const noteBody = el('div', 'rx-notebody');
+    const noteTitle = el('h2', 'rx-notetitle');
+    const noteHead = el('div', 'rx-notehead');
+    const noteText = el('div', 'rx-notetext');
+    noteBody.append(noteTitle, noteHead, noteText);
+    const notePop = pop(noteBody, T('Note'));
+    function showNote(tg) {
+      noteTitle.textContent = tagName(tg);
+      noteHead.replaceChildren(...noteLines(tg).map((line) => el('p', null, line)));
+      noteHead.hidden = !noteHead.childNodes.length;
+      noteText.textContent = tg.note;
+      notePop.showModal();
+      noteBody.scrollTop = 0;
+    }
+    // what's said above a note another program left: who it's from, as
+    // that program says, and what it's about; nothing for the writer's own
+    function noteLines(tg) {
+      const f = tg.made && tg.made.from;
+      if (!f) return [];
+      const at = Date.parse(f.at);
+      const out = [Number.isFinite(at) ? T('As given by {app}, {when}', { app: String(f.app), when: fmtTime(at) }) : T('As given by {app}', { app: String(f.app) })];
+      if (f.model) out.push(T('Model: {model}', { model: String(f.model) }));
+      if (f.pasted) out.push(T('Pasted in by the writer'));
+      const c = f.chapter && (data.chapters || []).find((x) => x.id === f.chapter);
+      if (c) out.push(T('About {chapter}', { chapter: c.title || T('Untitled chapter') }));
+      if (f.since) out.push(T('The chapter had changed by the time NEO recorded this.'));
+      return out;
+    }
 
     if (!book.days.length) {
       sheet.append(el('p', 'rx-empty', T('Nothing was recorded.')));

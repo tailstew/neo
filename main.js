@@ -1013,7 +1013,7 @@ ipcMain.handle('book:duplicate', (_e, bookId, title) => {
     for (const ent of fs.readdirSync(from, { withFileTypes: true })) {
       // (a write caught halfway, a spare copy, a placeholder: not the book;
       // nor the original's Writing History, which stays with it)
-      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json' || (from === src && ent.name === 'recording')) continue;
+      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json' || (from === src && (ent.name === 'recording' || ent.name === 'history-notes'))) continue;
       const a = path.join(from, ent.name);
       const b = path.join(to, ent.name);
       if (ent.isDirectory()) copyDir(a, b);
@@ -1234,6 +1234,69 @@ ipcMain.handle('book:conflicts', (_e, bookId, skip) => {
     out.push({ file, meta: meta && typeof meta === 'object' ? meta : null });
   }
   return out;
+});
+
+// Notes another program left for Writing History (Draft Sleuth's feedback):
+// book-…/history-notes/<id>.json, written once by that program and never
+// moved, rewritten or deleted by NEO, which takes each into the history as a
+// tag (takeHistoryNotes in app.js). [{ file, note }] for each, note checked
+// against the contract (docs/tag-notes-plan.md) and cut to its known fields,
+// or null for one too big, unreadable or breaking it. One named in `skip`
+// (taken in already, on this device) comes as `{ file, taken: true }`,
+// unread. A note still in iCloud is waited for, and left out if it never
+// comes down: it's looked at again next time.
+const HISTORY_NOTE_MAX = 256 * 1024;
+const HISTORY_NOTE_ID = /^[a-z0-9-]{1,64}$/;
+function historyNote(raw, id) {
+  let n;
+  try { n = JSON.parse(raw); } catch { return null; }
+  if (!n || typeof n !== 'object' || Array.isArray(n) || n.neoNote !== 1 || n.id !== id) return null;
+  const str = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  if (!str(n.at, 40) || !Number.isFinite(Date.parse(n.at)) || !str(n.app, 40) || !str(n.text, 50000)) return null;
+  const out = { id, at: new Date(Date.parse(n.at)).toISOString(), app: n.app, kind: n.kind === 'feedback' ? 'feedback' : 'note', text: n.text };
+  if (n.chapter !== undefined) {
+    if (!str(n.chapter, 80) || !/^[A-Za-z0-9_-]+$/.test(n.chapter)) return null;
+    out.chapter = n.chapter;
+    if (n.hash !== undefined) {
+      if (typeof n.hash !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(n.hash)) return null;
+      out.hash = n.hash;
+    }
+  } else if (n.hash !== undefined) return null;
+  if (n.model !== undefined) {
+    if (!str(n.model, 80)) return null;
+    out.model = n.model;
+  }
+  if (n.pasted !== undefined) {
+    if (typeof n.pasted !== 'boolean') return null;
+    if (n.pasted) out.pasted = true;
+  }
+  return out;
+}
+ipcMain.handle('book:notes', (_e, bookId, skip) => {
+  const dir = path.join(bookDir(bookId), 'history-notes');
+  const taken = skipSet(skip);
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  names = names.filter((f) => f.endsWith('.json'));
+  const out = names.filter((f) => taken.has(f)).map((file) => ({ file, taken: true }));
+  const fresh = names.filter((f) => !taken.has(f));
+  const read = (away = new Set()) => {
+    const list = out.slice();
+    for (const file of fresh) {
+      const full = path.join(dir, file);
+      if (away.has(full)) continue;
+      const id = file.slice(0, -5);
+      let note = null;
+      try {
+        const st = fs.statSync(full);
+        if (!st.isFile()) continue;
+        if (HISTORY_NOTE_ID.test(id) && st.size <= HISTORY_NOTE_MAX) note = historyNote(fs.readFileSync(full, 'utf8'), id);
+      } catch { continue; } // gone meanwhile
+      list.push({ file, note });
+    }
+    return list;
+  };
+  return afterLocal(fresh.map((f) => path.join(dir, f)), () => read(), (away) => read(away));
 });
 
 ipcMain.handle('aux:read', (_e, bookId, name) => {

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('neo', {
   deleteChapter: (bookId, chId) => ipcRenderer.invoke('chapter:delete', bookId, chId),
   chapterConflicts: (bookId, skip) => ipcRenderer.invoke('chapter:conflicts', bookId, skip),
   bookConflicts: (bookId, skip) => ipcRenderer.invoke('book:conflicts', bookId, skip),
+  bookNotes: (bookId, skip) => ipcRenderer.invoke('book:notes', bookId, skip),
 
   readAux: (bookId, name) => ipcRenderer.invoke('aux:read', bookId, name),
   writeAux: (bookId, name, html) => ipcRenderer.invoke('aux:write', bookId, name, html),

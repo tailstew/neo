@@ -1073,5 +1073,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Τίποτα δεν τοποθετεί αυτό το ιστορικό στον χρόνο: καμία συνεδρία γραφής δεν χρονοσημάνθηκε. Δείχνει πώς γράφτηκε το βιβλίο, όχι πότε, και ένα ιστορικό φτιαγμένο εκ των υστέρων θα έμοιαζε ίδιο.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Τοποθετημένο στον χρόνο: {n} από {all} συνεδρίες γραφής χρονοσημάνθηκαν μέσα σε μία ημέρα από το τέλος τους, οι μισές μέσα σε {soon}.",
   "a minute": "ένα λεπτό",
-  "Chapters imported": "Εισαγωγή κεφαλαίων"
+  "Chapters imported": "Εισαγωγή κεφαλαίων",
+  "Note (optional)": "Σημείωση (προαιρετικά)",
+  "Note": "Σημείωση",
+  "Copied.": "Αντιγράφηκε.",
+  "Read All": "Ολόκληρη",
+  "This tag has a note": "Αυτή η ετικέτα έχει σημείωση",
+  "Edit Note…": "Επεξεργασία σημείωσης…",
+  "Add a Note…": "Προσθήκη σημείωσης…",
+  "Feedback · {app}": "Σχόλια · {app}",
+  "Note · {app}": "Σημείωση · {app}",
+  "As given by {app}": "Όπως το έδωσε το {app}",
+  "As given by {app}, {when}": "Όπως το έδωσε το {app}, {when}",
+  "Model: {model}": "Μοντέλο: {model}",
+  "Pasted in by the writer": "Επικολλήθηκε από τον συγγραφέα",
+  "About {chapter}": "Για: {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Όταν το κατέγραψε το NEO, το κεφάλαιο είχε ήδη αλλάξει."
 }

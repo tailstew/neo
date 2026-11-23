@@ -183,6 +183,16 @@ test('a moment tagged with a name is sealed within a minute, not at the next hou
   await until(() => sealCount() === n + 1 && stampsOf(n + 1).length === 2, 10000, 'the tag’s seal');
 });
 
+test('a note another program left (history-notes/) is sealed within a minute once it’s taken in, not at the next hour', async () => {
+  neo.shorten[IDLE] = 60 * 60 * 1000;
+  const n = sealCount();
+  const dir = path.join(neo.LIB, neo.book, 'history-notes');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'ds-sealed.json'), JSON.stringify({ neoNote: 1, id: 'ds-sealed', at: new Date().toISOString(), app: 'Draft Sleuth', kind: 'feedback', text: 'Feedback to be timestamped.' }));
+  await js('takeHistoryNotes(book.id)');
+  await until(() => sealCount() === n + 1 && stampsOf(n + 1).length === 2, 10000, 'the note’s seal');
+});
+
 test('typing goes on while a seal waits on slow authorities', async () => {
   for (const id of ['digicert', 'sectigo', 'globalsign']) neo.tsa[id].delay = 4000;
   try {

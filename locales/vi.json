@@ -1277,5 +1277,20 @@
   "Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Dấu thời gian của bạn được ký bằng một khóa giữ trên máy tính này, và nằm cùng cuốn sách trong Lịch sử viết của nó. Bất kỳ ai cũng có thể kiểm tra chúng, không cần NEO.",
   "Your writing history": "Lịch sử viết của bạn",
   "Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in File → Record Writing History → Timestamp Services….": "Bài viết của bạn từ {when} chưa được đóng dấu thời gian: không dịch vụ dấu thời gian nào phản hồi hơn một tuần nay. Nó vẫn được ghi. Hãy kiểm tra kết nối, hoặc chọn dịch vụ khác trong Tệp → Ghi Lịch sử viết → Dịch vụ dấu thời gian….",
-  "Your writing up to {when} is waiting for the network to timestamp it.": "Bài viết của bạn đến {when} đang chờ mạng để được đóng dấu thời gian."
+  "Your writing up to {when} is waiting for the network to timestamp it.": "Bài viết của bạn đến {when} đang chờ mạng để được đóng dấu thời gian.",
+  "Note (optional)": "Ghi chú (không bắt buộc)",
+  "Note": "Ghi chú",
+  "Copied.": "Đã sao chép.",
+  "Read All": "Đọc hết",
+  "This tag has a note": "Thẻ đánh dấu này có ghi chú",
+  "Edit Note…": "Sửa ghi chú…",
+  "Add a Note…": "Thêm ghi chú…",
+  "Feedback · {app}": "Nhận xét · {app}",
+  "Note · {app}": "Ghi chú · {app}",
+  "As given by {app}": "Nguyên văn từ {app}",
+  "As given by {app}, {when}": "Nguyên văn từ {app}, {when}",
+  "Model: {model}": "Mô hình: {model}",
+  "Pasted in by the writer": "Do người viết dán vào",
+  "About {chapter}": "Về {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Khi NEO ghi lại, chương đã thay đổi rồi."
 }

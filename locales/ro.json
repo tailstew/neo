@@ -1179,5 +1179,20 @@
   "Nothing fixes this history in time: no writing session was timestamped. It shows how the book was written, but not when, and a history made up afterwards could look the same.": "Nimic nu fixează acest istoric în timp: nicio sesiune de scris nu a primit marcaj temporal. Arată cum a fost scrisă cartea, dar nu și când, iar un istoric inventat ulterior ar putea arăta la fel.",
   "Fixed in time: {n} of {all} writing sessions were timestamped within a day of ending, half of them within {soon}.": "Fixat în timp: {n} din {all} sesiuni de scris au primit marcaj temporal în ziua de după încheiere, jumătate dintre ele în mai puțin de {soon}.",
   "a minute": "un minut",
-  "Chapters imported": "Capitole importate"
+  "Chapters imported": "Capitole importate",
+  "Note (optional)": "Notă (opțională)",
+  "Note": "Notă",
+  "Copied.": "Copiat.",
+  "Read All": "Citește tot",
+  "This tag has a note": "Acest reper are o notă",
+  "Edit Note…": "Editează nota…",
+  "Add a Note…": "Adaugă o notă…",
+  "Feedback · {app}": "Părere · {app}",
+  "Note · {app}": "Notă · {app}",
+  "As given by {app}": "Așa cum a dat-o {app}",
+  "As given by {app}, {when}": "Așa cum a dat-o {app}, {when}",
+  "Model: {model}": "Model: {model}",
+  "Pasted in by the writer": "Lipită de autor",
+  "About {chapter}": "Despre {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Când NEO a înregistrat-o, capitolul se schimbase deja."
 }

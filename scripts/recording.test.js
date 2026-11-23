@@ -665,7 +665,7 @@ function tagged(device, id, start, steps) {
       html = R.applyEdit(html, at, 0, s.type);
       continue;
     }
-    w.push([s.dt || 100, 'tag', s.id, s.label === undefined ? null : s.label, s.at || null, ...(s.made ? [s.made] : [])]);
+    w.push([s.dt || 100, 'tag', s.id, s.label === undefined ? null : s.label, s.at || null, ...(s.made || s.note ? [s.made || null] : []), ...(s.note ? [s.note] : [])]);
     const c = w.chunk();
     parts.push(c);
     lines[s.id] = c.first + c.text.split('\n').findIndex((l) => l.includes('"tag"'));
@@ -712,6 +712,30 @@ test('a later line renames or removes a tag; tags on two devices go by the time 
   assert.equal(R.tagsOf(statsOf([a, c])).find((x) => x.id === 't1').label, 'First');
   // a tag on a session the history doesn't hold is left out
   assert.deepEqual(R.tagsOf(statsOf([b])).map((x) => x.id), ['t3']);
+});
+
+test('a tag can carry a note: in the stats only when it has one, kept through a rename, changed by a later line', () => {
+  const note = 'What the editor said:\n\nThe middle sags.';
+  const a = tagged('d-1', '2026-10-08T09-00-00Z-aaaa', '2026-10-08T09:00:00.000Z', [
+    { type: 'x' }, { id: 't1', label: 'Draft 2', note }, { id: 't2', label: 'Plain' }, { id: 't3', note: 'NEO’s own, with a note' }
+  ]);
+  // the line: made null before a note when there's no made
+  const line = a.text.split('\n').find((l) => l.includes('"t3"'));
+  assert.deepEqual(JSON.parse(line).slice(1), ['tag', 't3', null, null, null, 'NEO’s own, with a note']);
+  const [st] = statsOf([a]);
+  assert.equal(st.stats.tags[0].note, note);
+  assert.ok(!('note' in st.stats.tags[1]), 'a line without a note gives its tag no note key');
+  let tags = R.tagsOf(statsOf([a]));
+  assert.deepEqual(tags.map((x) => [x.id, x.label, x.note]), [['t1', 'Draft 2', note], ['t2', 'Plain', null], ['t3', null, 'NEO’s own, with a note']]);
+  // a rename carries the note along; an edited note carries the name; a note taken off goes
+  const iso = '2026-10-08T09:00:00.200Z';
+  const b = tagged('d-1', '2026-10-08T09-01-00Z-bbbb', '2026-10-08T09:01:00.000Z', [
+    { id: 't1', label: 'Draft 3', at: [a.id, a.lines.t1, 'd-1', iso], note },
+    { id: 't2', label: 'Plain', at: [a.id, a.lines.t2, 'd-1', iso], note: 'Added later' },
+    { id: 't3', at: [a.id, a.lines.t3, 'd-1', iso] }
+  ]);
+  tags = R.tagsOf(statsOf([a, b]));
+  assert.deepEqual(tags.map((x) => [x.id, x.label, x.note]), [['t1', 'Draft 3', note], ['t2', 'Plain', 'Added later'], ['t3', null, null]]);
 });
 
 test('a restore’s tag is the moment before the restore: the text it replaced', () => {

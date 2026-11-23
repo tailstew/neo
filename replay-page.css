@@ -72,6 +72,11 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-tagname { display: block; overflow: hidden; text-overflow: ellipsis; }
 .rx-tagname::before { content: ""; display: inline-block; margin-right: 6px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
 .rx-tagwhen { display: block; font-size: 11px; color: var(--soft); }
+.rx-notemark { margin-left: 6px; font-size: 11px; color: #c9a24f; }
+.rx-notetitle { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+.rx-notehead p { margin: 0 0 4px; font-size: 12px; color: var(--soft); }
+.rx-notehead { margin-bottom: 12px; }
+.rx-notetext { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 
 /* the main pane */
 .rx-player { grid-area: main; display: flex; flex-direction: column; min-height: 0; min-width: 0; position: relative; }

@@ -847,6 +847,56 @@ test('Tag This Moment… (Ctrl+S in History): a toast, newest first in Tags, a f
   await neo.closeHistory();
 });
 
+test('a tag with a note: the mark in Tags, the bar above the sheet when it’s picked, Edit Note…, and a rename keeps the note', async () => {
+  await atDayEnd(0);
+  await js('document.querySelector(".page-sheet-backdrop").focus()');
+  key('s', [neo.CTRL]);
+  // Enter in the note box is a new line, not a save
+  await waitFor('!!document.querySelector(".tag-note-modal .tn-note")');
+  await js(`(() => { const n = document.querySelector('.tag-note-modal .tn-note'); n.focus(); n.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); })()`);
+  await tick(200);
+  assert.ok(await js('!!document.querySelector(".tag-note-modal")'), 'Enter in the note leaves the dialog open');
+  const note = 'Feedback, line one.\n<b>not bold</b>\nLine three.\nLine four.\nLine five.';
+  await neo.answerTagNote('Noted', note);
+  await waitFor('/Tagged “Noted”/.test($("#hint").textContent)');
+  const tg = await lastTag();
+  assert.deepEqual([tg[3], tg[5], tg[6]], ['Noted', null, note], 'the line: made null, then the note');
+  await waitFor('!!document.querySelector(".hs-tag-item.hs-has-note")');
+  assert.deepEqual(await js('[...document.querySelectorAll(".hs-tag-item.hs-has-note .hs-ch-name")].map((x) => x.textContent)'), ['Noted']);
+  // picked: its moment, and the note in the bar as plain text
+  await js('[...document.querySelectorAll(".hs-tag-item")].find((x) => x.querySelector(".hs-ch-name").textContent === "Noted").click()');
+  await waitFor('!document.querySelector(".hs-note-bar").hidden');
+  assert.equal(await js('document.querySelector(".hs-note-body").textContent'), note);
+  assert.equal(await js('document.querySelector(".hs-note-body b")'), null, 'never read as HTML');
+  await js('document.querySelector(".hs-note-all").click()');
+  await waitFor('!!document.querySelector(".tag-note-modal .tn-read")');
+  assert.equal(await js('document.querySelector(".tag-note-modal .tn-read").textContent'), note);
+  key('Escape');
+  await waitFor('!document.querySelector(".tag-note-modal")');
+  assert.ok(await js('!!historyShown'), 'Esc closes the note, not History');
+  // Edit Note…, then a rename that keeps it
+  assert.ok(await neo.tagMenu('Noted', 'note'));
+  assert.ok((await js('window.__menu.map((i) => i.label)')).includes('Edit Note…'));
+  await neo.answerTagNote('', 'Shorter note.');
+  await waitFor('document.querySelector(".hs-note-body").textContent === "Shorter note."');
+  assert.ok(await neo.tagMenu('Noted', 'rename'));
+  await neo.answerInput('Noted again');
+  await waitFor('[...document.querySelectorAll(".hs-tag-item .hs-ch-name")].some((x) => x.textContent === "Noted again")');
+  assert.deepEqual((await lastTag()).slice(3), ['Noted again', (await lastTag())[4], null, 'Shorter note.'], 'the rename carries the note');
+  // search finds it by its note's words
+  await js('historyShown.player.runFind("shorter")');
+  await waitFor('!!document.querySelector(".hs-results .hs-ch-name")');
+  assert.equal(await js('document.querySelector(".hs-results .hs-ch-name").textContent'), 'Tag · Noted again');
+  await js('historyShown.player.runFind("")');
+  // the days put the bar away
+  await neo.closeHistory();
+  await flush();
+  await neo.openHistory();
+  assert.ok((await neo.tagItems()).includes('Noted again'), 'it sticks');
+  assert.ok(await js('document.querySelector(".hs-note-bar").hidden'));
+  await neo.closeHistory();
+});
+
 test('a moment tagged in the days is the day’s end', async () => {
   await neo.openHistory();
   await js('historyShown.player.setMode("book")');

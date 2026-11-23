@@ -296,7 +296,8 @@
           const name = (f && f.name) || f;
           const sub = rel ? rel + '/' + name : name;
           if (/\.icloud$/.test(name)) throw new Error(t('Some of this book is still downloading from iCloud. Try again in a moment'));
-          if (f && f.type === 'directory') { if (sub !== 'recording') await walk(sub); }
+          // (not the original's Writing History, nor the notes it took in)
+          if (f && f.type === 'directory') { if (sub !== 'recording' && sub !== 'history-notes') await walk(sub); }
           else if (!/\.(tmp|bak)$/.test(name) && sub !== 'book.json') files.push(sub);
         }
       };

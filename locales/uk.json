@@ -1496,5 +1496,20 @@
   "Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.": "Ваші мітки часу підписано ключем, що зберігається на цьому комп’ютері, і вони залишаються з книгою в її історії письма. Будь-хто може їх перевірити, без NEO.",
   "Your writing history": "Ваша історія письма",
   "Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in File → Record Writing History → Timestamp Services….": "Ваш текст від {when} не отримав мітки часу: жодна служба міток часу не відповідає вже понад тиждень. Запис триває. Перевірте з’єднання або виберіть інші служби у Файл → Записувати історію письма → Служби міток часу….",
-  "Your writing up to {when} is waiting for the network to timestamp it.": "Ваш текст до {when} чекає на мережу, щоб отримати мітку часу."
+  "Your writing up to {when} is waiting for the network to timestamp it.": "Ваш текст до {when} чекає на мережу, щоб отримати мітку часу.",
+  "Note (optional)": "Нотатка (необов’язково)",
+  "Note": "Нотатка",
+  "Copied.": "Скопійовано.",
+  "Read All": "Читати повністю",
+  "This tag has a note": "Ця позначка має нотатку",
+  "Edit Note…": "Змінити нотатку…",
+  "Add a Note…": "Додати нотатку…",
+  "Feedback · {app}": "Відгук · {app}",
+  "Note · {app}": "Нотатка · {app}",
+  "As given by {app}": "У тому вигляді, як передав {app}",
+  "As given by {app}, {when}": "У тому вигляді, як передав {app}, {when}",
+  "Model: {model}": "Модель: {model}",
+  "Pasted in by the writer": "Вставлено автором",
+  "About {chapter}": "Про розділ: {chapter}",
+  "The chapter had changed by the time NEO recorded this.": "Коли NEO це записав, розділ уже змінився."
 }

@@ -308,6 +308,18 @@ module.exports = function e2e(name, library = {}, opts = {}) {
     })()`);
     await tick(300);
   };
+  // the tag dialog (askTagNote) answered: the name, when it asks one, and the note
+  neo.answerTagNote = async (name, note) => {
+    await neo.waitFor(`!!document.querySelector('.tag-note-modal .tn-note')`);
+    await js(`(() => {
+      const bd = document.querySelector('.tag-note-modal');
+      const n = bd.querySelector('.tn-name');
+      if (!n.hidden) n.value = ${JSON.stringify(name || '')};
+      bd.querySelector('.tn-note').value = ${JSON.stringify(note || '')};
+      bd.querySelector('.m-ok').click();
+    })()`);
+    await neo.tick(300);
+  };
   // the recording on disk: this computer's folder in the book
   neo.recDir = () => {
     const root = path.join(LIB, neo.book, 'recording');
