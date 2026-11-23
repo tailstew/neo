@@ -11,7 +11,7 @@ const lib = path.join(tmp, 'NEO Library');
 fs.mkdirSync(lib);
 app.setPath('documents', tmp);
 app.setPath('userData', path.join(tmp, 'app'));
-fs.writeFileSync(path.join(lib, 'library.json'), JSON.stringify({ firstRunDone: true, moreFeatures: true,
+fs.writeFileSync(path.join(lib, 'library.json'), JSON.stringify({ firstRunDone: true, historyAsked: true, moreFeatures: true,
   shelves: [{ id: 's1', name: 'Test', bookIds: [] }] }));
 const loadFile = BrowserWindow.prototype.loadFile;
 BrowserWindow.prototype.loadFile = function (file, opts) { return loadFile.call(this, path.resolve(__dirname, '..', file), opts); };

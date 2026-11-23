@@ -24,7 +24,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: 'Test Writer', penNames: [], firstRunDone: true, moreFeatures: true, pageTheme: process.env.THEME || 'night',
+  authorName: 'Test Writer', penNames: [], firstRunDone: true, historyAsked: true, moreFeatures: true, pageTheme: process.env.THEME || 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 const loadFile = BrowserWindow.prototype.loadFile;

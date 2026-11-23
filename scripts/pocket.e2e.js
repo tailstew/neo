@@ -21,7 +21,7 @@ const lib = path.join(tmp, 'docs', 'NEO Library');
 fs.mkdirSync(lib, { recursive: true });
 const ALL = { cards: true, notesPages: true, poetry: true, footnotes: true, formatting: true, penNames: true, covers: true, pages: true, focus: true, readAloud: true, vim: false, exports: true };
 fs.writeFileSync(path.join(lib, 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, pageTheme: 'night', features: ALL,
+  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night', features: ALL,
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 
