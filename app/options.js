@@ -114,6 +114,12 @@ async function openOptions() {
           ${featureOn('exports') ? check('chapterTitles', !!library.exportCustomChapterTitles, t('Chapter titles only'), t('Exports show a chapter’s own title without “Chapter 7” before it.')) : ''}
         </section>
         <section>
+          <h3>${t('Writing History')}</h3>
+          ${IS_POCKET || !window.neo.proofSet ? check('historyOn', historyLevel() !== 'off', t('Record Writing History'), '') : `<label class="opt-row opt-select"><span class="opt-label">${t('Record Writing History')}</span>
+            <select data-opt="historyLevel">${[['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([v, l]) => `<option value="${v}"${historyLevel() === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+          <div class="opt-row opt-select"><span></span><button type="button" class="btn-link" data-opt-act="tsa">${t('Timestamp Services…')}</button></div>`}
+        </section>
+        <section>
           <h3>${t('Language and size')}</h3>
           ${langs && langs.list && langs.list.length > 1 ? `<label class="opt-row opt-select"><span class="opt-label">${t('Interface language')}</span>
             <select data-opt="uiLanguage">${langs.list.map((l) => `<option value="${escHtml(l.code)}"${l.code === langs.current ? ' selected' : ''}>${escHtml(l.name)}</option>`).join('')}</select></label>` : ''}
@@ -159,11 +165,19 @@ async function openOptions() {
       if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
       return;
     }
+    // one setting with the File menu's Record Writing History (setHistoryLevel);
+    // Record and Timestamp asks first, and a no leaves the level as it was
+    if (opt === 'historyLevel' || opt === 'historyOn') {
+      const got = await setHistoryLevel(opt === 'historyOn' ? (on ? 'record' : 'off') : on);
+      if (e.target.type === 'checkbox') e.target.checked = got !== 'off'; else e.target.value = got;
+      return;
+    }
     if (opt === 'chapterTitles') { library.exportCustomChapterTitles = !!on; await writeLibrary(library); return; }
     if (opt === 'spellLanguage') { await changeSpellLanguage(on); return; }
     if (opt === 'uiLanguage') { close(); window.neo.setUiLanguage(on); }
   });
   bd.addEventListener('click', async (e) => {
+    if (e.target.closest && e.target.closest('[data-opt-act="tsa"]')) { close(); openTsaServices(); return; }
     const z = e.target.closest && e.target.closest('[data-zoom]');
     if (!z) return;
     const next = nextZoomStep(library.uiZoom, Number(z.dataset.zoom));

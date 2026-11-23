@@ -44,6 +44,8 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 - [x] **(2 computers)** Answer the question on one computer: once the library has synced, the other isn't asked (an open question there goes away) and follows the answer. *(2026-11-15, 9ff4657 laptop / 19ff6ea Chromebook: started after the answer, not asked; open, the question went once the library came. A Chromebook's Syncthing sleeps while no Linux app runs, so the library can arrive just after NEO starts: then it asks at the next start)*
 - [x] **(phone)** The ⋯ sheet's **Record Writing History** is an on/off switch, and follows the desktop's choice (Record and timestamp on the desktop shows as ✓ On). A phone joining a library that has chosen isn't asked. *(2026-11-13, ad0e872, OnePlus 9, Android 14, library by Syncthing)*
 
+- [ ] Options… shows **Writing History**: on a computer a menu of Off, Record Only and Record and Timestamp, the same choice as the File menu's (change one and the other follows), with Timestamp Services… under it; on the phone a tick. Record and Timestamp asks first, and a no leaves it as it was.
+
 ## Writing History, the dialog
 
 - [x] **(2 computers)** Write in chapter 2 on one computer; on the other, with the caret in chapter 6, open History from the footer: it opens on the whole book, scrolled to chapter 6, and today's tile and the map show chapter 2's new writing. *(2026-11-23: History opened on the caret's chapter, so another computer's changes elsewhere looked lost; passed 2026-11-23, 57b7445 on the laptop, e74673b on the Chromebook. Watch This Chapter Being Written opened on the caret's chapter, not the one right-clicked; the user chose to drop it from the chapter's right-click, since History's side pane picks a chapter)*

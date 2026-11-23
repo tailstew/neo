@@ -249,6 +249,38 @@ test('Options settings: Markdown emphasis and the interface size', async () => {
   assert.equal(await js(`!!document.querySelector('.options-modal')`), false);
 });
 
+test('Options: Writing History’s level is there, and is the File menu’s', async () => {
+  const level = (v) => js(`(() => { try { const s = document.querySelector('.options-modal [data-opt="historyLevel"]'); if (!s) return 'missing'; const v = ${JSON.stringify(v || '')}; if (v) { s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); } return s.value; } catch (err) { return "ERR " + err.message; } })()`);
+  const ticked = () => { const out = []; const walk = (mm) => { for (const i of mm.items) { if (i.type === 'radio' && i.checked) out.push(i.label); if (i.submenu) walk(i.submenu); } }; walk(Menu.getApplicationMenu()); return out; };
+  await openOpts();
+  assert.equal(await level(), 'record');
+  assert.equal(await level('off'), 'off');
+  await tick(400);
+  assert.equal(onDisk().recordWriting, false);
+  assert.ok(ticked().includes('Off'), 'the menu follows');
+  await closeOpts();
+  await openOpts();
+  assert.equal(await level(), 'off');
+  assert.equal(await level('record'), 'record');
+  await tick(400);
+  assert.equal(onDisk().recordWriting, true);
+  assert.equal(onDisk().proveWriting, false);
+  assert.ok(ticked().includes('Record Only'));
+  // Record and Timestamp asks first; a no leaves it as it was
+  await level('timestamp');
+  await tick(300);
+  assert.equal(await js(`document.querySelectorAll('.modal-backdrop').length > 1`), true, 'the consent is asked');
+  await js(`(() => { const all = document.querySelectorAll('.modal-backdrop'); const top = all[all.length - 1]; const b = Array.from(top.querySelectorAll('button')).find((x) => !x.classList.contains('btn-gold')) || top.querySelector('button'); b.click(); })()`);
+  await tick(300);
+  assert.equal(await level(), 'record');
+  assert.notEqual(onDisk().proveWriting, true);
+  // Timestamp Services… opens its own window
+  await js(`document.querySelector('.options-modal [data-opt-act="tsa"]').click()`);
+  await tick(400);
+  assert.equal(await js(`!!document.querySelector('.options-modal')`), false);
+  await js(`document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove())`);
+});
+
 async function main() {
   await app.whenReady();
   let failed = 0;
