@@ -1083,5 +1083,7 @@
   "Model: {model}": "Modell: {model}",
   "Pasted in by the writer": "Az író illesztette be",
   "About {chapter}": "Erről: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Mire a NEO rögzítette, a fejezet már megváltozott."
+  "The chapter had changed by the time NEO recorded this.": "Mire a NEO rögzítette, a fejezet már megváltozott.",
+  "Changed: {chapters}": "Változott: {chapters}",
+  "{n} more": "még {n}"
 }

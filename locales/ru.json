@@ -1230,5 +1230,7 @@
   "Model: {model}": "Модель: {model}",
   "Pasted in by the writer": "Вставлено автором",
   "About {chapter}": "О главе: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Когда NEO это записал, глава уже изменилась."
+  "The chapter had changed by the time NEO recorded this.": "Когда NEO это записал, глава уже изменилась.",
+  "Changed: {chapters}": "Изменено: {chapters}",
+  "{n} more": "ещё {n}"
 }

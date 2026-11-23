@@ -1212,5 +1212,7 @@
   "Model: {model}": "Model: {model}",
   "Pasted in by the writer": "Wklejone przez piszącego",
   "About {chapter}": "Dotyczy: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Gdy NEO to zapisał, rozdział był już zmieniony."
+  "The chapter had changed by the time NEO recorded this.": "Gdy NEO to zapisał, rozdział był już zmieniony.",
+  "Changed: {chapters}": "Zmiany: {chapters}",
+  "{n} more": "i jeszcze {n}"
 }

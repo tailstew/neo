@@ -707,6 +707,7 @@
       b.addEventListener('click', () => {
         mode = id;
         markMode();
+        markChs();
         drawTiles();
         if (!h) return;
         // in the days, a day the chapter wasn't written on gives way to its last
@@ -858,7 +859,10 @@
       b.append(el('canvas'), el('span', 'rx-tiledate', fmtShort(d.day)));
       b.title = fmtDay(d.day) + (typed.size ? ' · ' + (dayTyped[i] === 1 ? T('1 character typed') : T('{n} characters typed', { n: fmtNum(dayTyped[i]) })) : '');
       b.addEventListener('click', () => openPlayer(i));
-      b.addEventListener('focus', () => { if (view === 'days') showDay(i); });
+      b.addEventListener('focus', () => { hoverDay = i; markChs(); if (view === 'days') showDay(i); });
+      b.addEventListener('blur', () => { if (hoverDay === i) { hoverDay = -1; markChs(); } });
+      b.addEventListener('pointerenter', () => { hoverDay = i; markChs(); });
+      b.addEventListener('pointerleave', () => { if (hoverDay === i) { hoverDay = -1; markChs(); } });
       strip.append(b);
     });
     // Each day's map, as NEO's tiles draw it (app.js, historyMap): where
@@ -870,6 +874,33 @@
     // are worked out here, once, a session at a time after the page has
     // opened, and each tile is drawn as its day is done.
     const dayStats = book.days.map(() => null);
+    // In the whole book, the chapters a day changed: named on its tile, and
+    // marked in the side pane while it's hovered (else the day on the sheet),
+    // a mark, not a pick, as NEO's History does
+    let hoverDay = -1;
+    function dayChs(i) {
+      const moved = (c) => c && ((c.ins && c.ins.some(Boolean)) || (c.del && c.del.some(Boolean)) || c.added || c.removed);
+      const hit = new Set();
+      for (const st of dayStats[i] || []) for (const [ch, c] of Object.entries(st.chapters || {})) if (!Rec.isStream(ch) && moved(c)) hit.add(ch);
+      const order = book.orders[i + 1] || book.lastOrder || (data.chapters || []).map((c) => c.id);
+      return [...order.filter((ch) => hit.has(ch)), ...[...hit].filter((ch) => !order.includes(ch))];
+    }
+    function markChs() {
+      const i = hoverDay >= 0 ? hoverDay : k;
+      const on = new Set(!mode && i >= 0 ? dayChs(i) : []);
+      for (const b of chList.children) b.classList.toggle('rx-chday', !!b.dataset.ch && on.has(b.dataset.ch));
+    }
+    function titleTile(i) {
+      const b = strip.children[i];
+      const chs = dayChs(i);
+      if (!b || !chs.length) return;
+      const title = (id) => { const c = (data.chapters || []).find((x) => x.id === id); return c ? c.title || T('Untitled chapter') : null; };
+      const names = chs.map(title).filter(Boolean);
+      if (!names.length) return;
+      const shown = names.slice(0, 4);
+      if (names.length > 4) shown.push(T('{n} more', { n: names.length - 4 }));
+      b.title += ' · ' + T('Changed: {chapters}', { chapters: shown.join(', ') });
+    }
     const dayLens = book.days.map(() => ({}));
     const INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
     function drawTile(i) {
@@ -961,6 +992,8 @@
         for (const [ch, c] of Object.entries(pg.doc)) if (c && !Rec.isStream(ch)) dayLens[i][ch] = c.length;
         placeTiles();
         drawTile(i);
+        titleTile(i);
+        markChs();
       }
     })();
 
@@ -984,6 +1017,7 @@
       if (h !== day) { h = day; k = i; drawn.clear(); }
       for (const b of strip.children) b.setAttribute('aria-selected', String(+b.dataset.k === k));
       markNav();
+      markChs();
       rebuild(false);
       return true;
     }

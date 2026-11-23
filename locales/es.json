@@ -1426,5 +1426,7 @@
   "Model: {model}": "Modelo: {model}",
   "Pasted in by the writer": "Pegado por quien escribe",
   "About {chapter}": "Sobre {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Cuando NEO lo registró, el capítulo ya había cambiado."
+  "The chapter had changed by the time NEO recorded this.": "Cuando NEO lo registró, el capítulo ya había cambiado.",
+  "Changed: {chapters}": "Cambios en: {chapters}",
+  "{n} more": "{n} más"
 }

@@ -1065,5 +1065,7 @@
   "Model: {model}": "Model: {model}",
   "Pasted in by the writer": "Yazar tarafından yapıştırıldı",
   "About {chapter}": "Konu: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "NEO bunu kaydettiğinde bölüm zaten değişmişti."
+  "The chapter had changed by the time NEO recorded this.": "NEO bunu kaydettiğinde bölüm zaten değişmişti.",
+  "Changed: {chapters}": "Değişen: {chapters}",
+  "{n} more": "{n} tane daha"
 }

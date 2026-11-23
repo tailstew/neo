@@ -147,6 +147,40 @@ test('File → Writing History… with a book open opens it, on the days', async
   await neo.closeHistory();
 });
 
+test('the whole book: a tile names the chapters its day changed, and hovering it marks them in the side pane, not picked', async () => {
+  await neo.openHistory();
+  await js('historyShown.player.setMode("book")');
+  await neo.daysReady();
+  const marked = () => js('[...document.querySelectorAll(".hs-list .hs-ch.hs-ch-day .hs-ch-name")].map((x) => x.textContent)');
+  const picked = () => js('[...document.querySelectorAll(".hs-list .hs-ch[aria-selected=true] .hs-ch-name")].map((x) => x.textContent)');
+  // the side pane lists the chapters in the book at the moment shown, so a
+  // chapter the day deleted or joined is named on the tile but not marked
+  const hovered = {};
+  for (const day of [DAYS[0], DAYS[2]]) {
+    const title = await js(`document.querySelector('.hs-strip .hs-tile[data-day="${day}"]').title`);
+    const m = title.match(/Changed: ([^·]+)/);
+    assert.ok(m, 'the tile names chapters: ' + title);
+    const names = m[1].trim().split(', ');
+    await js(`document.querySelector('.hs-strip .hs-tile[data-day="${day}"]').dispatchEvent(new PointerEvent('pointerenter'))`);
+    const on = hovered[day] = await marked();
+    assert.ok(on.length > 0, 'marked while hovered');
+    if (!names.some((x) => / more$/.test(x))) for (const x of on) assert.ok(names.includes(x), x + ' is named on the tile: ' + title);
+    assert.deepEqual(await picked(), ['The whole book'], 'a mark, not a pick');
+  }
+  await js(`document.querySelector('.hs-strip .hs-tile[data-day="${DAYS[2]}"]').dispatchEvent(new PointerEvent('pointerleave'))`);
+  await js(`document.querySelector('.hs-strip .hs-tile[data-day="${DAYS[0]}"]').dispatchEvent(new PointerEvent('pointerenter'))`);
+  assert.deepEqual(await marked(), hovered[DAYS[0]]);
+  await js(`document.querySelector('.hs-strip .hs-tile[data-day="${DAYS[0]}"]').dispatchEvent(new PointerEvent('pointerleave'))`);
+  assert.deepEqual(await marked(), hovered[DAYS[2]], 'back to the day shown');
+  // a chapter picked: no marks, and its tiles don't name chapters
+  await js(`historyShown.player.setMode(${JSON.stringify(ID.Three)})`);
+  await neo.daysReady();
+  assert.deepEqual(await marked(), []);
+  assert.ok(!/Changed:/.test(await js('document.querySelector(".hs-strip .hs-tile").title')));
+  await js('historyShown.player.setMode("book")');
+  await neo.closeHistory();
+});
+
 test('the days: ← and → show each day as it ended, Enter opens one paused, Space plays, Esc goes back, then closes', async () => {
   await neo.openHistory();
   await js('historyShown.player.setMode("book")');

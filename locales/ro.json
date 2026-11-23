@@ -1194,5 +1194,7 @@
   "Model: {model}": "Model: {model}",
   "Pasted in by the writer": "Lipită de autor",
   "About {chapter}": "Despre {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Când NEO a înregistrat-o, capitolul se schimbase deja."
+  "The chapter had changed by the time NEO recorded this.": "Când NEO a înregistrat-o, capitolul se schimbase deja.",
+  "Changed: {chapters}": "Modificat: {chapters}",
+  "{n} more": "încă {n}"
 }

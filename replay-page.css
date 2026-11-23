@@ -68,6 +68,8 @@ h3 { font-size: 16px; margin: 18px 0 6px; }
 .rx-chbtn, .rx-tagbtn { display: block; width: 100%; text-align: left; background: none; border: none; border-radius: 4px; padding: 5px 10px; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rx-chbtn:hover, .rx-tagbtn:hover { background: rgba(128,128,128,0.1); }
 .rx-chbtn[aria-selected="true"] { background: rgba(128,128,128,0.14); color: var(--accent); }
+/* a chapter the day hovered (or on the sheet) changed, in the whole book: the map's gold, at its edge, not a pick */
+.rx-chday { box-shadow: inset 3px 0 0 #c9a86a; }
 .rx-sidehead { margin: 16px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--soft); }
 .rx-tagname { display: block; overflow: hidden; text-overflow: ellipsis; }
 .rx-tagname::before { content: ""; display: inline-block; margin-right: 6px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }

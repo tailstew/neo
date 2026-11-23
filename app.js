@@ -4338,7 +4338,7 @@ async function exportWritingHistory(bookId = book && book.id) {
 // their English: every T('…') there is here (scripts/replay-page.test.js
 // checks it), and goes into the page in the writer's language
 const REPLAY_PAGE_WORDS = [
-  tk('This tag has a note'), tk('Note'),
+  tk('This tag has a note'), tk('Note'), tk('Changed: {chapters}'), tk('{n} more'),
   tk('Feedback · {app}'), tk('Note · {app}'), tk('As given by {app}'), tk('As given by {app}, {when}'), tk('Model: {model}'),
   tk('Pasted in by the writer'), tk('About {chapter}'), tk('The chapter had changed by the time NEO recorded this.'),
   tk('paused {n} h'), tk('paused {n} min'), tk('paused {n} s'),
@@ -5320,6 +5320,34 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     historyMap(g, W, parts, whole ? 8 : 6);
   }
 
+  // the chapters a day changed the text of, in the book's order at its end
+  function dayChapters(d) {
+    const moved = (c) => c && ((c.ins && c.ins.some(Boolean)) || (c.del && c.del.some(Boolean)) || c.added || c.removed);
+    const hit = new Set();
+    for (const x of d.list) for (const [ch, c] of Object.entries(x.stats.chapters || {})) if (!Rec.isStream(ch) && moved(c)) hit.add(ch);
+    const order = columns(d.to - 1);
+    return [...order.filter((ch) => hit.has(ch)), ...[...hit].filter((ch) => !order.includes(ch))];
+  }
+
+  // In the whole book, a day's tile names the chapters it changed, and
+  // hovering it marks them in the side pane (a mark, not a pick)
+  function dayChapterNames(d) {
+    const chs = dayChapters(d);
+    if (!chs.length) return '';
+    const order = columns(d.to - 1);
+    const names = chs.slice(0, 4).map((ch) => listLabel(ch, order));
+    if (chs.length > 4) names.push(t('{n} more', { n: chs.length - 4 }));
+    return t('Changed: {chapters}', { chapters: names.join(', ') });
+  }
+
+  // the chapters marked in the side pane: the day hovered, else the day on the sheet
+  let hoverDay = null;
+  function markChapters() {
+    const d = hoverDay || S.days[curDay()];
+    const on = new Set(mode === 'book' && d ? dayChapters(d) : []);
+    for (const b of list.querySelectorAll('.hs-ch[data-ch]')) b.classList.toggle('hs-ch-day', on.has(b.dataset.ch));
+  }
+
   // a day's tile: its date, and its map
   function dayTile(d, onPick, label = '') {
     const b = document.createElement('button');
@@ -5327,12 +5355,18 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     b.dataset.day = d.day;
     b.setAttribute('role', 'option');
     const marked = (tagsByDay.get(d.day) || []).map(tagName);
-    b.title = (label ? label + ' · ' : '') + describeDay(d) + (marked.length ? ' · ' + t('Tags') + ': ' + marked.join(', ') : '');
+    const where = mode === 'book' ? dayChapterNames(d) : '';
+    b.title = (label ? label + ' · ' : '') + describeDay(d) + (where ? ' · ' + where : '') + (marked.length ? ' · ' + t('Tags') + ': ' + marked.join(', ') : '');
     if (marked.length) b.classList.add('hs-tagged');
     b.innerHTML = '<canvas></canvas><span></span>';
     b.lastChild.textContent = historyDayLabel(d.day);
     drawTile(b.firstChild, d);
     b.addEventListener('click', onPick);
+    const hover = (x) => { hoverDay = x; markChapters(); };
+    b.addEventListener('pointerenter', () => hover(d));
+    b.addEventListener('pointerleave', () => { if (hoverDay === d) hover(null); });
+    b.addEventListener('focus', () => hover(d));
+    b.addEventListener('blur', () => { if (hoverDay === d) hover(null); });
     return b;
   }
 
@@ -5383,6 +5417,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (b.getAttribute('aria-selected') !== String(on)) b.setAttribute('aria-selected', String(on));
       if (on) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+    markChapters();
   }
 
   function drawWhen() {
@@ -7328,8 +7363,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     for (const ch of absent ? [...ids, mode] : ids) {
       const c = seen.get(ch);
       const b = item(listLabel(ch, order), c ? span(c) : t('Not recorded yet'), mode === ch, c ? () => setMode(ch) : null);
+      b.dataset.ch = ch;
       if (absent && ch === mode) b.classList.add('hs-ch-absent');
     }
+    markChapters();
     renderTagList();
   }
 

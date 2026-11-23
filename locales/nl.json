@@ -1147,5 +1147,7 @@
   "Model: {model}": "Model: {model}",
   "Pasted in by the writer": "Geplakt door de schrijver",
   "About {chapter}": "Over {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Toen NEO dit vastlegde, was het hoofdstuk al veranderd."
+  "The chapter had changed by the time NEO recorded this.": "Toen NEO dit vastlegde, was het hoofdstuk al veranderd.",
+  "Changed: {chapters}": "Gewijzigd: {chapters}",
+  "{n} more": "nog {n}"
 }

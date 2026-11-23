@@ -1292,5 +1292,7 @@
   "Model: {model}": "Mô hình: {model}",
   "Pasted in by the writer": "Do người viết dán vào",
   "About {chapter}": "Về {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Khi NEO ghi lại, chương đã thay đổi rồi."
+  "The chapter had changed by the time NEO recorded this.": "Khi NEO ghi lại, chương đã thay đổi rồi.",
+  "Changed: {chapters}": "Đã thay đổi: {chapters}",
+  "{n} more": "thêm {n}"
 }

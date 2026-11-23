@@ -515,6 +515,20 @@ test('the whole book: the save dialog in the last export folder, named “<title
     assert.equal(await page.js('getComputedStyle(document.querySelector(".rx-menu")).display'), 'none', 'no ☰ beside the side pane');
     assert.ok(s.headerRight, 'the buttons at the right of the header');
     assert.ok(s.controlsAboveStrip, 'the controls above the tiles');
+    // in the whole book a tile names the chapters its day changed, and
+    // hovering it marks them on the left (a mark, not a pick)
+    for (let i = 0; i < 100 && !await page.js('[...document.querySelectorAll(".rx-tile")].some((b) => /Changed: /.test(b.title))'); i++) await tick(100);
+    const hov = await page.js(`(() => {
+      const b = [...document.querySelectorAll('.rx-tile')].find((x) => /Changed: /.test(x.title));
+      b.dispatchEvent(new PointerEvent('pointerenter'));
+      const on = [...document.querySelectorAll('.rx-chbtn.rx-chday')].map((x) => x.textContent);
+      const picked = [...document.querySelectorAll('.rx-chbtn[aria-selected=true]')].map((x) => x.textContent);
+      b.dispatchEvent(new PointerEvent('pointerleave'));
+      return { on, picked, names: b.title.match(/Changed: ([^·]+)/)[1].trim().split(', ') };
+    })()`);
+    assert.ok(hov.on.length > 0, 'marked while hovered');
+    if (!hov.names.some((x) => / more$/.test(x))) for (const x of hov.on) assert.ok(hov.names.includes(x), x + ' named on the tile: ' + hov.names);
+    assert.deepEqual(hov.picked, ['The whole book']);
     // the controls stay on screen at a low window
     page.win.setSize(1100, 520);
     await tick(400);

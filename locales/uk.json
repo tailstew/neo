@@ -1511,5 +1511,7 @@
   "Model: {model}": "Модель: {model}",
   "Pasted in by the writer": "Вставлено автором",
   "About {chapter}": "Про розділ: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Коли NEO це записав, розділ уже змінився."
+  "The chapter had changed by the time NEO recorded this.": "Коли NEO це записав, розділ уже змінився.",
+  "Changed: {chapters}": "Змінено: {chapters}",
+  "{n} more": "ще {n}"
 }

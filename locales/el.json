@@ -1088,5 +1088,7 @@
   "Model: {model}": "Μοντέλο: {model}",
   "Pasted in by the writer": "Επικολλήθηκε από τον συγγραφέα",
   "About {chapter}": "Για: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "Όταν το κατέγραψε το NEO, το κεφάλαιο είχε ήδη αλλάξει."
+  "The chapter had changed by the time NEO recorded this.": "Όταν το κατέγραψε το NEO, το κεφάλαιο είχε ήδη αλλάξει.",
+  "Changed: {chapters}": "Αλλαγές: {chapters}",
+  "{n} more": "{n} ακόμη"
 }

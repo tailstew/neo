@@ -1291,5 +1291,7 @@
   "Model: {model}": "모델: {model}",
   "Pasted in by the writer": "작가가 붙여 넣음",
   "About {chapter}": "대상: {chapter}",
-  "The chapter had changed by the time NEO recorded this.": "NEO가 기록할 때는 이미 장이 바뀌어 있었습니다."
+  "The chapter had changed by the time NEO recorded this.": "NEO가 기록할 때는 이미 장이 바뀌어 있었습니다.",
+  "Changed: {chapters}": "바뀐 곳: {chapters}",
+  "{n} more": "그 밖에 {n}개"
 }
