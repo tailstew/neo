@@ -942,7 +942,7 @@ test('caches an earlier NEO made are there before History first opens', async ()
 });
 
 // (opened mid-sentence: nothing saved or flushed first, and the words just typed are there)
-test('History in the footer opens on the chapter as it is, over its days; the last session plays back to the book as it is', async () => {
+test('History in the footer opens on the whole book as it is, over its days; the last session plays back to the book as it is', async () => {
   await caretAt(0, 0, -1);
   await type(' Watched.');
   const chId = (await chapterIds())[0];
@@ -953,8 +953,8 @@ test('History in the footer opens on the chapter as it is, over its days; the la
   assert.ok(o.sessions >= 5, JSON.stringify(o));
   assert.equal(o.open, 1, 'the session in progress is in it');
   assert.equal(o.day, o.days - 1, 'it opens on the latest day');
-  assert.equal(o.mode, chId, 'on the chapter the caret was in');
-  assert.deepEqual(await playerHTML(), { [chId]: await js(`chapterHTML[${JSON.stringify(chId)}]`) }, 'the chapter as it is now');
+  assert.equal(o.mode, 'book', 'on the whole book, not only the chapter the caret was in');
+  assert.equal((await playerHTML())[chId], await js(`chapterHTML[${JSON.stringify(chId)}]`), 'the chapter as it is now');
   assert.ok(await js('document.querySelectorAll(".hs-strip .hs-tile").length >= 1'), 'a tile for each day');
   assert.ok(await js('document.querySelector(".hs-controls").hidden && document.querySelector(".hs-dayline").hidden'), 'no player’s controls on the days');
   await playLatest();
@@ -1159,8 +1159,8 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await playerReady({ drawn: false });
   await tick(300);
   assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'a day picked doesn’t play');
-  // just before it was deleted, it's listed (in the whole book: History
-  // opens on the caret's chapter, whose steps hold no other's delete)
+  // just before it was deleted, it's listed (in the whole book: a
+  // chapter's steps hold no other's delete)
   await js('historyShown.player.setMode("book")');
   await playerReady({ drawn: false });
   const deleteAt = await js(`(() => {

@@ -4518,8 +4518,9 @@ function evidenceHtml(ev, cover, { scope = null, title = '', name = (ch) => ch, 
 // { weight, bins: [{ ins, del }] } (a session's changes along a chapter),
 // laid out as a grid read like a page, `side` cells a row (more if there are
 // more parts than cells), each part a run of cells as long as its share of
-// the weights. A line in `edge` marks where each part after the first begins.
-function historyMap(g, W, parts, side, edge) {
+// the weights. Nothing marks where a part begins: the map shows where the
+// text changed, not how the book divides.
+function historyMap(g, W, parts, side) {
   if (!parts.length) return;
   side = Math.max(side, Math.ceil(Math.sqrt(parts.length)));
   const n = side * side;
@@ -4530,11 +4531,9 @@ function historyMap(g, W, parts, side, edge) {
   while (over < 0) { cells[cells.indexOf(Math.max(...cells))]++; over++; }
   const ins = new Float32Array(n);
   const del = new Float32Array(n);
-  const starts = [];
   let at = 0;
   parts.forEach((p, i) => {
     const k = cells[i];
-    starts.push(at);
     for (const c of p.bins) {
       const nb = c.ins.length;
       for (let b = 0; b < nb; b++) {
@@ -4556,10 +4555,6 @@ function historyMap(g, W, parts, side, edge) {
     g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : ins[q] && del[q] ? HISTORY_INK.edited : ins[q] ? HISTORY_INK.added : HISTORY_INK.deleted;
     g.fillRect((q % side) * cs, Math.floor(q / side) * cs, Math.max(0.5, cs - gap), cs - gap);
   }
-  // where each chapter after the first begins
-  g.globalAlpha = 0.85;
-  g.fillStyle = edge;
-  for (const q of starts.slice(1)) if (q < n) g.fillRect((q % side) * cs - (q % side ? 1 : 0), Math.floor(q / side) * cs, 1.5, cs - gap);
   g.globalAlpha = 1;
 }
 
@@ -4944,8 +4939,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     untouched: []    // chapters in the book the recording never saw
   };
   let view = 'days';      // or 'player'
-  // the chapter the writer is in, unless the history never saw it
-  let mode = chId || (here && ((caret && caret.chId) || currentChapterId)) || 'book';
+  // the whole book, scrolled to the chapter the writer is in, so a change
+  // elsewhere (another device's, in another chapter) is never out of sight;
+  // a chapter only when asked for (Watch This Chapter Being Written)
+  let mode = chId || 'book';
   let settled = !!chId;   // whether the history has had its say on the mode
   let dsel = -1;          // the day the days show, an index into S.days
   let following = true;   // the days stay on the latest as the cache fills in
@@ -5221,7 +5218,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   // A day's map: where it changed the text, as a grid read like a page,
   // green where words came, red where they went, gold where both. In the
   // whole book each chapter has a run of cells as long as its share of the
-  // book's words, in the book's order, and a line marks where each begins.
+  // book's words, in the book's order, unmarked: 64 cells of the book.
   const HISTORY_TILE = 46;
   function drawTile(cv, d) {
     const dpr = window.devicePixelRatio || 1;
@@ -5238,7 +5235,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       weight: words[ch] > 0 ? words[ch] : usual,
       bins: d.list.map((x) => x.stats.chapters[ch]).filter((c) => c && c.ins)
     }));
-    historyMap(g, W, parts, whole ? 8 : 6, getComputedStyle(cv).color);
+    historyMap(g, W, parts, whole ? 8 : 6);
   }
 
   // a day's tile: its date, and its map
