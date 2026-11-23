@@ -139,7 +139,7 @@ Each of these changes chapters in code that came in with the rebase onto 1.5.0. 
 - [x] **(phone)** Kill the app mid-session (`adb shell am force-stop com.hughhowey.neopocket`), reopen the book: the session is closed as crashed (only once the book opens: reopening the app alone leaves it open), the words it hadn't recorded come in as a `catch-up`, and the day plays through, those words all at once. *(2026-11-13, 9045ce8, OnePlus 9, Android 14)*
 - [x] **(phone)** A session written on the phone plays on the desktop, named "iPhone" / "Android", and the desktop's on the phone. *(2026-11-13, 69bf432: Android, on the laptop; the laptop's session, with its tag, on the phone)*
 - [x] **(phone)** Search on the phone over a book with a long history finishes, and shows progress meanwhile. A finding picked shows its phrase; upright and on its side History's side pane and footer buttons are in the ☰ drawer, and the text fills the sheet; a restore can be undone from its toast, or from History while the chapter is as it left it. *(2026-11-13, a601c42, OnePlus 9, Android 14: a copy of Jagged Future; "the door" in about a second; "zebra crossing" finds nothing)*
-- [ ] **(phone)** Delete a phone session from the book on the desktop after a desktop has mirrored it (7 days on): the phone still plays it from the mirror.
+- [x] **(phone)** Delete a phone session from the book on the desktop after a desktop has mirrored it (7 days on): the phone still plays it from the mirror. *(passed 2026-11-23, d471f20's APK: Bad News' phone session of 13 Nov 21:28 deleted from the book on the laptop; the phone played its typing from the mirror; the file put back afterwards)*
 
 ## Checked by the e2e tests
 
