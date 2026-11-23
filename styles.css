@@ -1985,7 +1985,10 @@ body.bright .pop-menu button:disabled { color: #8a8a8a; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+    /* none, not 0.01ms: a duration on every element made inherited changes
+       (visibility) transition too, so a field shown and focused at once, as
+       Find in History's drawer, was still hidden and refused the focus */
+    transition: none !important; scroll-behavior: auto !important;
   }
   .book:hover, .new-book:hover { transform: none; }
 }

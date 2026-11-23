@@ -5441,7 +5441,10 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
       if (j > 0) seek(j - 1);
     }
     if (playIt) setPlaying(true);
-    bd.focus();
+    // the dialog's keys work again, unless the writer has gone on to type in
+    // its search field meanwhile (a day loads after the pick that asked for it)
+    const typing = document.activeElement;
+    if (!(typing && bd.contains(typing) && typing.matches('input, textarea'))) bd.focus();
   }
 
   function buildView() {

@@ -374,7 +374,10 @@ test('Timestamp Services… is under a line after Record and Timestamp, and from
 
 test('↑ and ↓ show only on the row pointed at or with focus; GlobalSign moved first stays first and stamps first', async () => {
   await tsa.open();
-  const shown = (id) => js(`getComputedStyle(document.querySelector('.tsa-list li[data-id="${id}"] .tsa-up')).opacity`);
+  // (read once the fade has had its frame: with the system's Reduce motion on,
+  // styles.css makes every transition 0.01 ms rather than none, so a read at
+  // once still sees where it started)
+  const shown = async (id) => { await tick(50); return js(`getComputedStyle(document.querySelector('.tsa-list li[data-id="${id}"] .tsa-up')).opacity`); };
   await js('document.activeElement.blur()');
   assert.equal(await shown('globalsign'), '0');
   await js(`document.querySelector('.tsa-list li[data-id="globalsign"] input').focus()`);
