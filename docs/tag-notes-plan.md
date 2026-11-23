@@ -55,7 +55,7 @@ Draft Sleuth writes, NEO reads. Neither changes the other's files.
 | `at` | ISO time the feedback was received (or, when pasted, when it was added). |
 | `app` | The program's name, at most 40 characters. Shown as given, never trusted. |
 | `kind` | `"feedback"` or `"note"`. Anything else is read as `"note"`. |
-| `text` | Plain text, at most 50,000 characters. Draft Sleuth puts the prompt it sent, then the reply. |
+| `text` | Plain text, at most 50,000 characters. Draft Sleuth puts the reply, then the prompt it sent. |
 | `chapter` | Optional. The chapter the note is about. |
 | `hash` | Optional, with `chapter`. The hash of the chapter file exactly as read: SHA-256 of its UTF-8 bytes, the first 16 bytes, base64url. In Node: `crypto.createHash('sha256').update(html, 'utf8').digest().subarray(0, 16).toString('base64url')`. This equals `Rec.digest(html)` in NEO's `recording.js:263`, the hash in each `w` line. |
 | `model` | Optional, at most 80 characters. |
@@ -171,7 +171,7 @@ New `lib/historynote.js`: builds the note of the contract above and the chapter 
 
 - Only for a NEO library source. Add a `writeHistoryNote(bookId, note)` to `lib/library.js` and `lib/sources/neo.js`: make `history-notes/` if it's missing, write `.tmp`, rename. The existing `writeOwn` writes only in the book's folder itself and makes no folder. A Word document's source has no such method, and the window shows the feedback without recording it.
 - Read the chapter file once, and use that same string for the hash and for the text sent, so the hash is of exactly what Claude saw.
-- `text` in the note: a line naming the prompt version, the prompt's own text, a blank line, then the reply.
+- `text` in the note: the reply, a blank line, then a line naming the prompt version and the prompt's own text.
 - Written once the reply is complete. A call that failed or was cancelled writes nothing.
 - The dialog shows, before sending, the line "This feedback will be kept in NEO's Writing History", with a box to untick, remembered in settings. Proofreading never shows it and never writes.
 - **Feedback from elsewhere:** a second way in, "Add feedback you got elsewhere…", where the writer pastes what they asked and what came back. Same file, `pasted: true`, no `model` unless they give one, and the hash of the chapter as it is now.
