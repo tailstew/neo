@@ -4868,9 +4868,8 @@ const HISTORY_DRAWER = '(max-width: 720px), (max-height: 500px)';
 // named). It opens on the days: the chapter the writer is in (or the
 // book) as it is now, with a tile for each day it was written on below.
 // A day picked opens the player on it, with its typing timeline, play and
-// speed. Nothing plays until the writer presses Play. With `firstDay`,
-// straight into the player at the first day the chapter was written.
-async function openHistory({ bookId = book && book.id, chId = null, firstDay = false, snapshot = null } = {}) {
+// speed. Nothing plays until the writer presses Play.
+async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
   if (!bookId || !historyCanOpen() || historyShown) return;
   const here = !!(book && book.id === bookId && !$('#editor-view').hidden);
   const caret = here ? captureCaret() : null;
@@ -5023,9 +5022,9 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
   let view = 'days';      // or 'player'
   // the whole book, scrolled to the chapter the writer is in, so a change
   // elsewhere (another device's, in another chapter) is never out of sight;
-  // a chapter only when asked for (Watch This Chapter Being Written)
-  let mode = chId || 'book';
-  let settled = !!chId;   // whether the history has had its say on the mode
+  // a chapter only when picked in the side pane
+  let mode = 'book';
+  let settled = false;    // whether the history has had its say on the mode
   let dsel = -1;          // the day the days show, an index into S.days
   let following = true;   // the days stay on the latest as the cache fills in
 
@@ -5088,7 +5087,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     S.building = false;
     S.open = m.open || [];
     if (m.error) S.error = m.error;
-    if (firstDay && chId) { firstDay = false; reindex({ show: false }); startWatching(); } else if (snapshot) {
+    if (snapshot) {
       const s = snapshot;
       snapshot = null;
       reindex({ show: false });
@@ -7462,12 +7461,6 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
 
   /* ---------- the recording itself ---------- */
 
-  // Watch This Chapter Being Written: the first day it was written, ready to play
-  function startWatching() {
-    const i = S.sessions.findIndex((s) => s.stats.chapters[chId]);
-    if (i >= 0) openPlayer(i, { ch: chId }); else showDays(dsel);
-  }
-
   // Every device's sessions, as one history: the devices that wrote it are
   // named where a day or a session is
   async function load() {
@@ -7816,7 +7809,6 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   // any piece of the story can leave on its own — to a beta reader, an
   // editor, a magazine — in any format the book can
   if (STORY_KINDS.includes(kind) && words > 0) items.push('-', { label: t('Export Chapter…'), value: 'export' });
-  if (historyCanOpen()) items.push('-', { label: t('Watch This Chapter Being Written'), value: 'history' });
   // one switch for the whole book, where the parts are: count chapters
   // from 1 again after each part
   if (kind === 'part') {
@@ -7825,10 +7817,6 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   items.push('-', { label: t('Delete'), value: 'delete', danger: true });
   const choice = await popMenu(x, y, items, { title: chapterName(chId), from: from || document.querySelector(`.nav-item[data-id="${chId}"] .n-row`) });
   if (!choice || choice === kind) return null;
-  if (choice === 'history') {
-    openHistory({ chId, firstDay: true });
-    return null;
-  }
   if (choice === 'export') {
     const formats = [
       ...(moreOn() ? [{ label: t('Text (.txt)'), value: 'txt' }, { label: t('Markdown (.md)'), value: 'md' }, { label: t('HTML (.html)'), value: 'html' }] : []),

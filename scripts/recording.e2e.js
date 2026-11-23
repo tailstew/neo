@@ -1144,7 +1144,7 @@ test('one chapter on its own; Esc goes back to the days, then puts the caret bac
   assert.equal(await js(`document.activeElement.closest('.chapter') && document.activeElement.closest('.chapter').dataset.id`), chId);
 });
 
-test('a deleted chapter is listed, and a chapter’s menu opens it at the start, paused', async () => {
+test('a deleted chapter is listed, and a chapter’s menu has no way into History', async () => {
   await js('openHistory()');
   await daysReady();
   // the side pane lists the chapters at the moment shown: at the day's end,
@@ -1188,21 +1188,16 @@ test('a deleted chapter is listed, and a chapter’s menu opens it at the start,
   await tick(300);
   key('Escape');
   await tick(300);
+  // a chapter's right-click has no way into History: the footer's History is the one
   const chId = (await chapterIds())[0];
-  await js(`(() => {
+  const offered = await js(`(async () => {
     const realPop = popMenu;
-    popMenu = async () => { popMenu = realPop; return 'history'; };
-    return chapterMenu(${JSON.stringify(chId)});
+    let items = null;
+    popMenu = async (x, y, list) => { popMenu = realPop; items = list; return null; };
+    await chapterMenu(${JSON.stringify(chId)});
+    return items.filter((i) => i && i.value).map((i) => i.value);
   })()`);
-  await playerReady({ drawn: false }); // at its very start the chapter isn't written yet
-  await tick(200);
-  assert.ok(await js('historyShown.player.pos() < historyShown.player.steps().length'), 'it starts at the beginning');
-  assert.equal(await js('historyShown.player.mode()'), chId);
-  assert.equal(await js('document.querySelector(".hs-play").getAttribute("aria-label")'), 'Play', 'it waits for Play');
-  key('Escape');
-  await tick(300);
-  key('Escape');
-  await tick(300);
+  assert.ok(offered.length && !offered.includes('history'), 'no Watch This Chapter Being Written: ' + offered);
 });
 
 test('while History is open the menus stay live: an item clicked closes it and then does what it says, one reached by its shortcut does nothing, and ⌘S tags', async () => {
