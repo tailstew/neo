@@ -862,11 +862,9 @@
       while (over < 0) { cells[cells.indexOf(Math.max(...cells))]++; over++; }
       const ins = new Float32Array(n);
       const del = new Float32Array(n);
-      const starts = [];
       let at = 0;
       parts.forEach((p, j) => {
         const k = cells[j];
-        starts.push(at);
         for (const c of p.bins) {
           const nb = c.ins.length;
           for (let bi = 0; bi < nb; bi++) {
@@ -888,9 +886,6 @@
         g.fillStyle = !v ? 'rgba(128,128,128,0.16)' : ins[q] && del[q] ? INK.edited : ins[q] ? INK.added : INK.deleted;
         g.fillRect((q % side) * cs, Math.floor(q / side) * cs, Math.max(0.5, cs - gap), cs - gap);
       }
-      g.globalAlpha = 0.85;
-      g.fillStyle = getComputedStyle(cv).color;
-      for (const q of starts.slice(1)) if (q < n) g.fillRect((q % side) * cs - (q % side ? 1 : 0), Math.floor(q / side) * cs, 1.5, cs - gap);
       g.globalAlpha = 1;
     }
     // the days the chapter picked was written on (all of them for the whole
