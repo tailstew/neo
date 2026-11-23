@@ -172,6 +172,29 @@ test('the whole book: a tile names the chapters its day changed, and hovering it
   assert.deepEqual(await marked(), hovered[DAYS[0]]);
   await js(`document.querySelector('.hs-strip .hs-tile[data-day="${DAYS[0]}"]').dispatchEvent(new PointerEvent('pointerleave'))`);
   assert.deepEqual(await marked(), hovered[DAYS[2]], 'back to the day shown');
+  // in a day's player, the mark follows the chapter being written at the
+  // moment shown, and the timeline's label names it
+  await js(`historyShown.player.openPlayer(historyShown.player.days()[0].from)`);
+  await neo.playerReady({ drawn: false });
+  const at = await js(`(() => {
+    const P = historyShown.player;
+    const out = [];
+    const n = P.steps().length;
+    for (const f of [0.3, 0.6, 1]) {
+      P.seek(Math.round(n * f));
+      const c = P.caret();
+      const label = c && [...document.querySelectorAll('.hs-list .hs-ch[data-ch]')].find((b) => b.dataset.ch === c.ch);
+      out.push({ want: label ? [label.querySelector('.hs-ch-name').textContent] : [], marked: [...document.querySelectorAll('.hs-list .hs-ch.hs-ch-day .hs-ch-name')].map((x) => x.textContent), tip: P.describeAt(P.pos()) });
+    }
+    return out;
+  })()`);
+  for (const x of at) {
+    assert.deepEqual(x.marked, x.want, 'only the chapter at the moment shown');
+    if (x.want.length) assert.ok(x.tip.endsWith(' · ' + x.want[0]), 'the timeline names it: ' + x.tip);
+  }
+  assert.ok(at.some((x) => x.want.length), 'a moment with a chapter being written');
+  await js('historyShown.player.showDays()');
+  await neo.daysReady();
   // a chapter picked: no marks, and its tiles don't name chapters
   await js(`historyShown.player.setMode(${JSON.stringify(ID.Three)})`);
   await neo.daysReady();

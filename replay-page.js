@@ -885,10 +885,18 @@
       const order = book.orders[i + 1] || book.lastOrder || (data.chapters || []).map((c) => c.id);
       return [...order.filter((ch) => hit.has(ch)), ...[...hit].filter((ch) => !order.includes(ch))];
     }
+    // (in the player, the chapter being written at the moment shown)
     function markChs() {
-      const i = hoverDay >= 0 ? hoverDay : k;
-      const on = new Set(!mode && i >= 0 ? dayChs(i) : []);
-      for (const b of chList.children) b.classList.toggle('rx-chday', !!b.dataset.ch && on.has(b.dataset.ch));
+      let on = [];
+      if (!mode) {
+        if (hoverDay >= 0) on = dayChs(hoverDay);
+        else if (view === 'player' && h) on = caret ? [caret.ch] : [];
+        else if (k >= 0) on = dayChs(k);
+      }
+      for (const b of chList.children) {
+        const want = !!b.dataset.ch && on.includes(b.dataset.ch);
+        if (b.classList.contains('rx-chday') !== want) b.classList.toggle('rx-chday', want);
+      }
     }
     function titleTile(i) {
       const b = strip.children[i];
@@ -1233,6 +1241,7 @@
 
     function draw(follow = playing) {
       if (!h) return;
+      markChs();
       const list = mode ? [mode] : order();
       const want = list.join('\n');
       if (sheet.dataset.list !== want) {
@@ -1372,6 +1381,18 @@
       const p = posAt(c);
       const s = steps.length ? h.steps[steps[Math.max(0, p - 1)]] : null;
       if (s) lines.push([fmtTime(s.wall), devName(s)].filter(Boolean).join(' · '));
+      // in the whole book, the chapter being written then
+      if (!mode) {
+        const to = nAt(p);
+        for (let i = to - 1; i >= 0 && i >= to - 3000; i--) {
+          const x = h.steps[i];
+          if (x.k === 'e' && x.page !== false && !Rec.isStream(x.ch)) {
+            const c = (data.chapters || []).find((y) => y.id === x.ch);
+            lines.push(c ? c.title || T('Untitled chapter') : titles.get(x.ch) || T('Untitled chapter'));
+            break;
+          }
+        }
+      }
       return lines.join(' · ');
     }
 

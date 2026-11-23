@@ -5136,7 +5136,8 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     part: () => part, pickPart, partGo,
     markers: () => markers.map((m) => ({ kind: m.kind, label: m.label, x: m.x })), playing: () => playing, tags: () => tags,
     stampMarks: () => stampMarks.map((m) => ({ x: m.x, j: m.j, by: m.by })),
-    speed: (x) => { if (x) historyPrefs.speed = x; return historyPrefs.speed; }
+    speed: (x) => { if (x) historyPrefs.speed = x; return historyPrefs.speed; },
+    caret: () => caretAt, describeAt: (p) => describe(p > 0 ? vt[p - 1] : 0)
   };
   $h('.ps-done').onclick = close;
   bd.addEventListener('mousedown', (e) => { if (e.target === bd) close(); });
@@ -5340,12 +5341,21 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     return t('Changed: {chapters}', { chapters: names.join(', ') });
   }
 
-  // the chapters marked in the side pane: the day hovered, else the day on the sheet
+  // the chapters marked in the side pane, in the whole book: the day
+  // hovered; else in the player the chapter being written at the moment
+  // shown; else the day on the sheet's
   let hoverDay = null;
   function markChapters() {
-    const d = hoverDay || S.days[curDay()];
-    const on = new Set(mode === 'book' && d ? dayChapters(d) : []);
-    for (const b of list.querySelectorAll('.hs-ch[data-ch]')) b.classList.toggle('hs-ch-day', on.has(b.dataset.ch));
+    let on = [];
+    if (mode === 'book') {
+      if (hoverDay) on = dayChapters(hoverDay);
+      else if (view === 'player' && h) on = caretAt ? [caretAt.ch] : [];
+      else if (S.days[curDay()]) on = dayChapters(S.days[curDay()]);
+    }
+    for (const b of list.querySelectorAll('.hs-ch[data-ch]')) {
+      const want = on.includes(b.dataset.ch);
+      if (b.classList.contains('hs-ch-day') !== want) b.classList.toggle('hs-ch-day', want);
+    }
   }
 
   // a day's tile: its date, and its map
@@ -5920,6 +5930,7 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     syncPart();
     // the side pane's chapters, again when one came or went
     if (listedChapters().ids.join(',') !== listKey) renderList();
+    markChapters();
     const showing = shownChapters();
     const order = h.order(nAt(pos)) || dayOrder();
     const empty = paper.querySelector('.hs-empty');
@@ -6101,7 +6112,20 @@ async function openHistory({ bookId = book && book.id, chId = null, firstDay = f
     const stamp = stampMarks.find((m) => Math.abs(m.x - c) <= span);
     if (stamp) lines.push(stamp.by ? t('Timestamped {when}', { when: snapWhen(stamp.by) }) : t('Not timestamped'));
     if (s) lines.push([historyWhen(s.wall, HISTORY_MOMENT), stepDevice(s)].filter(Boolean).join(' · '));
+    // in the whole book, the chapter being written then
+    const ch = mode === 'book' ? chapterAt(lo) : null;
+    if (ch) lines.push(chapterLabel(ch, h.order(nAt(lo)) || dayOrder()));
     return lines.join(' · ');
+  }
+
+  // the chapter the caret was in after `p` entries of the view (as seek finds it)
+  function chapterAt(p) {
+    for (let j = Math.min(p, steps.length) - 1; j >= 0 && j >= p - 5000; j--) {
+      const s = h.steps[steps[j]];
+      if (s.page === false || Rec.isStream(s.ch)) continue;
+      if (s.k === 'e' || s.k === 's' || (s.k === 'b' && typeof s.html === 'string')) return s.ch;
+    }
+    return null;
   }
 
   function drawAll() {
