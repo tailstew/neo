@@ -12,6 +12,7 @@
 
 'use strict';
 
+// eslint-disable-next-line no-unused-vars -- a global: app.js reads NeoCovers
 const NeoCovers = (() => {
   // Tiles are 104×150 CSS px. Paint at 2× so retina shelves stay crisp.
   const W = 208;

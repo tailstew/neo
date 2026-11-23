@@ -71,6 +71,10 @@ You never have to pick a formatting element. Start a line with INT. or EXT. and 
 
 Export an industry-format PDF, or a Fountain or Final Draft (.fdx) file. Drop a .fountain or .fdx file on a shelf to import a script. Notes, Darlings, placeholders, sprints, and NEO Pocket all work the same as they do for books.
 
+**Writing History** 
+
+NEO can record how you write, keystroke by keystroke. Open **File → Writing History…** and watch any chapter being written, day by day, at any speed. Find the day a line first appeared, and bring back any earlier version of a chapter or a paragraph. It all stays in your book's folder on your computer. NEO asks once whether you want it: **Off**, **Record only**, or **Record and timestamp**, which also sends a fingerprint of the history (never your words) to two timestamp services every hour you write, so you can show when the writing existed. Change it any time under **File → Record Writing History**.
+
 **Exports** 
 
 EPUB 3 with a proper table of contents built to KDP's guidelines, Word .docx, PDF with page numbers and bookmarks, HTML, markdown, and plain text. Email a timestamped PDF snapshot to yourself with a SHA-256 fingerprint of the text in the body. Might come in handy someday.

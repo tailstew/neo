@@ -24,7 +24,7 @@ const lib = path.join(tmp, 'NEO Library');
 fs.mkdirSync(lib);
 // a writer from before the switch who uses nothing behind it
 fs.writeFileSync(path.join(lib, 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 const loadFile = BrowserWindow.prototype.loadFile;

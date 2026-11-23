@@ -19,20 +19,39 @@ async function loadLibrary() {
   libraryDirPath = await window.neo.libraryPath();
   applyShelfZoom();
   library = applyDeviceLook(await window.neo.readLibrary());
+  libraryBase = libraryCopy(library);
   // A first shelf is named in the language NEO had when it was made. If the
-  // writer never renamed it, it follows a change of language.
+  // writer never renamed it, it follows a change of language: from English,
+  // or from the language this device last showed (any language, the first
+  // time). Not from another device's, so a phone in another language and
+  // this computer don't take turns renaming it in library.json.
   const DEFAULT_SHELF = 'Works in Progress';
   const own = t(DEFAULT_SHELF);
+  const lang = NeoI18n.getLocale();
+  let was = null;
+  try { was = localStorage.getItem('neo.shelfLanguage'); } catch { /* none */ }
+  const names = new Set([DEFAULT_SHELF]);
+  if (was !== lang && window.neo.translationsOf) {
+    try {
+      const all = await window.neo.translationsOf(DEFAULT_SHELF);
+      for (const x of was ? [all[was]] : Object.values(all)) if (x) names.add(x);
+    } catch { /* English alone, as before */ }
+  }
   // (each writing name has a first shelf of its own, made the same way)
-  const untouched = (library.shelves || []).filter((s) => s.name === DEFAULT_SHELF && own !== DEFAULT_SHELF);
+  const untouched = (library.shelves || []).filter((s) => names.has(s.name) && s.name !== own);
   for (const s of untouched) s.name = own;
   if (untouched.length) await writeLibrary(library);
+  try { localStorage.setItem('neo.shelfLanguage', lang); } catch { /* fine */ }
   await setupFeatures();
   if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
+  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   const existing = !!library.firstRunDone;
   if (!existing) {
     showFirstRun();
+  } else if (library.historyAsked !== true) {
+    askHistoryLevel(); // a library from before Writing History, asked once
   }
+  if (window.neo.recState) window.neo.recState(); // the File menu's level
   renderShelves();
   whatsNewAtLaunch(existing);
 }
@@ -49,7 +68,7 @@ function showFirstRun() {
       $('#fr-pocket-btn').onclick = () => { window.neo.usePocketLibrary(); };
     }).catch(() => {});
   }
-  let picked = { body: Object.keys(BODY_FONTS)[0] || 'Georgia', dropcap: 'literary' };
+  const picked = { body: Object.keys(BODY_FONTS)[0] || 'Georgia', dropcap: 'literary' };
 
   // Step 1: who are you, and how do you write?
   $$('.fr-choice').forEach((btn) => {
@@ -109,9 +128,23 @@ function showFirstRun() {
     preview();
   }
 
+  // Step 3: Writing History, chosen before a word is written. Where it can't
+  // record (an old iOS), there's nothing to choose.
+  let level = 'record';
+  $('#fr-next').onclick = () => {
+    if (!historyCan()) { $('#fr-done').click(); return; }
+    $('#fr-step2').hidden = true;
+    $('#fr-step3').hidden = false;
+    historyLevelCards($('#fr-levels'), level, (v) => { level = v; });
+  };
+
   $('#fr-done').onclick = async () => {
     library.fonts = { body: picked.body, dropcap: picked.dropcap };
     library.firstRunDone = true;
+    // the choice made here is the consent: nothing asks again
+    library.historyAsked = true;
+    library.recordWriting = level !== 'off';
+    library.proveWriting = level === 'timestamp' && !!window.neo.proofSet;
     // the shelf was drawn (and the author record seeded as Anonymous) before
     // the name was typed — carry the name across
     currentAuthor().name = library.authorName || (library.penNames || [])[0] || t('Anonymous');
@@ -130,6 +163,8 @@ function showFirstRun() {
     note.hidden = true;
     applyFonts();
     fr.hidden = true;
+    if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+    if (window.neo.recState) window.neo.recState();
     renderShelves();
   };
 }
@@ -172,6 +207,7 @@ async function shelfMeta(bookId) {
 // read-only, so the assignment threw and app.js stopped loading.
 function writeBookMeta(bookId, meta, known) {
   bookMetaCache.delete(bookId);
+  if (meta === book) noteStructure();
   return window.neo.writeBookMeta(bookId, meta, known);
 }
 
@@ -908,8 +944,6 @@ function sheetBackdrop(kind, label, inner) {
   return bd;
 }
 
-// the lines of a page that say who said the lines above them (a dash first)
-const ATTRIBUTED_PAGES = ['dedication', 'epigraph', 'part'];
 
 async function openPageSheet(shelf, meta, label) {
   const live = (await window.neo.readBookMeta(meta.id)) || meta;
@@ -1273,6 +1307,7 @@ function bookTile(meta, opts = {}) {
         if (meta.coverImage) options.push({ label: t('Remove cover art'), desc: t('Deletes the image from the book folder. (To just hide it, use the ↻ on the book.)'), danger: true, value: 'uncover' });
       }
       options.push(
+        ...(historyCanOpen() ? [{ label: t('Writing History…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
         { label: t('Remove from bookshelf'), desc: t('Takes it off your shelves. The files stay safe in your NEO Library folder on disk.'), value: 'remove' },
         { label: trashLabel, desc: window.Capacitor ? t('Moves the book folder to Deleted Books in your NEO Library, where you can recover it.') : t('Sends the book folder to your system trash, where you can recover it.'), danger: true, value: 'trash' }
       );
@@ -1284,6 +1319,7 @@ function bookTile(meta, opts = {}) {
       if (startPart) items.push({ label: t('Start a part here'), value: 'part' }, '-');
       items.push({ label: t('Export…'), value: 'export' });
       if (canCopy) items.push({ label: t('Duplicate'), value: 'duplicate' });
+      if (historyCanOpen()) items.push({ label: t('Writing History…'), value: 'history' });
       if (coverItems.length) items.push({ label: t('Cover') + '  ›', value: 'coverMenu' });
       items.push('-', { label: t('Remove from bookshelf'), value: 'remove' }, { label: trashLabel, value: 'trash', danger: true });
       const x = e.clientX;
@@ -1297,12 +1333,16 @@ function bookTile(meta, opts = {}) {
       await duplicateBook(meta);
     } else if (choice === 'refresh') {
       await refreshCover(meta, el);
+    } else if (choice === 'history') {
+      await openHistory({ bookId: meta.id });
     } else if (choice === 'export' && script) {
       const fmt = await optionModal(t('Export “{title}”', { title: escHtml(shownTitle(meta.title)) }), null, [
         { label: 'PDF (.pdf)', value: 'pdf' },
-        { label: 'Fountain (.fountain)', value: 'fountain' }, { label: 'Final Draft (.fdx)', value: 'fdx' }
+        { label: 'Fountain (.fountain)', value: 'fountain' }, { label: 'Final Draft (.fdx)', value: 'fdx' },
+        ...(canExportHistory() ? [{ label: t('Writing History…'), value: 'history' }] : [])
       ]);
       if (!fmt) return;
+      if (fmt === 'history') { await exportWritingHistory(meta.id); return; }
       await openBook(meta.id);
       await doExport(fmt);
     } else if (choice === 'export') {
@@ -1310,9 +1350,11 @@ function bookTile(meta, opts = {}) {
         ...(featureOn('exports') ? [{ label: t('Text (.txt)'), value: 'txt' }, { label: t('Markdown (.md)'), value: 'md' }, { label: t('HTML (.html)'), value: 'html' }] : []),
         { label: 'PDF (.pdf)', value: 'pdf' },
         { label: t('Word (.docx)'), value: 'docx' }, { label: t('EPUB (.epub)'), value: 'epub' },
+        ...(canExportHistory() && !isPageMeta(meta) ? [{ label: t('Writing History…'), value: 'history' }] : []),
         ...(window.Capacitor || isPageMeta(meta) ? [] : [{ label: t('Paperback for KDP…'), value: 'paperback' }])
       ]);
       if (!fmt) return;
+      if (fmt === 'history') { await exportWritingHistory(meta.id); return; }
       if (window.Capacitor || fmt === 'paperback') {
         await openBook(meta.id);
         await doExport(fmt);
@@ -1589,15 +1631,17 @@ $('#add-shelf-btn').onclick = async () => {
   if (last) {
     last.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     const label = last.querySelector('.shelf-label');
-    if (label) setTimeout(() => {
-      if (NO_HOVER) { label.click(); return; }
-      label.focus();
-      const r = document.createRange();
-      r.selectNodeContents(label); // selected: typing replaces "New Shelf"
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }, 350);
+    if (label) {
+      setTimeout(() => {
+        if (NO_HOVER) { label.click(); return; }
+        label.focus();
+        const r = document.createRange();
+        r.selectNodeContents(label); // selected: typing replaces "New Shelf"
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }, 350);
+    }
   }
 };
 

@@ -18,7 +18,10 @@ function library() {
     logError() {}
   };
   const ctx = vm.createContext({ window: { neo }, snapsCan: () => true, renderSnapList() {}, logSnap(e) { throw e; },
-    htmlWords: (html) => html.split(/\s+/).filter(Boolean).length });
+    htmlWords: (html) => html.split(/\s+/).filter(Boolean).length,
+    // Writing History: a snapshot is also a tag there while the book records (not here),
+    // and a writer's day, not a calendar day, has one start-of-day snapshot
+    rec: { on: false }, writingDay: (d) => d.toDateString() });
   vm.runInContext(between('const SNAP_KEPT', '// (the rules above are plain functions: scripts/snapshots.test.js)') +
     between('let snapCache = null;', '// The first change of a writing day') +
     'let book = { id: "test", title: "Test", chapterOrder: ["a", "b"], chapterTitles: {} };' +

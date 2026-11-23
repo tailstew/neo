@@ -78,7 +78,7 @@ function handlePoetry(e, body, chId) {
       cur.classList.add('poetry');
       if (cur.textContent.trim() === '' && !cur.querySelector('i')) { italicize(cur); caretIntoStart(cur); }
     }
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     return true;
   }
 
@@ -108,7 +108,7 @@ function handlePoetry(e, body, chId) {
     block.after(line);
     caretIntoStart(line);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
   return true;
@@ -132,7 +132,7 @@ function handleFlush(e, body, chId) {
     document.execCommand('insertParagraph');
     const cur = caretBlock(body);
     if (cur) cur.classList.add('flush');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     return true;
   }
   const r = sel.getRangeAt(0);
@@ -142,7 +142,7 @@ function handleFlush(e, body, chId) {
   if (block.textContent.trim() === '' || head.toString().length === 0) {
     snapshotStructure('flush paragraph');
     block.classList.add('flush');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'para-kind');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -150,7 +150,7 @@ function handleFlush(e, body, chId) {
   document.execCommand('insertParagraph');
   const cur = caretBlock(body);
   if (cur && cur !== block) cur.classList.add('flush');
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   return true;
 }
 
@@ -172,7 +172,7 @@ function poetryBackspace(e, body, chId) {
   if (block.classList.contains('poetry')) romanize(block);
   block.classList.remove('poetry', 'flush');
   placeCaret(block, 0);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
   return true;
@@ -205,7 +205,7 @@ function toggleParaKind(kind) {
     else if (wasPoetry) romanize(p);
   }
   caretIntoStart(ps[0]);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
 }
@@ -219,7 +219,7 @@ function poetryUnderHeading(body, chId) {
   body.prepend(line);
   body.focus();
   caretIntoStart(line);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'para-kind');
   resetNativeUndo();
   breakRun++;
 }

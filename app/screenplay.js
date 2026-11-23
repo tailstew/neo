@@ -454,6 +454,7 @@ function spFromFdx(xml) {
 function spToFdx(lines, title = {}) {
   const NAMES = { heading: 'Scene Heading', action: 'Action', character: 'Character', paren: 'Parenthetical', dialogue: 'Dialogue', transition: 'Transition', shot: 'Shot' };
   const CAPS = ['heading', 'character', 'transition', 'shot'];
+  // oxlint-disable-next-line no-control-regex -- characters XML can't hold
   const esc = (s) => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const textEl = (r, caps) => {
     const style = [r.b && 'Bold', r.i && 'Italic', r.u && 'Underline', r.s && 'Strikeout'].filter(Boolean).join('+');
@@ -613,7 +614,7 @@ function spAfterChange(p) {
   const body = spBodyOf(p);
   if (!body) return;
   spLastPara = p;
-  syncChapter(body, spChapterOf(p));
+  syncChapter(body, spChapterOf(p), 'script');
   spSchedule();
   spRefreshGhost();
   spShowElement();
@@ -1174,7 +1175,7 @@ function spMoveScene(k, to) {
     if (target) target.before(n); else dest.appendChild(n);
   }
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
-  for (const b of new Set([body, dest])) syncChapter(b, b.closest('.chapter').dataset.id);
+  for (const b of new Set([body, dest])) syncChapter(b, b.closest('.chapter').dataset.id, 'script');
   breakRun++;
   spRepaginate();
   renderNav();
@@ -1213,7 +1214,7 @@ async function deleteSceneToDarlings(cell, quiet = false) {
   for (const n of nodes) n.remove();
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
   if (cell.dataset.sid && book.sceneNotes) delete book.sceneNotes[cell.dataset.sid];
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'darling-out');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('scene delete: ' + (err && err.message || err)));
@@ -1222,7 +1223,7 @@ async function deleteSceneToDarlings(cell, quiet = false) {
   renderNav();
   renderBoard();
   updateCounters();
-  if (text && !quiet) toast(t('Scene removed — its lines are in Darlings, or {key} to undo', { key: KZ }));
+  if (text && !quiet) undoToast(t('Scene removed — its lines are in Darlings, or {key} to undo', { key: KZ }));
 }
 
 // ---- the title page: title, "Written by", the writer, and at the foot
@@ -1320,7 +1321,7 @@ function spPaste(e, body, chId) {
   for (const p of body.querySelectorAll('p')) {
     for (const a of ['style']) if (p.getAttribute(a) && !/text-align/.test(p.getAttribute(a))) p.removeAttribute(a);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   spSchedule();
   return true;
 }
@@ -1379,7 +1380,7 @@ document.addEventListener('beforeinput', (e) => {
   // element and "int." never became a heading (#359)
   if (!lower.textContent.trim()) spSetClass(lower, body.children.length === 1 ? 'action' : upperType);
   placeCaret(lower, 0);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   breakRun++;
   spAfterChange(lower);
 }, true);
@@ -1427,7 +1428,7 @@ function spPasteMany(lines, body, chId) {
   p.after(frag);
   if (!p.textContent.trim() && !p.querySelector('.ph-mark')) p.remove();
   spCaretToEnd(last);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'script');
   resetNativeUndo();
   breakRun++;
   spSchedule();

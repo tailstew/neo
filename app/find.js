@@ -236,7 +236,7 @@ function replaceCurrent() {
     runSearch();
     return;
   }
-  if (chapter) syncChapter(chapter.querySelector('.chapter-body'), chapter.dataset.id);
+  if (chapter) syncChapter(chapter.querySelector('.chapter-body'), chapter.dataset.id, 'replace');
   const oldIdx = searchState.idx;
   runSearch();
   if (searchState.matches.length) gotoMatch(Math.min(oldIdx, searchState.matches.length - 1));
@@ -257,11 +257,11 @@ function replaceAllMatches() {
   }
   const n = ranges.length;
   for (const chId of book.chapterOrder) {
-    if (touched.has(chId)) syncChapter(document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`), chId);
+    if (touched.has(chId)) syncChapter(document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`), chId, 'replace-all');
   }
   if (n === 0) undoStack.pop(); // nothing changed, nothing to undo
   else breakRun++; // ⌘Z from inside the text reaches this undo too
-  toast(n ? t('{n} replaced across the whole book — {key} to undo', { n, key: KZ }) : t('0 replaced'));
+  if (n) undoToast(t('{n} replaced across the whole book — {key} to undo', { n, key: KZ })); else toast(t('0 replaced'));
   runSearch();
 }
 
@@ -383,14 +383,14 @@ async function importChaptersIntoBook(results, beforeId) {
   try {
     for (const a of adding) {
       const chId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
-      chapterHTML[chId] = a.html;
+      setChapterHTML(chId, a.html, 'import');
       ids.push(chId);
       // every chapter file is on disk before book.json names it
       await persistChapter(chId);
     }
   } catch (err) {
     window.neo.logError('import chapters: ' + (err && err.message || err));
-    for (const chId of ids) delete chapterHTML[chId];
+    for (const chId of ids) dropChapterHTML(chId, 'import');
     undoStack.pop();
     toast(t('Couldn’t import the chapters: {error}', { error: String(err && err.message || err) }), 6000);
     return 0;

@@ -61,11 +61,19 @@
         <div id="fr-bodyfonts" class="fr-fontrow"></div>
         <p style="margin-bottom:6px" data-i18n>Drop cap</p>
         <div id="fr-dropcaps" class="fr-fontrow"></div>
-        <p id="fr-error" role="alert" hidden></p>
+        <div style="text-align:right;margin-top:20px">
+          <button id="fr-next" class="btn-gold" data-i18n>Next</button>
+        </div>
+      </div>
+      <div id="fr-step3" hidden>
+        <h2 data-i18n>Your writing history</h2>
+        <p data-i18n>NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: File → Record Writing History.)</p>
+        <div id="fr-levels" class="fr-choices hl-cards"></div>
         <div style="text-align:right;margin-top:20px">
           <button id="fr-done" class="btn-gold" data-i18n>Start writing</button>
         </div>
       </div>
+      <p id="fr-error" role="alert" hidden></p>
     </div>
   </div>
 
@@ -120,6 +128,8 @@
         <div class="tab" role="tab" tabindex="0" aria-selected="false" data-tab="notes" data-i18n>Notes</div>
         <div class="tab" role="tab" tabindex="0" aria-selected="false" data-tab="outline" data-i18n>Outline</div>
         <div class="tab darlings" role="tab" tabindex="0" aria-selected="false" data-tab="darlings" data-i18n data-i18n-title title="Drag any selection here. It's saved, not gone.">Darlings</div>
+        <!-- not a tab: it opens the Writing History dialog over whichever tab is up -->
+        <div class="tab history-btn" role="button" tabindex="0" data-i18n data-i18n-title title="Watch this book being written" hidden>History</div>
       </div>
       <div id="counters">
         <span id="goal-counter" role="button" tabindex="0" data-i18n-title title="Today's words — click for goals, sprints, and your progress chart"></span>
@@ -148,9 +158,13 @@
 
   <script src="i18n.js"></script>
   <script src="covers.js"></script>
+  <script src="recording.js"></script>
+  <script src="sheet.js"></script>
   <script src="manuscript.js"></script>
   <script src="app/core.js"></script>
   <script src="app/shelf.js"></script>
+  <script src="app/recording.js"></script>
+  <script src="app/history.js"></script>
   <script src="app/editor.js"></script>
   <script src="app/typing.js"></script>
   <script src="app/paragraphs.js"></script>

@@ -38,7 +38,9 @@ function bookInMemory(chapters) {
     captureCaret: () => null,
     saveMeta: async () => {},
     maybeDailySnapshot: none,
-    flushAux: none, flushStickiesSave: none, flushSidecars: none
+    flushAux: none, flushStickiesSave: none, flushSidecars: none,
+    // Writing History's recorder, off
+    rec: new Proxy({ on: false }, { get: (r, k) => (k in r ? r[k] : none) })
   });
   for (const [from, to] of SLICES) {
     const at = app.indexOf(from);

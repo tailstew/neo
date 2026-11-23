@@ -24,7 +24,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 // run from scripts/, NEO's window would look for scripts/index.html
@@ -36,7 +36,7 @@ require('../main.js');
 
 let wc;
 const js = (code) => wc.executeJavaScript(code, true);
-const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+const tick = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 const text = (id) => js(`document.getElementById(${JSON.stringify(id)}).textContent`);
 
 // typed as keys: '\n' is Enter
@@ -539,6 +539,9 @@ async function main() {
     let win;
     while (!(win = BrowserWindow.getAllWindows()[0])) await tick(50);
     wc = win.webContents;
+    // a window behind another one, or minimized, gets no animation frames
+    // and slowed timers: keep it running unseen
+    wc.setBackgroundThrottling(false);
     while (!(await js(`typeof library !== 'undefined' && !!library`).catch(() => false))) await tick(50);
     await tick(300);
     await js(`(async () => {

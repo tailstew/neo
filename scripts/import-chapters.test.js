@@ -37,6 +37,9 @@ function room(opts = {}) {
     dialogueDashes: (s) => s,
     dashStyle: () => 'em',
     isScript: () => !!(opts.script),
+    // every change to a chapter goes through the recorder's two doors
+    setChapterHTML: (chId, html) => { ctx.chapterHTML[chId] = html; },
+    dropChapterHTML: (chId) => { delete ctx.chapterHTML[chId]; },
     snapshotStructure: (label) => { log.push('snapshot ' + label); ctx.undoStack.push({ label }); },
     persistChapter: async (chId) => {
       if (opts.failOn && ctx.chapterHTML[chId] && ctx.chapterHTML[chId].includes(opts.failOn)) throw new Error('disk full');

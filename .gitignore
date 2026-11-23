@@ -19,6 +19,10 @@ pocket/node_modules/
 pocket/www/app.js
 pocket/www/app/
 pocket/www/covers.js
+pocket/www/sheet.js
+pocket/www/recording.js
+pocket/www/recording-files.js
+pocket/www/history-worker.js
 pocket/www/styles.css
 pocket/www/fonts/
 pocket/www/i18n.js
@@ -26,6 +30,8 @@ pocket/www/jszip.min.js
 pocket/www/locales/
 pocket/www/hunspell/
 pocket/www/dict/
+pocket/android/app/capacitor.build.gradle
+pocket/android/capacitor.settings.gradle
 
 # working files beside the repo, never part of it
 Claude outputs/

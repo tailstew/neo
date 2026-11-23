@@ -2,7 +2,7 @@
 // Owns the window and all file-system access. The renderer talks to this
 // through the IPC handlers below (see preload.js for the exposed API).
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, utilityProcess, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, utilityProcess, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -155,6 +155,17 @@ function setUiLanguage(code) {
   try { buildMenu(); } catch (err) { logError('menu', err); }
   sendToWindow({ type: 'uiLanguage', value: uiLanguage });
 }
+
+// One string in every language NEO has: { code: text }
+ipcMain.handle('i18n:translations', (_e, key) => {
+  const out = {};
+  if (typeof key !== 'string') return out;
+  for (const { code } of listLanguages()) {
+    const v = localeDict(code)[key];
+    if (typeof v === 'string' && v) out[code] = v;
+  }
+  return out;
+});
 
 ipcMain.handle('i18n:reload', (e) => {
   e.sender.reload();
@@ -978,8 +989,9 @@ ipcMain.handle('book:create', (_e, meta) => {
 
 // A copy of a book, for a backup or a version to play with: every file in
 // its folder (chapters, notes, darlings, covers) written whole into a new
-// folder, then its book.json under the new id and title. A half-made copy
-// is removed; the original is only ever read.
+// folder, then its book.json under the new id and title. Not its Writing
+// History: recording/ stays with the original, and the copy starts its own
+// from a baseline. A half-made copy is removed; the original is only read.
 ipcMain.handle('book:duplicate', (_e, bookId, title) => {
   ensureLibrary();
   const src = bookDir(bookId);
@@ -999,8 +1011,9 @@ ipcMain.handle('book:duplicate', (_e, bookId, title) => {
   const copyDir = (from, to) => {
     fs.mkdirSync(to, { recursive: true });
     for (const ent of fs.readdirSync(from, { withFileTypes: true })) {
-      // (a write caught halfway, a spare copy, a placeholder: not the book)
-      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json') continue;
+      // (a write caught halfway, a spare copy, a placeholder: not the book;
+      // nor the original's Writing History, which stays with it)
+      if (/\.(tmp|bak|icloud)$/.test(ent.name) || ent.name === 'book.json' || (from === src && (ent.name === 'recording' || ent.name === 'history-notes'))) continue;
       const a = path.join(from, ent.name);
       const b = path.join(to, ent.name);
       if (ent.isDirectory()) copyDir(a, b);
@@ -1178,6 +1191,135 @@ function keepAuxBackup(file, text) {
   throw new Error('too many kept copies of ' + path.basename(file));
 }
 
+// A sync program that finds a file changed on two devices at once keeps
+// one and leaves the other beside it under a name of its own: Syncthing's
+// "<name>.sync-conflict-<date>-<time>-<device>.<ext>", Dropbox's and
+// Nextcloud's "<name> (… conflicted copy …).<ext>", iCloud's "<name> 2.<ext>".
+// NEO reads its files by name, so it would never see that version.
+// Returns the name of the file it is a copy of.
+const CONFLICT_COPY = [
+  /^(.+?)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}(\.[^.]+)$/,
+  /^(.+?) \([^)]*conflicted copy[^)]*\)(\.[^.]+)$/i,
+  /^(.+?) \d+(\.[^.]+)$/
+];
+function conflictOriginal(file) {
+  for (const re of CONFLICT_COPY) {
+    const m = re.exec(file);
+    if (m) return m[1] + m[2];
+  }
+  return null;
+}
+// a copy of a chapter: its chapter id
+function conflictCopyOf(file) {
+  const of = conflictOriginal(file);
+  return of && of.endsWith('.html') ? of.slice(0, -5) : null;
+}
+// a copy of book.json, or of NEO's own book.json.bak
+const bookConflictOf = (file) => ['book.json', 'book.json.bak'].includes(conflictOriginal(file));
+
+// [{ file, chapterId, html }] for each such copy in a book's chapters folder.
+// One named in `skip` (taken in already, on this device) comes without its
+// html, `{ file, chapterId, taken: true }`, so the window knows it's still there.
+const skipSet = (skip) => new Set(Array.isArray(skip) ? skip.map(String) : []);
+ipcMain.handle('chapter:conflicts', (_e, bookId, skip) => {
+  const dir = path.join(bookDir(bookId), 'chapters');
+  const out = [];
+  const taken = skipSet(skip);
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return out; }
+  for (const file of names) {
+    const chapterId = conflictCopyOf(file);
+    if (!chapterId) continue;
+    if (taken.has(file)) { out.push({ file, chapterId, taken: true }); continue; }
+    try { out.push({ file, chapterId, html: fs.readFileSync(path.join(dir, file), 'utf8') }); } catch { /* vanished */ }
+  }
+  return out;
+});
+
+// [{ file, meta }] for each copy of book.json in a book's folder: meta is the
+// copy read whole, or null (a copy of book.json.bak, or one that won't parse).
+// One named in `skip` comes as `{ file, meta: null, taken: true }`, unread.
+ipcMain.handle('book:conflicts', (_e, bookId, skip) => {
+  const dir = bookDir(bookId);
+  const out = [];
+  const taken = skipSet(skip);
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return out; }
+  for (const file of names) {
+    if (!bookConflictOf(file)) continue;
+    if (taken.has(file)) { out.push({ file, meta: null, taken: true }); continue; }
+    let meta = null;
+    if (conflictOriginal(file) === 'book.json') {
+      try { meta = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')); } catch { /* half there, or not JSON */ }
+    }
+    out.push({ file, meta: meta && typeof meta === 'object' ? meta : null });
+  }
+  return out;
+});
+
+// Notes another program left for Writing History (Draft Sleuth's feedback):
+// book-…/history-notes/<id>.json, written once by that program and never
+// moved, rewritten or deleted by NEO, which takes each into the history as a
+// tag (takeHistoryNotes in app.js). [{ file, note }] for each, note checked
+// against the contract (docs/tag-notes-plan.md) and cut to its known fields,
+// or null for one too big, unreadable or breaking it. One named in `skip`
+// (taken in already, on this device) comes as `{ file, taken: true }`,
+// unread. A note still in iCloud is waited for, and left out if it never
+// comes down: it's looked at again next time.
+const HISTORY_NOTE_MAX = 256 * 1024;
+const HISTORY_NOTE_ID = /^[a-z0-9-]{1,64}$/;
+function historyNote(raw, id) {
+  let n;
+  try { n = JSON.parse(raw); } catch { return null; }
+  if (!n || typeof n !== 'object' || Array.isArray(n) || n.neoNote !== 1 || n.id !== id) return null;
+  const str = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  if (!str(n.at, 40) || !Number.isFinite(Date.parse(n.at)) || !str(n.app, 40) || !str(n.text, 50000)) return null;
+  const out = { id, at: new Date(Date.parse(n.at)).toISOString(), app: n.app, kind: n.kind === 'feedback' ? 'feedback' : 'note', text: n.text };
+  if (n.chapter !== undefined) {
+    if (!str(n.chapter, 80) || !/^[A-Za-z0-9_-]+$/.test(n.chapter)) return null;
+    out.chapter = n.chapter;
+    if (n.hash !== undefined) {
+      if (typeof n.hash !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(n.hash)) return null;
+      out.hash = n.hash;
+    }
+  } else if (n.hash !== undefined) return null;
+  if (n.model !== undefined) {
+    if (!str(n.model, 80)) return null;
+    out.model = n.model;
+  }
+  if (n.pasted !== undefined) {
+    if (typeof n.pasted !== 'boolean') return null;
+    if (n.pasted) out.pasted = true;
+  }
+  return out;
+}
+ipcMain.handle('book:notes', (_e, bookId, skip) => {
+  const dir = path.join(bookDir(bookId), 'history-notes');
+  const taken = skipSet(skip);
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  names = names.filter((f) => f.endsWith('.json'));
+  const out = names.filter((f) => taken.has(f)).map((file) => ({ file, taken: true }));
+  const fresh = names.filter((f) => !taken.has(f));
+  const read = (away = new Set()) => {
+    const list = out.slice();
+    for (const file of fresh) {
+      const full = path.join(dir, file);
+      if (away.has(full)) continue;
+      const id = file.slice(0, -5);
+      let note = null;
+      try {
+        const st = fs.statSync(full);
+        if (!st.isFile()) continue;
+        if (HISTORY_NOTE_ID.test(id) && st.size <= HISTORY_NOTE_MAX) note = historyNote(fs.readFileSync(full, 'utf8'), id);
+      } catch { continue; } // gone meanwhile
+      list.push({ file, note });
+    }
+    return list;
+  };
+  return afterLocal(fresh.map((f) => path.join(dir, f)), () => read(), (away) => read(away));
+});
+
 ipcMain.handle('aux:read', (_e, bookId, name) => {
   // name: 'notes' | 'outline' | 'notes-<chapter>'
   const file = path.join(bookDir(bookId), libName(name) + '.html');
@@ -1278,6 +1420,11 @@ ipcMain.handle('book:delete', async (_e, bookId, title) => {
     const { shell } = require('electron');
     try {
       await shell.trashItem(bookDir(bookId));
+      // its recording's backup goes with it, so both come back from the trash
+      // together. If this one won't go, it stays where it is: nothing is lost.
+      if (fs.existsSync(recMirror(bookId))) {
+        try { await shell.trashItem(recMirror(bookId)); } catch (err) { logError('trash', err); }
+      }
       return true;
     } catch (err) {
       // Some filesystems have no Trash (network mounts, odd drives).
@@ -1293,6 +1440,610 @@ ipcMain.handle('book:delete', async (_e, bookId, title) => {
   }
   return false;
 });
+
+// ---------------------------------------------------------------------------
+// Writing History: the recording (docs/neo-recording-plan.md). Each device
+// writes only its own folder in the book, recording/<device>/; what it writes
+// and how it is read back is recording-files.js, which Pocket runs too. What
+// the recording is made of: recording.js.
+// ---------------------------------------------------------------------------
+const zlib = require('zlib');
+const RecFiles = require('./recording-files.js');
+const ReplayExport = require('./replay-export.js');
+
+const recIO = RecFiles.nodeIO({ fs, path, zlib, write: writeFileDurable, log: (source, err) => logError(source, err) });
+
+// this computer's id, made once; it names the folder only this computer writes
+function recDevice() {
+  const s = readSettings();
+  if (typeof s.recordingDevice === 'string' && RecFiles.DEVICE.test(s.recordingDevice)) return s.recordingDevice;
+  const id = 'd-' + require('crypto').randomBytes(8).toString('hex');
+  writeSettings({ ...s, recordingDevice: id });
+  return id;
+}
+const recRoot = (bookId) => path.join(bookDir(bookId), 'recording');
+const recDir = (bookId, device = recDevice()) => path.join(recRoot(bookId), libName(device));
+function recSession(name) {
+  if (!RecFiles.SESSION.test(libName(name))) throw new Error('Invalid recording session');
+  return name;
+}
+const recKnownFile = (bookId) => path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'known.json');
+// The book's backup mirror: its recording/ again, closed sessions only, kept
+// out of the daily zip (dailyBackup)
+const recMirrorRoot = () => path.join(LIBRARY_DIR, 'Backups', 'recordings');
+const recMirror = (bookId) => path.join(recMirrorRoot(), libName(bookId));
+
+// This device's closed sessions of a book into the mirror, as soon as they
+// close. A copy that fails is tried again at the next, or by dailyBackup.
+async function recMirrorMine(bookId) {
+  const device = recDevice();
+  try {
+    await RecFiles.mirrorDevice(recIO, recDir(bookId, device), path.join(recMirror(bookId), device));
+  } catch (err) { logError('recording backup', err); }
+}
+
+// What README.txt in a book's recording/ folder says
+const recReadme = () => [
+  t('This is NEO’s Writing History for this book: how it was written, keystroke by keystroke. NEO uses it to play the writing back and to bring back any earlier version of a chapter.'),
+  t('Each device writes only its own folder. The files are plain text, one line per event, gzipped once a session ends. Nothing here is ever sent anywhere.'),
+  t('Deleting this folder deletes the history. The book itself is untouched.')
+].join('\n\n') + '\n';
+
+// A book opens: sessions this device left open are closed, and the window
+// learns where the last recording left each chapter.
+ipcMain.handle('rec:start', async (_e, bookId, proof) => {
+  const device = recDevice();
+  const r = await RecFiles.start(recIO, recDir(bookId, device), device, recKnownFile(bookId), path.join(recMirror(bookId), device));
+  await recMirrorMine(bookId);
+  proofSetFlags(proof);
+  proofRun(bookId, 'start');
+  return { device, app: app.getVersion(), ...r };
+});
+
+// This computer's folder in a book's recording/, made the first time
+const recPrepare = (bookId) => RecFiles.prepare(recIO, recRoot(bookId), libName(recDevice()), recReadme(),
+  { name: os.hostname(), created: new Date().toISOString(), app: app.getVersion() });
+
+ipcMain.handle('rec:chunk', async (_e, bookId, session, first, text) => {
+  // The history deleted on another computer while this session was open: a
+  // sync program took its start from under it, so its lines go nowhere.
+  // What's left of it goes, with what this computer kept of the history, and
+  // the window starts again from the book as it is (rec.lost).
+  if (await RecFiles.cutShort(recIO, recDir(bookId), recSession(session), first)) {
+    // A sync program deletes a file at a time, so what's left of this
+    // device's part (its sessions, its seals, its copy in Backups) goes to
+    // the trash now, with the rest: a new history mustn't start from the
+    // old one's leftovers. (A folder the trash won't take is left, as it is.)
+    const { shell } = require('electron');
+    for (const dir of [recDir(bookId), path.join(recMirror(bookId), libName(recDevice()))]) {
+      if (!fs.existsSync(dir)) continue;
+      try { await shell.trashItem(dir); } catch (err) { logError('trash', err); }
+    }
+    await recForget(bookId);
+    return { lost: true };
+  }
+  const dir = await recPrepare(bookId);
+  await RecFiles.chunk(recIO, dir, recSession(session), first, text);
+  proofWrote(bookId, text);
+  return true;
+});
+
+ipcMain.handle('rec:rollup', async (_e, bookId, session) => {
+  const folder = path.join(recDir(bookId), recSession(session));
+  return fs.existsSync(folder) ? RecFiles.rollup(recIO, folder) : 0;
+});
+
+ipcMain.handle('rec:close', async (_e, bookId, session) => {
+  const dir = recDir(bookId);
+  if (fs.existsSync(path.join(dir, recSession(session)))) await RecFiles.closeSession(recIO, dir, session, false);
+  proofRun(bookId, 'words');
+  await recMirrorMine(bookId);
+  return true;
+});
+
+// Every device's sessions for a book, the mirror's too: [{ device, name, mine, sessions: [{ id, open }] }]
+ipcMain.handle('rec:list', (_e, bookId) => RecFiles.list(recIO, recRoot(bookId), recDevice(), recMirror(bookId)));
+
+// One session's text, closed or still open, from any device (a closed one
+// the book has lost or holds broken, from the mirror)
+ipcMain.handle('rec:read', (_e, bookId, device, session) => RecFiles.read(recIO, path.join(recRoot(bookId), libName(device)), recSession(session), path.join(recMirror(bookId), libName(device))));
+
+// The Writing History cache: each day's end state and stats, built from the
+// recording by history-worker.js in its own process, oldest day first, so
+// the window never waits on a year of writing. Derived from the recording,
+// so it lives in userData (recording-cache/<book>/), never the library.
+// The worker's progress goes to the window as rec:progress.
+let historyChild = null;
+let historySeq = 0;
+const historyWaiting = new Map();
+const historyCleaned = new Set();
+
+function historyRequest(msg) {
+  if (!historyChild) {
+    historyChild = utilityProcess.fork(path.join(__dirname, 'history-worker.js'), [], { serviceName: 'NEO Writing History', stdio: 'pipe' });
+    // what it said last, for the log if it dies
+    let said = '';
+    const hear = (d) => { said = (said + d).slice(-4000); };
+    historyChild.stdout.on('data', hear);
+    historyChild.stderr.on('data', hear);
+    historyChild.on('message', (m) => {
+      if (m.id) {
+        const w = historyWaiting.get(m.id);
+        if (!w) return;
+        historyWaiting.delete(m.id);
+        if (m.ok) w.resolve(m.result); else w.reject(new Error(m.error));
+        return;
+      }
+      if (m.type === 'built' && m.error) logError('history', m.error);
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('rec:progress', m);
+    });
+    historyChild.on('exit', (code) => {
+      historyChild = null;
+      if (code) logError('history', new Error('the history process exited with code ' + code + (said ? ':\n' + said.trim() : '')));
+      for (const w of historyWaiting.values()) w.reject(new Error('the history process exited'));
+      historyWaiting.clear();
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const id = ++historySeq;
+    historyWaiting.set(id, { resolve, reject });
+    historyChild.postMessage({ ...msg, id });
+  });
+}
+
+// What the worker needs to know about a book's recording: every device's.
+// Caches an earlier NEO made of it go: the keyframes the player kept before
+// days (PLAYER 1), and the days of one device at a time (before 4d).
+function historyTarget(bookId) {
+  const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
+  if (!historyCleaned.has(cache)) {
+    historyCleaned.add(cache);
+    try {
+      for (const n of fs.readdirSync(cache)) if (/^(kf-.*|days?-d-[0-9a-f]{16}.*)\.json\.gz$/.test(n)) fs.rmSync(path.join(cache, n), { force: true });
+    } catch { /* nothing cached yet */ }
+  }
+  return { key: libName(bookId), root: recRoot(bookId), mirror: recMirror(bookId), cache };
+}
+
+// the days built so far (the rest follow as rec:progress)
+ipcMain.handle('rec:days', (_e, bookId) => historyRequest({ type: 'days', ...historyTarget(bookId) }));
+// the page and each device's chapters as they were when a day began
+ipcMain.handle('rec:dayStart', (_e, bookId, day) => {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+  return historyRequest({ type: 'dayStart', day, ...historyTarget(bookId) });
+});
+
+// Search: the first pass over the day states is the answer; the worker then
+// looks inside days and posts what it finds as rec:progress. The phrase is
+// { text, word, cs } (Rec.phraseQuery), or a string
+ipcMain.handle('rec:search', (_e, bookId, phrase, sid) => {
+  const p = phrase && typeof phrase === 'object' ? phrase : { text: phrase };
+  const q = { text: String(p.text || '').slice(0, 200), word: p.word !== false, cs: !!p.cs };
+  if (!q.text.trim()) throw new Error('Nothing to search for');
+  return historyRequest({ type: 'search', phrase: q, sid: Number(sid) || 0, ...historyTarget(bookId) });
+});
+ipcMain.handle('rec:searchStop', (_e, bookId) => historyRequest({ type: 'searchStop', ...historyTarget(bookId) }));
+// Restore: paragraphs picked at the end of `day`, carried on to the last day built
+ipcMain.handle('rec:track', (_e, bookId, day, part, from) => {
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(day))) throw new Error('Invalid day');
+  const p = { ch: String(part && part.ch), a: Number(part && part.a) || 0, b: Number(part && part.b) || 0 };
+  return historyRequest({ type: 'track', day, part: p, from: String(from), ...historyTarget(bookId) });
+});
+
+// Deleting a book's Writing History, once the window has asked the writer
+// (who types a phrase to say yes): the book's recording/ and its backup
+// mirror go to the system trash (never deleted outright), and the cache
+// made from them goes. If the trash won't take one, it stays where it is,
+// shown, and nothing is lost.
+ipcMain.handle('rec:delete', async (_e, bookId) => {
+  const { shell } = require('electron');
+  const win = BrowserWindow.getFocusedWindow();
+  // the seal the session's close asked for, and its stamps, finish first:
+  // made after the folder went, it would land in the new history and name
+  // sessions that are in the trash (at most 20 s, so a slow authority
+  // can't hold the delete up)
+  const id = libName(bookId);
+  clearTimeout((proofWords.get(id) || {}).timer);
+  proofWords.delete(id);
+  const job = proofQueues.get(id);
+  if (job) await Promise.race([job, new Promise((resolve) => setTimeout(resolve, 20000))]);
+  for (const dir of [recRoot(bookId), recMirror(bookId)]) {
+    if (!fs.existsSync(dir)) continue;
+    try { await shell.trashItem(dir); } catch (err) {
+      logError('trash', err);
+      shell.showItemInFolder(dir);
+      dialog.showMessageBox(win, {
+        message: t('NEO couldn’t move that folder to the Trash.'),
+        detail: t('The history is untouched. Its folder is highlighted so you can deal with it yourself.')
+      });
+      return false;
+    }
+  }
+  await recForget(bookId);
+  return true;
+});
+
+// What this computer keeps of a book's history outside the book, dropped
+// once the history is deleted (here, or on another computer: rec:chunk)
+async function recForget(bookId) {
+  const cache = path.join(app.getPath('userData'), 'recording-cache', libName(bookId));
+  proofForget(bookId); // its seals went with the history
+  clearTimeout((proofWords.get(bookId) || {}).timer);
+  proofWords.delete(bookId);
+  if (historyChild) await historyRequest({ type: 'forget' }).catch(() => {});
+  historyCleaned.delete(cache);
+  fs.rmSync(cache, { recursive: true, force: true }); // (made from the history, nothing more)
+}
+
+// The evidence report (docs/neo-recording-plan.md, part 2): its figures over
+// every session (or only some chapters' lines), worked out in the history
+// process, and the time cover from each device's seals
+const recChapters = (chapters) => (Array.isArray(chapters) ? chapters.slice(0, 5000).map(String) : null);
+ipcMain.handle('rec:evidence', (_e, bookId, chapters) =>
+  historyRequest({ type: 'evidence', chapters: recChapters(chapters), ...historyTarget(bookId) }));
+
+// Where chapters' text came from in other chapters (Rec.movedIn), for the
+// export of some chapters to say what it leaves out
+ipcMain.handle('rec:moves', (_e, bookId) => historyRequest({ type: 'moves', ...historyTarget(bookId) }));
+
+// How far each of a day's sessions was timestamped, for the player's
+// footer and its timestamps' track
+ipcMain.handle('rec:stamps', (_e, bookId, sessions) =>
+  historyRequest({ type: 'stamps', sessions: Array.isArray(sessions) ? sessions.slice(0, 1000) : [], ...historyTarget(bookId) }));
+
+// Export Writing History…: the history as one HTML page anyone can open
+// (replay-export.js). The window sends the report as it showed it and the
+// page's words in the writer's language; the sessions, the seals and the
+// player are read here. The whole book carries its seals; chosen chapters
+// carry only their lines, and no seals (they covered the rest too).
+ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
+  const chapters = recChapters(opts.chapters);
+  const r = await historyRequest({ type: 'evidence', chapters, texts: true, ...historyTarget(bookId) });
+  if (!r.texts.length) throw new Error('Nothing recorded');
+  // every device's seals; an export of some chapters keeps them when they
+  // say what they sealed of those chapters' own lines (replay-export.js)
+  const seals = {};
+  for (const d of new Set(r.texts.map((s) => s.device))) seals[d] = ReplayExport.sealFiles(path.join(recRoot(bookId), libName(d), 'seals'));
+  // the page never carries a device's own name (device.json's, the computer's
+  // hostname): each is Device 1, 2, … in the order it first wrote
+  const shown = new Map();
+  for (const s of r.texts) if (!shown.has(s.device)) shown.set(s.device, t('Device {n}', { n: shown.size + 1 }));
+  r.texts = r.texts.map((s) => ({ ...s, name: shown.get(s.device) }));
+  const str = (v, n) => String(v || '').slice(0, n);
+  const strings = {};
+  for (const [k, v] of Object.entries(opts.strings || {})) if (typeof v === 'string') strings[k.slice(0, 2000)] = v.slice(0, 2000);
+  const html = ReplayExport.build({
+    title: str(opts.title, 500), author: str(opts.author, 500), lang: str(opts.lang, 20) || 'en', strings,
+    report: str(opts.report, 2000000), evidence: r.evidence, sessions: r.texts, seals, kept: chapters,
+    chapters: (Array.isArray(opts.order) ? opts.order : []).slice(0, 5000).map((c) => ({ id: str(c && c.id, 200), title: str(c && c.title, 500) })),
+    partial: !!chapters, script: opts.script === true, underline: opts.underline === true, version: app.getVersion(),
+    // each page's kind, and the editor's rules for a sheet with its type (sheetPageCss in app.js)
+    kinds: Object.fromEntries(Object.entries(opts.kinds && typeof opts.kinds === 'object' ? opts.kinds : {}).slice(0, 5000)
+      .filter(([, k]) => typeof k === 'string' && /^[a-z]{1,20}$/.test(k)).map(([c, k]) => [str(c, 200), k])),
+    css: str(opts.css, 20000000)
+  });
+  const win = BrowserWindow.getFocusedWindow();
+  const name = str(opts.fileName, 200).replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Writing History';
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: path.join(exportFolder(), name + '.html'),
+    filters: [{ name: 'HTML', extensions: ['html'] }]
+  });
+  if (canceled || !filePath) return null;
+  rememberExportFolder(filePath);
+  try {
+    fs.writeFileSync(filePath, html, 'utf8');
+  } catch (err) {
+    logError('export replay', err);
+    throw new Error('Could not write the file (' + ((err && err.message) || err) + ')');
+  }
+  return filePath;
+});
+
+// ---------------------------------------------------------------------------
+// Proof of when I wrote (docs/neo-recording-plan.md, part 2; proof.js):
+// opt-in, off unless library.proveWriting. Seals of this device's recording
+// of a book once the writing stops for a while (or has gone on for an
+// hour), when a session closes with words unsealed, and when the writer
+// names a tag, each signed with this computer's key and
+// stamped by two timestamp authorities. Only a seal's SHA-256 leaves the
+// computer, never a word. Nothing here holds up a save: the window isn't
+// waiting, and a stamp that fails is asked for again later.
+// ---------------------------------------------------------------------------
+const Proof = require('./proof.js');
+const PROOF_HOUR = 3600 * 1000;
+const PROOF_IDLE = 5 * 60 * 1000;
+let proofOn = false;
+let proofTimer = null;
+const proofQueues = new Map(); // bookId -> its last proof job: one at a time per book
+const proofWords = new Map();   // bookId -> { since, timer }: words written since its last seal
+
+// A chunk that wrote words (a chapter or stream written, taken out, a tag,
+// or a catch-up of text changed while nothing recorded) wants a seal: once
+// the writing has stopped for PROOF_IDLE, so the seal, and its mark on
+// History's timeline, comes at the end of the stretch it covers, or once
+// the first unsealed words are an hour old.
+// A chunk of caret moves and focus alone changes nothing worth sealing.
+function proofWrote(bookId, text) {
+  if (!proofOn || !/^\[\d+,"(?:w|d|tag)",|^\[\d+,"x","catch-up"\]/m.test(text)) return;
+  let w = proofWords.get(bookId);
+  if (!w) proofWords.set(bookId, w = { since: Date.now(), timer: null });
+  clearTimeout(w.timer);
+  if (Date.now() - w.since >= PROOF_HOUR) { proofRun(bookId, 'words'); return; }
+  w.timer = setTimeout(() => proofRun(bookId, 'words'), PROOF_IDLE);
+}
+
+// the window says what the writer chose (in library.json, which it reads)
+function proofSetFlags(f) {
+  if (!f || typeof f !== 'object') return;
+  proofOn = !!f.on;
+  if ('tsas' in f) proofServicesUse(Array.isArray(f.tsas) ? f.tsas : null);
+  // stamps that failed (offline) are asked for again every half hour, and
+  // another device's sessions that reached a book since are sealed
+  if (proofOn && !proofTimer) {
+    proofTimer = setInterval(() => {
+      if (!proofOn) return;
+      proofOthers().then((others) => { for (const bookId of new Set([...proofQueues.keys(), ...others])) proofRun(bookId, 'retry'); });
+    }, 30 * 60 * 1000);
+  }
+}
+
+// The books whose recording holds another device's folder: what Pocket
+// writes reaches this computer by sync, and is sealed here, open or not
+// (Pocket seals nothing itself). The library is walked by the proof worker.
+function proofOthers() {
+  return proofCall({ type: 'others', libraryDir: LIBRARY_DIR, me: recDevice() }).catch((err) => { logError('proof', err); return []; });
+}
+
+// This computer's signing key, Ed25519, made the first time it seals and
+// kept encrypted with safeStorage in userData, never in the library. Only
+// this process can read it; the proof worker is handed it as it starts.
+function proofKeyPem() {
+  let pem = readSecret('proofKey');
+  if (!pem) {
+    pem = Proof.newKey();
+    writeSecret('proofKey', pem);
+  }
+  return pem;
+}
+
+// The seals are made in a process of its own (proof-worker.js): a seal reads
+// the book's sessions, another device's among them, and a file iCloud won't
+// hand over held NEO's main process with it. Here it holds up only the
+// seals, and a job that overruns ends the worker (the next starts another).
+const PROOF_JOB_LIMIT_MS = 10 * 60 * 1000;
+let proofChild = null;
+let proofNext = 0;
+const proofPending = new Map(); // id -> { resolve, reject, timer }
+function proofWorker() {
+  if (proofChild) return proofChild;
+  const child = utilityProcess.fork(path.join(__dirname, 'proof-worker.js'), [], { serviceName: 'NEO proof' });
+  proofChild = child;
+  const gone = (why) => {
+    if (proofChild === child) proofChild = null;
+    for (const [id, p] of proofPending) { clearTimeout(p.timer); p.reject(new Error(why)); proofPending.delete(id); }
+  };
+  child.on('message', (m) => {
+    if (!m) return;
+    if (m.log) { logError(m.log, new Error(m.error)); return; }
+    const p = proofPending.get(m.id);
+    if (!p) return;
+    proofPending.delete(m.id);
+    clearTimeout(p.timer);
+    if (m.ok) p.resolve(m.result); else p.reject(new Error(m.error));
+  });
+  child.on('exit', (code) => gone('the proof worker stopped (' + code + ')'));
+  // (the key and the services first: messages are taken in the order sent)
+  proofSend(child, { type: 'key', pem: proofKeyPem() }).catch(() => {});
+  proofSend(child, proofServicesMsg()).catch(() => {});
+  return child;
+}
+function proofSend(child, msg) {
+  return new Promise((resolve, reject) => {
+    const id = ++proofNext;
+    const timer = setTimeout(() => {
+      proofPending.delete(id);
+      reject(new Error('proof: ' + msg.type + ' took longer than ' + PROOF_JOB_LIMIT_MS / 60000 + ' minutes, and the worker was stopped'));
+      try { child.kill(); } catch { /* gone */ }
+    }, PROOF_JOB_LIMIT_MS);
+    proofPending.set(id, { resolve, reject, timer });
+    child.postMessage({ ...msg, id });
+  });
+}
+const proofCall = (msg) => {
+  try { return proofSend(proofWorker(), msg); } catch (err) { return Promise.reject(err); }
+};
+// what a book's Sealer is made with, in the worker
+function proofSealerOpts(bookId) {
+  const device = recDevice();
+  return {
+    dir: recDir(bookId, device), book: libName(bookId), device,
+    cacheFile: path.join(app.getPath('userData'), 'recording-cache', libName(bookId), 'heads.json')
+  };
+}
+// a book whose history went: its Sealer too
+function proofForget(bookId) {
+  proofQueues.delete(bookId);
+  if (proofChild) proofSend(proofChild, { type: 'forget', bookId }).catch(() => {});
+}
+
+// The timestamp services, as the writer arranged them in Timestamp
+// services…: library.proofTsas, which the window reads and writes with the
+// rest of library.json, so the writer's other computers ask the same ones.
+// Each is { id, on } for one of NEO's three, or { id, name, url, on,
+// added: true, public, rootName, root } for one the writer added, with its
+// root's PEM, which its stamps are checked against. NEO's three that the
+// list lacks (none saved yet, or a fourth in a later NEO) come after, on.
+let proofTsasSaved = null;
+function proofServices() {
+  const out = [];
+  const seen = new Set();
+  for (const s of proofTsasSaved || []) {
+    if (!s || typeof s.id !== 'string' || seen.has(s.id)) continue;
+    const ours = Proof.TSAS.find((t) => t.id === s.id);
+    if (ours) out.push({ ...ours, on: s.on !== false, public: true });
+    else {
+      if (!s.added || !/^[a-z0-9-]{1,48}$/.test(s.id) || !/^https?:\/\//i.test(s.url || '')) continue;
+      const root = typeof s.root === 'string' && s.root.length < 65536 ? s.root : '';
+      let certs = [];
+      try { certs = Proof.certsIn(root); } catch { /* none */ }
+      if (!certs.length) continue; // can't be checked without it
+      out.push({ id: s.id, name: String(s.name || s.id), url: s.url, on: s.on !== false, added: true, public: !!s.public, rootName: String(s.rootName || ''), root });
+    }
+    seen.add(s.id);
+  }
+  for (const t of Proof.TSAS) if (!seen.has(t.id)) out.push({ ...t, on: true, public: true });
+  return out;
+}
+// what the worker's Sealers ask (those on), and the roots of the services
+// the writer added, which their stamps are checked against
+function proofServicesMsg() {
+  const list = proofServices();
+  return { type: 'services', tsas: list.filter((s) => s.on), added: list.filter((s) => s.added).map((s) => s.root) };
+}
+// the list in library.json, as the window last gave it (null: the defaults)
+function proofServicesUse(saved) {
+  proofTsasSaved = saved;
+  if (proofChild) proofSend(proofChild, proofServicesMsg()).catch((err) => logError('proof', err));
+}
+// A change in the dialog: kept here at once, and handed back for the window
+// to write into library.json as keep (null takes it out)
+function proofServicesSave(list) {
+  const keep = list
+    ? list.map((s) => (s.added
+      ? { id: s.id, name: s.name, url: s.url, on: s.on, added: true, public: s.public, rootName: s.rootName, root: s.root }
+      : { id: s.id, on: s.on }))
+    : null;
+  proofServicesUse(keep);
+  return { list: proofServicesShown(), keep };
+}
+// for the window: never the root itself
+const proofServicesShown = () => proofServices().map(({ root, gap, ...s }) => s);
+
+// A service being added, tried and waiting for the writer's yes: url -> it
+const proofTried = new Map();
+
+ipcMain.handle('proof:services', () => proofServicesShown());
+// the order and on/off the writer chose: [{ id, on }]
+ipcMain.handle('proof:servicesSet', (_e, order) => {
+  if (!Array.isArray(order)) return { list: proofServicesShown(), keep: proofTsasSaved };
+  const now = proofServices();
+  const list = [];
+  for (const o of order) {
+    const s = o && now.find((x) => x.id === o.id);
+    if (s && !list.includes(s)) list.push({ ...s, on: !!o.on });
+  }
+  for (const s of now) if (!list.some((x) => x.id === s.id)) list.push(s);
+  return proofServicesSave(list);
+});
+// Restore the defaults: NEO's three, on, and none of the writer's
+ipcMain.handle('proof:servicesReset', () => proofServicesSave(null));
+// one test request to a service the writer gives, and its root found:
+// { ok, url, name, public, rootName, problems }. Nothing is kept yet.
+ipcMain.handle('proof:serviceTry', async (_e, url) => {
+  let u;
+  try { u = new URL(String(url).trim()); } catch { return { ok: false, problems: [t('that isn’t a web address')] }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, problems: [t('it must start with http:// or https://')] };
+  // (the same address however it's written: http://host and http://host/)
+  const same = (url) => { try { return new URL(url).href === u.href; } catch { return false; } };
+  if (proofServices().some((s) => same(s.url))) return { ok: false, problems: [t('it’s already in the list')] };
+  const r = await Proof.tryService(u.href, { fetch: (...a) => globalThis.fetch(...a) });
+  if (!r.ok) return { ok: false, url: u.href, problems: r.problems };
+  const rootName = r.root.subject.split('\n').reverse().find((l) => /^(CN|O)=/.test(l)) || r.root.subject;
+  const tried = { url: u.href, name: u.hostname.replace(/^www\./, ''), public: r.public, rootName: rootName.replace(/^(CN|O)=/, ''), root: Proof.pemOf(r.root) };
+  proofTried.set(u.href, tried);
+  return { ok: true, url: tried.url, name: tried.name, public: tried.public, rootName: tried.rootName, problems: [] };
+});
+// the writer said yes: the service at the end of the list, on
+ipcMain.handle('proof:serviceAdd', (_e, url) => {
+  const tried = proofTried.get(url);
+  if (!tried) return { list: proofServicesShown(), keep: proofTsasSaved };
+  proofTried.delete(url);
+  const now = proofServices();
+  const id = Proof.serviceId(tried.url, [...Proof.TSAS.map((t) => t.id), ...now.map((s) => s.id)]);
+  return proofServicesSave([...now, { id, name: tried.name, url: tried.url, on: true, added: true, public: tried.public, rootName: tried.rootName, root: tried.root }]);
+});
+// one the writer added, taken out of the list. Its stamps already in a
+// book keep their root there, so they can still be checked.
+ipcMain.handle('proof:serviceRemove', (_e, id) => {
+  const now = proofServices();
+  const s = now.find((x) => x.id === id && x.added);
+  if (!s) return { list: proofServicesShown(), keep: proofTsasSaved };
+  return proofServicesSave(now.filter((x) => x !== s));
+});
+
+// A book's seals, one call at a time: `words` seals what changed if words
+// were written since the last seal (proofWrote), `now` whatever changed,
+// `start` renews a seal nearly a year old and seals words here no seal
+// covers yet (NEO quit or crashed before their seal); `start` and `retry`
+// seal another device's sessions no seal names yet (Sealer.others); then each
+// asks for the stamps the newest seal lacks. Resolves to the seal made, or
+// null.
+function proofRun(bookId, how) {
+  if (!proofOn) return Promise.resolve(null);
+  const w = proofWords.get(bookId);
+  if (how === 'words' && !w) return Promise.resolve(null);
+  if (w && (how === 'words' || how === 'now')) { clearTimeout(w.timer); proofWords.delete(bookId); }
+  const job = (proofQueues.get(bookId) || Promise.resolve()).then(async () => {
+    const r = await proofCall({ type: 'run', bookId, how, sealer: proofSealerOpts(bookId), now: Date.now() });
+    // (a book never written on here gets this computer's folder now)
+    if (r.made) await recPrepare(bookId);
+    if (how !== 'retry' || r.made || r.stamped) {
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('proof:changed', bookId);
+    }
+    return r.made;
+  }).catch((err) => { logError('proof', err); return null; });
+  proofQueues.set(bookId, job);
+  return job;
+}
+
+ipcMain.handle('proof:set', (_e, flags) => { proofSetFlags(flags); return true; });
+// a tag the writer named, or proof just turned on: sealed at once
+ipcMain.handle('proof:seal', async (_e, bookId) => !!(await proofRun(libName(bookId), 'now')));
+// for the dialog: how many seals, the newest, who stamped it; `settled`
+// waits for the seal and stamps under way (a book just opened asks again)
+ipcMain.handle('proof:status', async (_e, bookId, settled) => {
+  const st = { on: proofOn, seals: 0 };
+  try {
+    if (!fs.existsSync(path.join(recDir(bookId), 'seals'))) return st;
+    bookId = libName(bookId);
+    if (settled) await proofQueues.get(bookId);
+    return { ...st, ...await proofCall({ type: 'status', bookId, sealer: proofSealerOpts(bookId), now: Date.now() }) };
+  } catch (err) {
+    logError('proof', err);
+    return st;
+  }
+});
+
+// The window says when the recording setting changed, so the File menu's
+// tick follows it
+ipcMain.on('rec:state', () => {
+  try { buildMenu(); } catch (err) { logError('menu', err); }
+});
+
+// While Writing History is open, a menu item clicked closes it and then does
+// what it says; a shortcut does nothing behind it (the window drops a
+// message marked byKey). The window says when it opens and closes, so ⌘S
+// reads Tag This Moment… meanwhile.
+let historyOpen = false;
+ipcMain.on('ui:modal', (_e, on) => {
+  if (historyOpen === !!on) return;
+  historyOpen = !!on;
+  try { buildMenu(); } catch (err) { logError('menu', err); }
+});
+// whether the menu item running now was reached by its shortcut, for
+// sendToWindow to say so
+let menuByKey = false;
+function markShortcuts(items) {
+  for (const item of items) {
+    if (Array.isArray(item.submenu)) markShortcuts(item.submenu);
+    if (typeof item.click !== 'function') continue;
+    const click = item.click;
+    item.click = (mi, w, ev) => {
+      menuByKey = !!(ev && ev.triggeredByAccelerator);
+      try { return click(mi, w, ev); } finally { menuByKey = false; }
+    };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Cover art: images live inside the book's folder, so covers travel with
@@ -1383,7 +2134,7 @@ function readSecret(name) {
   }
 }
 
-ipcMain.handle('secret:set', (_e, name, value) => {
+function writeSecret(name, value) {
   const { safeStorage } = require('electron');
   const all = readJSON(SECRETS_FILE(), {});
   if (!value) {
@@ -1394,6 +2145,11 @@ ipcMain.handle('secret:set', (_e, name, value) => {
     all[name] = { enc: false, value: String(value) };
   }
   writeJSON(SECRETS_FILE(), all);
+}
+
+ipcMain.handle('secret:set', (_e, name, value) => {
+  if (name === 'proofKey') return false; // the signing key is NEO's own, never the window's
+  writeSecret(name, value);
   return true;
 });
 
@@ -2414,6 +3170,14 @@ process.on('uncaughtException', (err) => logError('main', err));
 process.on('unhandledRejection', (err) => logError('main-promise', err));
 ipcMain.handle('log:error', (_e, msg) => logError('renderer', msg));
 
+// What Backups/README.txt says: how to get things back
+const backupReadme = () => [
+  t('These are NEO’s backups of your library.'),
+  t('Each neo-backup-<date>.zip is the whole library as it was that day, and the last 14 days are kept. To get a book or a chapter back, open a zip and copy the book’s folder, or the chapter’s file from its chapters folder, into your library. Close NEO first.'),
+  t('Writing History is kept apart, in the recordings folder, because a finished session never changes: each one is copied there once, when it ends, and kept. To get a book’s history back, copy recordings/<book folder>/ into that book’s recording folder. Names never clash, and a file in both places is the same file.'),
+  t('Restoring a chapter from a zip leaves its history alone: the history already holds every earlier version, and shows the text going back.')
+].join('\n\n') + '\n';
+
 // One zip of the whole library per day, keeping the last 14. Cheap insurance.
 // The day's backup is made in a process of its own (backup-worker.js). It
 // reads every file in the library, and a file iCloud (or a sync tool) won't
@@ -2421,17 +3185,28 @@ ipcMain.handle('log:error', (_e, msg) => logError('renderer', msg));
 // that day or any day after, since the backup ran at launch. Now a stuck
 // file holds up only the backup, which leaves it out and says so, and a
 // backup that overruns altogether is ended.
+// Books' recordings aren't in the zip: a finished session never changes, so
+// the same process copies each one once into Backups/recordings/<book
+// folder>/ instead, this device's every one, another device's once it closed
+// more than 7 days ago and is still missing (RecFiles.sweep), at every call,
+// after the zip, so a session file that won't come can't cost the day's zip.
 let BACKUP_LIMIT_MS = 15 * 60 * 1000; // the whole job
 let BACKUP_FILE_LIMIT_MS = 20 * 1000; // one file
 function dailyBackup() {
   if (backupRunning) return Promise.resolve(); // one at a time (the hourly look can meet a slow one)
   let target;
+  let device;
   try {
     ensureLibrary();
     const backupsDir = path.join(LIBRARY_DIR, 'Backups');
     if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    const readme = path.join(backupsDir, 'README.txt');
+    let was = null;
+    try { was = fs.readFileSync(readme, 'utf8'); } catch { /* not yet */ }
+    if (was !== backupReadme()) writeFileDurable(readme, backupReadme());
+    device = recDevice();
     target = path.join(backupsDir, `neo-backup-${new Date().toISOString().slice(0, 10)}.zip`);
-    if (fs.existsSync(target)) return Promise.resolve();
+    if (fs.existsSync(target)) target = null; // today's is made: the recordings alone
   } catch (err) {
     logError('backup', err);
     return Promise.resolve();
@@ -2440,16 +3215,21 @@ function dailyBackup() {
   return new Promise((resolve) => {
     let child = null;
     let timer = null;
+    let mirrored = 0;
+    let done = false;
+    // this call's own end: a worker's late 'exit' after its answer must not
+    // end the next backup, already under way
     const finish = (err) => {
-      if (!backupRunning) return;
+      if (done) return;
+      done = true;
       backupRunning = false;
       clearTimeout(timer);
       if (err) {
         logError('backup', err);
-        try { fs.unlinkSync(target + '.tmp'); } catch { /* none */ }
+        if (target) try { fs.unlinkSync(target + '.tmp'); } catch { /* none */ }
       }
       try { if (child) child.kill(); } catch { /* gone */ }
-      resolve();
+      resolve(mirrored);
     };
     try {
       child = utilityProcess.fork(path.join(__dirname, 'backup-worker.js'), [], { serviceName: 'NEO backup' });
@@ -2457,12 +3237,18 @@ function dailyBackup() {
     timer = setTimeout(() => finish(new Error('the backup took longer than ' + BACKUP_LIMIT_MS / 60000 + ' minutes and was stopped')), BACKUP_LIMIT_MS);
     child.on('message', (msg) => {
       if (!msg || !msg.ok) { finish(new Error((msg && msg.error) || 'the backup failed')); return; }
+      mirrored = msg.mirrored || 0;
       if (msg.away && msg.away.length) requestDownload(new Set(msg.away));
       if (msg.missed && msg.missed.length) logError('backup', new Error("left out of today's backup: " + msg.missed.join(', ')));
+      for (const e of msg.errors || []) logError('recording backup', new Error(e));
       finish(null);
     });
     child.on('exit', (code) => finish(code ? new Error('the backup stopped (' + code + ')') : null));
-    child.postMessage({ libraryDir: LIBRARY_DIR, target, keep: 14, fileLimitMs: BACKUP_FILE_LIMIT_MS });
+    child.postMessage({
+      libraryDir: LIBRARY_DIR, target, keep: 14, fileLimitMs: BACKUP_FILE_LIMIT_MS,
+      recordings: { mirror: recMirrorRoot(), device },
+      recordingsNote: t('Writing History isn’t in this zip. Each book’s history is in Backups/recordings/, beside the zips, and Backups/README.txt says how to put it back.') + '\n'
+    });
   });
 }
 let backupRunning = false;
@@ -2554,6 +3340,12 @@ function createWindow() {
   win.on('enter-full-screen', () => fullScreenChanged(true));
   win.on('leave-full-screen', () => fullScreenChanged(false));
   win.webContents.on('did-finish-load', () => { if (win.isFullScreen()) fullScreenChanged(true); });
+  // a page loaded afresh has no Writing History open: give the menus back
+  win.webContents.on('did-start-loading', () => {
+    if (!historyOpen) return;
+    historyOpen = false;
+    try { buildMenu(); } catch (err) { logError('menu', err); }
+  });
   const remember = () => {
     clearTimeout(rememberTimer);
     if (win.isDestroyed() || win.isFullScreen() || win.isMinimized()) return;
@@ -2739,7 +3531,7 @@ ipcMain.handle('spell:learn', async (_e, word) => {
 // ---------------------------------------------------------------------------
 function sendToWindow(msg) {
   const w = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
-  if (w) w.webContents.send('menu', msg);
+  if (w) w.webContents.send('menu', menuByKey ? { ...msg, byKey: true } : msg);
 }
 
 // the Format menu's ticks: whether the caret is in a poetry paragraph, and
@@ -2966,7 +3758,9 @@ function buildMenu() {
           submenu: scriptState.on ? [
             { label: 'PDF (.pdf)', click: () => sendToWindow({ type: 'export', format: 'pdf' }) },
             { label: 'Fountain (.fountain)', click: () => sendToWindow({ type: 'export', format: 'fountain' }) },
-            { label: 'Final Draft (.fdx)', click: () => sendToWindow({ type: 'export', format: 'fdx' }) }
+            { label: 'Final Draft (.fdx)', click: () => sendToWindow({ type: 'export', format: 'fdx' }) },
+            { type: 'separator' },
+            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) }
           ] : [
             { feature: 'exports', label: t('Plain Text (.txt)'), click: () => sendToWindow({ type: 'export', format: 'txt' }) },
             { feature: 'exports', label: 'Markdown (.md)', click: () => sendToWindow({ type: 'export', format: 'md' }) },
@@ -2974,6 +3768,8 @@ function buildMenu() {
             { label: 'PDF (.pdf)', click: () => sendToWindow({ type: 'export', format: 'pdf' }) },
             { label: 'Word (.docx)', click: () => sendToWindow({ type: 'export', format: 'docx' }) },
             { label: 'EPUB (.epub)', click: () => sendToWindow({ type: 'export', format: 'epub' }) },
+            { type: 'separator' },
+            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) },
             { type: 'separator' },
             { label: t('Paperback for KDP…'), click: () => sendToWindow({ type: 'export', format: 'paperback' }) },
             { feature: 'exports', label: t('Manuscript Format…'), click: () => sendToWindow({ type: 'export', format: 'manuscript' }) }
@@ -2989,13 +3785,33 @@ function buildMenu() {
         { type: 'separator' },
         // shown, not registered: the window answers ⌘S itself, so it works the
         // same in Pocket with a keyboard and never fires twice
-        { label: t('Take Snapshot'), accelerator: 'CmdOrCtrl+S', registerAccelerator: false, click: () => sendToWindow({ type: 'snapshot' }) },
+        // (in Writing History, ⌘S tags the moment on the sheet)
+        { id: 'snapshot', label: historyOpen ? t('Tag This Moment…') : t('Take Snapshot'), accelerator: 'CmdOrCtrl+S', registerAccelerator: false, click: () => sendToWindow({ type: 'snapshot' }) },
         { type: 'separator' },
         { feature: 'covers', label: t('Cover Art…'), click: () => sendToWindow({ type: 'coverArt' }) },
         {
           label: t('Goals…'),
           accelerator: 'CmdOrCtrl+,',
           click: () => sendToWindow({ type: 'stats' })
+        },
+        {
+          label: t('Writing History…'),
+          click: () => sendToWindow({ type: 'history' })
+        },
+        {
+          // one setting, three levels, kept in library.json as the window
+          // writes them (setHistoryLevel); nothing until the writer's asked
+          label: t('Record Writing History'),
+          submenu: (() => {
+            const lib = readJSON(LIBRARY_FILE, {});
+            const level = lib.historyAsked !== true || lib.recordWriting === false ? 'off' : lib.proveWriting === true ? 'timestamp' : 'record';
+            return [...[['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
+              label, type: 'radio', checked: level === value, click: () => sendToWindow({ type: 'historyLevel', value })
+            })),
+            // who stamps the seals (openTsaServices in app.js)
+            { type: 'separator' },
+            { label: t('Timestamp Services…'), click: () => sendToWindow({ type: 'tsaServices' }) }];
+          })()
         },
         { type: 'separator' },
         {
@@ -3028,6 +3844,7 @@ function buildMenu() {
         { role: 'pasteAndMatchStyle', label: t('Paste and Match Style') }, { role: 'selectAll', label: t('Select All') },
         { type: 'separator' },
         {
+          id: 'find',
           label: isMac ? t('Find & Replace') : t('Find & Replace').replace(/&/g, '&&'),
           accelerator: 'CmdOrCtrl+F',
           click: () => sendToWindow({ type: 'find' })
@@ -3268,6 +4085,7 @@ function buildMenu() {
       ]
     }
   ];
+  markShortcuts(template);
   const menu = Menu.buildFromTemplate(featureTemplate(template, featuresState));
   editMenuState.edit = null; // the old menu bar is going: forget its Edit menu first
   Menu.setApplicationMenu(menu);

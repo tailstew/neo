@@ -80,7 +80,7 @@ function vimWord(key) {
   let n = 0;
   if (key === 'w') {
     const start = vimClass(chars[0]);
-    while (n < chars.length && start && vimClass(chars[n]) === start) n++;
+    if (start) while (n < chars.length && vimClass(chars[n]) === start) n++;
     while (n < chars.length && vimClass(chars[n]) === 0) n++;
     if (n >= chars.length) { vimMove('forward', 'paragraphboundary'); vimMove('forward', 'character'); return; }
   } else if (key === 'e') {
@@ -93,7 +93,7 @@ function vimWord(key) {
     chars.reverse();
     while (n < chars.length && vimClass(chars[n]) === 0) n++;
     const cls = vimClass(chars[n]);
-    while (n < chars.length && cls && vimClass(chars[n]) === cls) n++;
+    if (cls) while (n < chars.length && vimClass(chars[n]) === cls) n++;
     if (!chars.length) { vimMove('backward', 'character'); vimMove('backward', 'paragraphboundary'); return; }
   }
   vimMove(key === 'b' ? 'backward' : 'forward', 'character', n);
@@ -379,7 +379,7 @@ function createChapterAt(idx) {
   // (from the order as it stands, before the new chapter joins it)
   const first = isScript() ? '<p><br></p>' : newChapterHtml(book.chapterOrder, idx, (c) => chapterHTML[c], (c) => isStory(c));
   book.chapterOrder.splice(idx, 0, chId);
-  chapterHTML[chId] = first;
+  setChapterHTML(chId, first, 'new');
   persistChapter(chId);
   saveMeta();
   renderChapters();
@@ -393,18 +393,21 @@ function newChapter() {
   focusChapter(chId);
 }
 
-async function deleteChapterQuiet(chId) {
+// cause: what Writing History says took it ('merge' when its words went
+// into another chapter, 'outline' onto a loose card)
+async function deleteChapterQuiet(chId, cause = 'delete') {
   // a save still queued for this chapter must not resurrect it (nejcc, #70)
   clearTimeout(saveTimers[chId]);
   delete saveTimers[chId];
   book.chapterOrder = book.chapterOrder.filter((c) => c !== chId);
-  delete chapterHTML[chId];
+  dropChapterHTML(chId, cause);
   delete wordCache[chId];
   if (book.sectionNotes) delete book.sectionNotes[chId];
   if (book.chapterNotes) delete book.chapterNotes[chId];
   if (book.chapterKinds) delete book.chapterKinds[chId];
   stickies = stickies.filter((s) => s.chapterId !== chId);
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies, 'delete');
+  rec.streams('delete');
   const bookId = book.id;
   renderChapters();
   renderStickies();

@@ -145,6 +145,68 @@ describe('filesystem', { concurrency: 1 }, () => {
     }
   });
 
+  test("a sync program's conflict copies of a chapter are found, and those taken in already aren't read", () => {
+    const dir = tempLibrary();
+    try {
+      const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
+      const chapters = path.join(dir, book.id, 'chapters');
+      const copies = {
+        'ch-a1-b2.sync-conflict-20261030-144927-Q7EGGF3.html': 'ch-a1-b2', // Syncthing
+        "ch-a1-b2 (Ada's conflicted copy 2026-10-30).html": 'ch-a1-b2', // Dropbox
+        'ch-a1-b2 (conflicted copy 2026-10-30 144927).html': 'ch-a1-b2', // Nextcloud
+        'ch-a1-b2 2.html': 'ch-a1-b2' // iCloud
+      };
+      fs.writeFileSync(path.join(chapters, 'ch-a1-b2.html'), '<p>here</p>');
+      for (const name of Object.keys(copies)) fs.writeFileSync(path.join(chapters, name), '<p>there</p>');
+      fs.writeFileSync(path.join(chapters, 'ch-a1-b2.html.tmp'), '<p>half</p>');
+      const found = main.call('chapter:conflicts', book.id);
+      assert.equal(JSON.stringify(found.map((c) => [c.file, c.chapterId]).sort()), JSON.stringify(Object.entries(copies).sort()));
+      assert.ok(found.every((c) => c.html === '<p>there</p>' && !c.taken));
+
+      const skip = ['ch-a1-b2 2.html', 'ch-a1-b2.sync-conflict-20261030-144927-Q7EGGF3.html'];
+      const again = main.call('chapter:conflicts', book.id, skip);
+      assert.equal(again.length, 4, 'every copy still listed');
+      for (const c of again) {
+        if (skip.includes(c.file)) assert.equal(JSON.stringify(c), JSON.stringify({ file: c.file, chapterId: 'ch-a1-b2', taken: true }), 'unread');
+        else assert.equal(c.html, '<p>there</p>');
+      }
+      assert.deepEqual(fs.readdirSync(chapters).sort(), ['ch-a1-b2.html', 'ch-a1-b2.html.tmp', ...Object.keys(copies)].sort(), 'nothing moved');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a sync program's conflict copies of book.json are found and read, and those taken in already aren't", () => {
+    const dir = tempLibrary();
+    try {
+      const book = main.call('book:create', { title: 'Hello', author: 'Ada' });
+      const folder = path.join(dir, book.id);
+      const copies = {
+        'book.sync-conflict-20261030-155357-ZJR4MCC.json': '{"chapterOrder":["a"]}',
+        "book (Ada's conflicted copy 2026-10-30).json": '{"chapterOrder":["b"]}',
+        'book 2.json': '{"chapterOrder":',
+        'book.json.sync-conflict-20261030-155358-ZJR4MCC.bak': '{"chapterOrder":["c"]}'
+      };
+      for (const [name, text] of Object.entries(copies)) fs.writeFileSync(path.join(folder, name), text);
+      fs.writeFileSync(path.join(folder, 'notes.sync-conflict-20261030-155357-ZJR4MCC.html'), '<p>not book.json</p>');
+      const found = main.call('book:conflicts', book.id);
+      assert.equal(JSON.stringify(found.map((c) => [c.file, c.meta && c.meta.chapterOrder]).sort()), JSON.stringify([
+        ["book (Ada's conflicted copy 2026-10-30).json", ['b']],
+        ['book 2.json', null], // half there
+        ['book.json.sync-conflict-20261030-155358-ZJR4MCC.bak', null], // a backup: listed, not read
+        ['book.sync-conflict-20261030-155357-ZJR4MCC.json', ['a']]
+      ]));
+      const again = main.call('book:conflicts', book.id, ['book.sync-conflict-20261030-155357-ZJR4MCC.json']);
+      assert.equal(JSON.stringify(again.find((c) => c.file === 'book.sync-conflict-20261030-155357-ZJR4MCC.json')),
+        JSON.stringify({ file: 'book.sync-conflict-20261030-155357-ZJR4MCC.json', meta: null, taken: true }));
+      assert.equal(JSON.stringify(again.find((c) => c.file === "book (Ada's conflicted copy 2026-10-30).json").meta.chapterOrder), '["b"]');
+      for (const name of Object.keys(copies)) assert.equal(fs.existsSync(path.join(folder, name)), true, 'nothing moved');
+      assert.equal(fs.existsSync(path.join(folder, 'sync-conflicts')), false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('notes round-trip, and a JSON replace leaves the whole file and no .tmp', () => {
     const dir = tempLibrary();
     try {

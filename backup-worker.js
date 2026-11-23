@@ -7,8 +7,14 @@
 // process: each file gets a time limit, one that runs out is left out of the
 // zip and named, and main.js ends this process if the whole job overruns.
 //
-// Message in:  { libraryDir, target, keep, fileLimitMs? }
-// Message out: { ok: true, missed: [...], away: [...] } or { ok: false, error }
+// It also copies each book's closed Writing History sessions into the
+// mirror, Backups/recordings/<book folder>/ (RecFiles.sweep), after the zip,
+// so a session file that won't come can't cost the day's zip. The zip leaves
+// every book's recording/ out.
+//
+// Message in:  { libraryDir, target (null: today's zip is made), keep, fileLimitMs?,
+//                recordings?: { mirror, device }, recordingsNote? }
+// Message out: { ok: true, missed: [...], away: [...], mirrored, errors: [...] } or { ok: false, error }
 
 'use strict';
 
@@ -62,7 +68,7 @@ async function writeDurable(file, data) {
   await fsp.rename(tmp, file);
 }
 
-async function backup({ libraryDir, target, keep, fileLimitMs = FILE_LIMIT_MS }) {
+async function zipLibrary({ libraryDir, target, keep, fileLimitMs = FILE_LIMIT_MS, recordingsNote }) {
   const JSZip = require('jszip');
   const zip = new JSZip();
   const missed = [];
@@ -75,8 +81,9 @@ async function backup({ libraryDir, target, keep, fileLimitMs = FILE_LIMIT_MS })
       // only NEO's own things: a library kept in a busy folder (Dropbox,
       // Documents) doesn't zip everything else in there every day
       if (rel === '' && !(name.startsWith('book-') || name.startsWith('library.json') || name === '_catalog.txt')) continue;
-      // a book's snapshots stay out: they're a history of their own
-      if (name === 'snapshots' && rel.startsWith('book-') && !rel.includes('/')) continue;
+      // a book's snapshots stay out: they're a history of their own; its
+      // Writing History too: that's mirrored instead (recordings, below)
+      if ((name === 'snapshots' || name === 'recording') && rel.startsWith('book-') && !rel.includes('/')) continue;
       if (name === '.DS_Store' || /^\..+\.icloud$/.test(name)) continue; // Finder litter; iCloud's stand-in for a file
       const full = path.join(dir, name);
       const relPath = rel ? rel + '/' + name : name;
@@ -100,6 +107,7 @@ async function backup({ libraryDir, target, keep, fileLimitMs = FILE_LIMIT_MS })
       missed.push(`${relPath} (${err.code === 'ETIMEDOUT' ? 'not handed over in time' : err.code || err.message})`);
     }
   }
+  if (recordingsNote) zip.file('_recordings.txt', recordingsNote);
   if (missed.length) zip.file('_left-out-of-this-backup.txt', missed.join('\n') + '\n');
   const data = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   await JSZip.loadAsync(data); // reads back whole, or it doesn't count
@@ -109,6 +117,51 @@ async function backup({ libraryDir, target, keep, fileLimitMs = FILE_LIMIT_MS })
   const backups = (await fsp.readdir(dir)).filter((f) => /^neo-backup-.*\.zip$/.test(f)).sort();
   while (backups.length > keep) await fsp.unlink(path.join(dir, backups.shift())).catch(() => {});
   return { missed, away: [...away] };
+}
+
+// Writing History's backup: each book's closed sessions copied once into the
+// mirror, this device's every one, another device's once it closed more than
+// 7 days ago and is still missing. Copies only what the mirror lacks, so a
+// second run copies nothing. A copy is read back and compared before it stays.
+async function recordings(libraryDir, { mirror, device }) {
+  const zlib = require('zlib');
+  const RecFiles = require('./recording-files.js');
+  const errors = [];
+  const io = RecFiles.nodeIO({
+    fs, path, zlib,
+    write: (file, data) => {
+      const tmp = file + '.tmp';
+      const fd = fs.openSync(tmp, 'w');
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
+      try {
+        // as main.js's writeFileDurable: on until every byte is down
+        for (let off = 0; off < buf.length;) {
+          const n = fs.writeSync(fd, buf, off, buf.length - off);
+          if (!(n > 0)) throw Object.assign(new Error('Short write: ' + tmp), { code: 'EIO' });
+          off += n;
+        }
+        fs.fsyncSync(fd);
+      } finally { fs.closeSync(fd); }
+      fs.renameSync(tmp, file);
+    },
+    log: (source, err) => errors.push(source + ': ' + String((err && err.stack) || err))
+  });
+  let mirrored = 0;
+  let names = [];
+  try { names = await fsp.readdir(libraryDir); } catch { return { mirrored, errors }; }
+  for (const name of names) {
+    if (!name.startsWith('book-')) continue;
+    const root = path.join(libraryDir, name, 'recording');
+    try { if (!(await fsp.stat(root)).isDirectory()) continue; } catch { continue; }
+    try { mirrored += await RecFiles.sweep(io, root, path.join(mirror, name), device); } catch (err) { errors.push(name + ': ' + String((err && err.stack) || err)); }
+  }
+  return { mirrored, errors };
+}
+
+async function backup(job) {
+  const zipped = job.target ? await zipLibrary(job) : { missed: [], away: [] };
+  const rec = job.recordings ? await recordings(job.libraryDir, job.recordings) : { mirrored: 0, errors: [] };
+  return { ...zipped, ...rec };
 }
 
 // Electron's utility process (parentPort); a plain Node child in the tests

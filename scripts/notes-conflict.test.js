@@ -39,6 +39,9 @@ function harness() {
     book: { id: 'b1' },
     window: { neo },
     console,
+    // Writing History's recorder, which these pages are recorded by (app/recording.js)
+    recIsNotesKind: () => false,
+    recNotesRead() {},
   });
   const api = vm.runInContext(
     `let auxDirty = false;\n${block}\n({ flushAux, refreshOpenAux, auxPending, auxBase, auxSeq, setDirty(v) { auxDirty = v; } })`,

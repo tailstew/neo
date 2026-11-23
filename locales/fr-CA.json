@@ -24,5 +24,14 @@
   "What happens in this scene?": "Que se passe-t-il dans cette scène?",
   "What happens in this section?": "Que se passe-t-il dans cette section?",
   "What happens in this section…": "Que se passe-t-il dans cette section?",
-  "What needs doing here?": "Que reste-t-il à faire ici?"
+  "What needs doing here?": "Que reste-t-il à faire ici?",
+  "{n} sessions; {b} with a broken chain, {u} not following the one before (one is missing between).": {
+    "one": "{n} séance; {b} à la chaîne rompue, {u} sans suite avec la précédente (il en manque une entre les deux).",
+    "other": "{n} séances; {b} à la chaîne rompue, {u} sans suite avec la précédente (il en manque une entre les deux)."
+  },
+  "Half of the gaps between keys were between {low} and {high}; the middle one was {mid}.": "La moitié des intervalles entre touches était entre {low} et {high}; l’intervalle médian était de {mid}.",
+  "Timestamp your writing history?": "Horodater votre historique d’écriture?",
+  "Restore the defaults?": "Rétablir les réglages par défaut?",
+  "Sealed {when}. Last timestamped {then}; waiting for the network for the rest.": "Scellé {when}. Dernier horodatage {then}; en attente du réseau pour le reste.",
+  "This browser can’t check Ed25519 signatures; a recent Chrome, Firefox or Safari can.": "Ce navigateur ne sait pas vérifier les signatures Ed25519; un Chrome, Firefox ou Safari récent le peut."
 }

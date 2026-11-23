@@ -32,6 +32,8 @@ function keepTypingStyle(doc, move) {
 
 function wireChapterBody(body, chId) {
   body.addEventListener('focus', () => { currentChapterId = chId; updateCounters(); highlightNav(); });
+  // ahead of NEO's own handlers, which may change the page themselves
+  for (const type of ['keydown', 'beforeinput', 'paste']) body.addEventListener(type, () => rec.drift(chId, body));
 
   // ⌘Z takes back what was typed since the last pause, not a whole page of
   // it: a second of quiet closes the engine's undo run (the caret stays put).
@@ -51,12 +53,12 @@ function wireChapterBody(body, chId) {
       if (keepTypingStyle(document, () => sel.collapse(sel.anchorNode, sel.anchorOffset)).length) sc.scrollTop = keep;
     }, 1000);
   };
-  body.addEventListener('input', () => {
+  body.addEventListener('input', (e) => {
     sealUndoOnEdit(); // chapterHTML is still the text from before this edit
     breakRun = 0; // fresh typing: ⌘Z belongs to the engine again
     if (isScript()) scriptInput(body);
     markDialogueOpening(body);
-    chapterHTML[chId] = captureBody(body);
+    setChapterHTML(chId, captureBody(body), 'input', { inputType: e.inputType, hint: (html) => caretHtmlOffset(body, html) });
     wordCache[chId] = null;
     scheduleChapterSave(chId);
     if (nbspMarksEnabled) paintNonBreakingMarks();
@@ -113,7 +115,7 @@ function wireChapterBody(body, chId) {
         const caret = captureCaret();
         stripJunkSpans(body);
         restoreCaret(caret);
-        syncChapter(body, chId); // what's saved is the cleaned paragraph
+        syncChapter(body, chId, 'tidy'); // what's saved is the cleaned paragraph
       }
       reconcileMarks();
     } else if (text) {
@@ -177,7 +179,7 @@ function wireChapterBody(body, chId) {
     // a script: its own Enter, Tab and ⌘1–7; no breaks, poetry or chapters
     if (isScript()) {
       if (scriptKey(e, body)) return;
-      if (spaceSafeDelete(e, body, chId)) return;
+      if (spaceSafeDelete(e, body)) return;
       if (emptyChapterBackspace(e, body, chId)) return;
       if (chapterStartBackspace(e, body, chId)) return;
       if (guardMarkerDelete(e, body, chId)) return;
@@ -190,7 +192,7 @@ function wireChapterBody(body, chId) {
     if (handleFlush(e, body, chId)) return;
     if (poetryBackspace(e, body, chId)) return;
     if (sceneBreakDelete(e, body, chId)) return;
-    if (spaceSafeDelete(e, body, chId)) return;
+    if (spaceSafeDelete(e, body)) return;
     if (emptyChapterBackspace(e, body, chId)) return;
     if (chapterStartBackspace(e, body, chId)) return;
     if (guardMarkerDelete(e, body, chId)) return;
@@ -607,7 +609,7 @@ function chapterStartBackspace(e, body, chId) {
   // …and on its first line. Below an empty line, Backspace takes the empty
   // line away and the paragraph moves up to the top of the chapter; it
   // never reaches past it into the chapter above.
-  let el = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer;
+  const el = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer;
   const block = el && el.closest ? el.closest('p') : null;
   if (block && body.contains(block) && block !== body.firstElementChild) {
     const above = block.previousElementSibling;
@@ -616,7 +618,7 @@ function chapterStartBackspace(e, body, chId) {
     snapshotStructure('empty line removed');
     above.remove();
     placeCaret(block, 0);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -644,10 +646,10 @@ function chapterStartBackspace(e, body, chId) {
   const was = caretHeight();
   const prevCount = prevBody.querySelectorAll('p').length;
   const keepScroll = $('#paper-scroll').scrollTop;
-  chapterHTML[prevId] = captureBody(prevBody) + captureBody(body);
+  setChapterHTML(prevId, captureBody(prevBody) + captureBody(body), 'merge');
   persistChapter(prevId);
   for (const s of stickies) if (s.chapterId === chId) s.chapterId = prevId;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies, 'merge');
   for (const d of darlings) if (d.chapterId === chId) d.chapterId = prevId;
   writeSidecar(book.id, 'darlings', darlings);
   foldNotesPage(chId, prevId);
@@ -659,7 +661,8 @@ function chapterStartBackspace(e, body, chId) {
   if (book.chapterNotes) delete book.chapterNotes[chId];
   if (book.chapterKinds) delete book.chapterKinds[chId];
   book.chapterOrder = book.chapterOrder.filter((c) => c !== chId);
-  delete chapterHTML[chId];
+  dropChapterHTML(chId, 'merge');
+  rec.streams('merge');
   clearTimeout(saveTimers[chId]);
   delete saveTimers[chId];
   // on disk, in the order that can't lose a word: the chapter above with
@@ -753,7 +756,7 @@ function flatPoint(p, off) {
 // whitespace repair, which duplicates a neighboring character. When that exact
 // hazard is about to happen, take the right-hand space along with the deletion,
 // leaving one clean space. All other deletes stay native.
-function spaceSafeDelete(e, body, chId) {
+function spaceSafeDelete(e, body) {
   if (e.key !== 'Backspace' && e.key !== 'Delete') return false;
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   const sel = window.getSelection();
@@ -856,7 +859,7 @@ function guardMarkerDelete(e, body, chId) {
       renderAllFootnoteLists();
     } else {
       adjacent.remove();
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
     }
     return true;
   }
@@ -877,7 +880,7 @@ function guardMarkerDelete(e, body, chId) {
   caret.collapse(true);
   sel.removeAllRanges();
   sel.addRange(caret);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'break');
   return true;
 }
 
@@ -924,10 +927,10 @@ function splitChapterAt(body, chId, block, sel, was) {
     n = next;
   }
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'split');
   const idx = book.chapterOrder.indexOf(chId);
   const newId = createChapterAt(idx + 1);
-  chapterHTML[newId] = parts.join('') || '<p><br></p>';
+  setChapterHTML(newId, parts.join('') || '<p><br></p>', 'split');
   persistChapter(newId);
   renderChapters();
   settle();
@@ -964,7 +967,7 @@ function handleEnter(e, body, chId) {
       restoreCaret(caret);
     }
     document.execCommand('insertParagraph');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
   if (block.classList.contains('scene-break')) { e.preventDefault(); return true; } // Enter on a *** line: nothing
@@ -979,7 +982,7 @@ function handleEnter(e, body, chId) {
       block.classList.remove('poetry', 'flush');
       romanize(block);
       placeCaret(block, 0);
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
       resetNativeUndo();
       breakRun++;
       return true;
@@ -992,7 +995,7 @@ function handleEnter(e, body, chId) {
       if (wasPoetry) romanize(cur);
       placeCaret(cur, 0);
     }
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
   const prev = block.previousElementSibling;
@@ -1037,7 +1040,7 @@ function handleEnter(e, body, chId) {
       keep.collapse(true);
       sel.removeAllRanges();
       sel.addRange(keep);
-      syncChapter(body, chId);
+      syncChapter(body, chId, 'break');
       resetNativeUndo();
       // no input event follows a break made by hand, so the caret is kept in
       // sight here, as typing keeps it: a break near the window's foot pushed
@@ -1058,7 +1061,7 @@ function handleEnter(e, body, chId) {
       restoreCaret(caret);
     }
     document.execCommand('insertParagraph');
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     return true;
   }
 
@@ -1092,7 +1095,7 @@ function handleEnter(e, body, chId) {
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     if (!typewriterEnabled) revealCaretSettled(body); // (see the break above)
     breakRun++;

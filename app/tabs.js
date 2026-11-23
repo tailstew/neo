@@ -4,7 +4,7 @@
 /*  TABS — Manuscript / Notes / Outline / Darlings                     */
 /* ================================================================== */
 
-$$('.tab').forEach((tab) => {
+$$('.tab[data-tab]').forEach((tab) => {
   tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   tab.addEventListener('dblclick', async () => {
     const kind = tab.dataset.tab;
@@ -20,6 +20,11 @@ $$('.tab').forEach((tab) => {
     writeLibrary(library);
   });
 });
+
+// History, after the tabs: the Writing History, scrolled to the chapter the caret is in
+const historyBtn = $('.tab.history-btn');
+historyBtn.hidden = !historyCanOpen();
+historyBtn.addEventListener('click', () => openHistory());
 
 // Darlings tab is a drop target for selected text
 const darlingsTab = $('.tab.darlings');
@@ -149,7 +154,7 @@ async function moveSelectionToDarlings(html, text) {
   if (chId) {
     const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
     if (body) {
-      chapterHTML[chId] = captureBody(body);
+      setChapterHTML(chId, captureBody(body), 'darling-out');
       wordCache[chId] = null;
     }
   }
@@ -184,7 +189,7 @@ async function moveSelectionToDarlings(html, text) {
   }
   if (chId && book && book.id === bookId) scheduleChapterSave(chId);
   updateCounters();
-  toast(t('Saved to Darlings — kill without remorse ({key} to undo)', { key: KZ }));
+  undoToast(t('Saved to Darlings — kill without remorse ({key} to undo)', { key: KZ }));
 }
 
 // Older versions of NEO planted invisible marker spans at darling cut points,
@@ -211,7 +216,7 @@ async function migrateDarlingAnchors() {
     const chapter = span.closest('.chapter');
     span.remove();
     if (body && chapter) {
-      chapterHTML[chapter.dataset.id] = captureBody(body);
+      setChapterHTML(chapter.dataset.id, captureBody(body), 'heal');
       wordCache[chapter.dataset.id] = null;
       scheduleChapterSave(chapter.dataset.id);
     }
@@ -241,6 +246,7 @@ let tabPlaces = {};
 
 let auxLoad = 0; // which Notes read is the current one
 function switchTab(name) {
+  if (book && name !== currentTab) rec.context('tab:' + name);
   closeCardEditor();
   closeFootnote();
   auxLoad++;
@@ -263,7 +269,7 @@ function switchTab(name) {
   sidePaneForTab(name);
   queueSideCards();
   applyBright();
-  $$('.tab').forEach((t) => {
+  $$('.tab[data-tab]').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === name);
     t.setAttribute('aria-selected', t.dataset.tab === name ? 'true' : 'false');
   });
@@ -330,7 +336,10 @@ function switchTab(name) {
     const pending = auxPending[bookId + '/' + kind];
     (pending ? Promise.resolve(pending.html) : auxRead(bookId, kind)).then((html) => {
       if (load !== auxLoad || !book || book.id !== bookId || currentTab !== name || notesKind(notesPage) !== kind) return;
+      // (the book's own notes page is recorded; a chapter's isn't yet)
+      recNotesRead(html || '', bookId, kind);
       auxEditor.innerHTML = html || '';
+      recNotesShown = auxEditor.innerHTML;
       auxEditor.dataset.kind = kind;
       auxEditor.dataset.book = bookId;
       auxEditor.contentEditable = 'true';
@@ -510,7 +519,7 @@ function outlineLine(kind, chId, secId, index, label, text) {
           const next = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
           book.chapterOrder.splice(book.chapterOrder.indexOf(cur) + 1, 0, next);
           cur = next;
-          chapterHTML[cur] = '<p><br></p>';
+          setChapterHTML(cur, '<p><br></p>', 'new');
           book.chapterNotes[cur] = it.text;
           persistChapter(cur);
           secAt = 0;
@@ -716,7 +725,7 @@ function syncGhosts(chId) {
     }
     placeGhost(body, sec, before);
   });
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'ghost');
 }
 
 // where the section holding el begins: its *** (or the body's first line)

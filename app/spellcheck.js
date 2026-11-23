@@ -133,10 +133,10 @@ function capitalSlips(el) {
       } catch { /* changed underneath us */ }
     };
     // the paragraph's first letter, past opening quotes, brackets and dashes
-    const lead = text.match(/^[\s"'“‘„«»(\[¿¡—–-]*/)[0].length;
+    const lead = text.match(/^[\s"'“‘„«»([¿¡—–-]*/)[0].length;
     if (/\p{Ll}/u.test(text[lead] || '') && !/^\p{Ll}\./u.test(text.slice(lead, lead + 2))) mark(lead);
     // a letter after a full stop (not an ellipsis or an abbreviation)
-    const stop = /(?<!\.)\.\s+["'“‘„«(\[]?(\p{Ll})/gu;
+    const stop = /(?<!\.)\.\s+["'“‘„«([]?(\p{Ll})/gu;
     let m;
     while ((m = stop.exec(text))) {
       const before = text.slice(0, m.index).match(/([\p{L}.]+)$/u);
@@ -252,6 +252,7 @@ document.addEventListener('contextmenu', async (e) => {
         const r = document.createRange();
         r.setStart(node, at); r.setEnd(node, at + 1);
         sel.removeAllRanges(); sel.addRange(r);
+        rec.mark('spell');
         document.execCommand('insertText', false, s);
         if (chEl) spellScanEl(spellElFor(chEl.dataset.id), chEl.dataset.id);
       }
@@ -287,6 +288,7 @@ document.addEventListener('contextmenu', async (e) => {
       const r = document.createRange();
       r.setStart(node, a); r.setEnd(node, b);
       sel.removeAllRanges(); sel.addRange(r);
+      rec.mark('spell');
       // a dictionary suggests its apostrophe straight (м'ясо); on the page
       // it's ’, as NEO types it
       document.execCommand('insertText', false, s.replace(/(?<=[\p{L}\p{M}])'(?=[\p{L}\p{M}])/gu, '’'));

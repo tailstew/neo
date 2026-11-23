@@ -23,7 +23,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 // run from scripts/, NEO's window would look for scripts/index.html
@@ -169,18 +169,20 @@ const around = () => js(`(() => {
   return { first: body.children[10].innerHTML, second: body.children[11].innerHTML, breaks: body.querySelectorAll('p.scene-break').length, caretIn: [...body.children].indexOf(p), caretAt: s.anchorOffset, caretLen: p.textContent.length };
 })()`);
 const SPOTS = ['before the first *', 'between the first and second *', 'between the second and third *', 'after the last *'];
-for (const key of ['Backspace', 'Delete']) for (const at of [0, 1, 2, 3]) {
-  test(`${key} with the caret ${SPOTS[at]} removes the whole break`, async () => {
-    const breaks = await js(`document.querySelectorAll('.chapter-body p.scene-break').length`);
-    await breakBetween('Gulls over the slips.', 'Mara counted the boats.', at);
-    await press(key, '');
-    const w = await around();
-    assert.equal(w.breaks, breaks, 'the break is gone');
-    assert.equal(w.first, 'Gulls over the slips.');
-    assert.equal(w.second, 'Mara counted the boats.');
-    if (key === 'Backspace') assert.deepEqual([w.caretIn, w.caretAt], [10, w.caretLen], 'the caret at the end of the line above');
-    else assert.deepEqual([w.caretIn, w.caretAt], [11, 0], 'the caret at the start of the line below');
-  });
+for (const key of ['Backspace', 'Delete']) {
+  for (const at of [0, 1, 2, 3]) {
+    test(`${key} with the caret ${SPOTS[at]} removes the whole break`, async () => {
+      const breaks = await js(`document.querySelectorAll('.chapter-body p.scene-break').length`);
+      await breakBetween('Gulls over the slips.', 'Mara counted the boats.', at);
+      await press(key, '');
+      const w = await around();
+      assert.equal(w.breaks, breaks, 'the break is gone');
+      assert.equal(w.first, 'Gulls over the slips.');
+      assert.equal(w.second, 'Mara counted the boats.');
+      if (key === 'Backspace') assert.deepEqual([w.caretIn, w.caretAt], [10, w.caretLen], 'the caret at the end of the line above');
+      else assert.deepEqual([w.caretIn, w.caretAt], [11, 0], 'the caret at the start of the line below');
+    });
+  }
 }
 
 test('⌘Z puts a break removed from its own line back', async () => {

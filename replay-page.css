@@ -1,0 +1,243 @@
+/* The exported replay page (replay-export.js): a book's Writing History in
+   any browser, laid out as NEO's own Writing History: the chapters and the
+   tags down the left, the sheet, the day's timeline or the days under it
+   with the controls above them, and the pop-ups' buttons in the header. Light or dark as the reader's system is.
+   Without JavaScript it's a page with the report on it. */
+:root {
+  --paper: #fbfaf7;
+  --ink: #1c1c1c;
+  --soft: #6b675f;
+  --rule: #e2ddd2;
+  --accent: #9a7a3c;
+  --ok: #2f7a4a;
+  --bad: #b23a2e;
+  --sheet: #ffffff;
+  --pane: #f3f1ec;
+  --stamp: #2f7d6d;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #1d1c1b; --ink: #d6d2c6; --soft: #9a958a; --rule: #34322e; --accent: #c9a86a; --ok: #6fbf8a; --bad: #e07a6e; --sheet: #232221; --pane: #191817; --stamp: #6fb7a8; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+button { font: inherit; color: inherit; }
+h2 { font-size: 19px; margin: 0 0 10px; }
+h3 { font-size: 16px; margin: 18px 0 6px; }
+
+/* without JavaScript: a plain page */
+.rx-top, .rx-report, .rx-made { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+.rx-top { padding-top: 40px; }
+.rx-top h1 { font: 600 34px/1.2 Georgia, "Times New Roman", serif; margin: 0 0 4px; }
+.rx-by { margin: 0 0 18px; color: var(--soft); }
+.rx-lede { font-size: 18px; margin: 0 0 12px; }
+.rx-note { color: var(--soft); border-left: 3px solid var(--accent); padding-left: 12px; }
+.rx-report { margin-top: 28px; }
+.rx-made { color: var(--soft); font-size: 13px; padding-bottom: 40px; }
+
+/* with it: the player fills the window */
+.rx-js { overflow: hidden; }
+.rx-js .rx-app {
+  position: fixed; inset: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top" "side main";
+}
+.rx-js .rx-top { grid-area: top; max-width: none; margin: 0; padding: 12px 18px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.rx-js .rx-top h1 { font-size: 22px; margin: 0; }
+.rx-js .rx-by { margin: 0; }
+.rx-menu, .rx-scrim { display: none; }
+.rx-menu { align-self: center; align-items: center; justify-content: center; width: 34px; height: 34px; margin-right: 2px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: none; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; }
+.rx-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
+.rx-actions[hidden] { display: none; }
+.rx-js .rx-lede { flex-basis: 100%; font-size: 13px; color: var(--soft); margin: 0; }
+.rx-js .rx-note { flex-basis: 100%; font-size: 13px; margin: 4px 0 0; }
+.rx-js .rx-made { padding: 16px 0 0; margin: 0; max-width: none; }
+/* under the player until the checks are done and take it into their pop-up:
+   left there, it shows through the header's title */
+.rx-js > .rx-made { display: none; }
+
+/* the side: chapters, then tags */
+.rx-side { grid-area: side; overflow-y: auto; padding: 12px 8px; border-right: 1px solid var(--rule); background: var(--pane); }
+.rx-chbtn, .rx-tagbtn { display: block; width: 100%; text-align: left; background: none; border: none; border-radius: 4px; padding: 5px 10px; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-chbtn:hover, .rx-tagbtn:hover { background: rgba(128,128,128,0.1); }
+.rx-chbtn[aria-selected="true"] { background: rgba(128,128,128,0.14); color: var(--accent); }
+/* a chapter the day hovered (or on the sheet) changed, in the whole book: the map's gold, at its edge, not a pick */
+.rx-chday { box-shadow: inset 3px 0 0 #c9a86a; }
+.rx-sidehead { margin: 16px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--soft); }
+.rx-tagname { display: block; overflow: hidden; text-overflow: ellipsis; }
+.rx-tagname::before { content: ""; display: inline-block; margin-right: 6px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
+.rx-tagwhen { display: block; font-size: 11px; color: var(--soft); }
+.rx-notemark { margin-left: 6px; font-size: 11px; color: #c9a24f; }
+.rx-notetitle { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+.rx-notehead p { margin: 0 0 4px; font-size: 12px; color: var(--soft); }
+.rx-notehead { margin-bottom: 12px; }
+.rx-notetext { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+
+/* the main pane */
+.rx-player { grid-area: main; display: flex; flex-direction: column; min-height: 0; min-width: 0; position: relative; }
+.rx-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 3px 12px; font-size: 11px; color: var(--soft); background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; pointer-events: none; z-index: 2; }
+.rx-badge[hidden] { display: none; }
+.rx-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 0 32px; }
+.rx-sheet {
+  width: min(var(--page-w, 760px), calc(100% - 32px));
+  margin: 0 auto;
+  font: 18px/1.6 Georgia, "Times New Roman", serif;
+}
+/* Each page is a sheet as History shows it: its margins, its text, its
+   kind's layout and the drop cap are NEO's own rules (styles.css's for
+   History's sheets, .rp-chapter and .rp-body), which the export carries in
+   the style before this one, with the writer's type (sheetPageCss in
+   app.js); these only give it this page's paper. */
+.rx-ch { background: var(--sheet); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; margin-bottom: 30px; }
+.rx-ch.sheet { min-height: 0; box-shadow: none; }
+.rx-chhead { font: 600 15px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--soft); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 1.2em; }
+.rx-body img { max-width: 100%; }
+.rx-empty { color: var(--soft); font-style: italic; }
+.rx-caret { display: inline-block; width: 0; height: 1.1em; margin-right: -1px; border-left: 2px solid var(--accent); vertical-align: text-bottom; }
+.rx-status { color: var(--soft); font-size: 13px; margin: 0; padding: 0 18px; }
+.rx-status:empty { display: none; }
+
+.rx-bottom { flex: none; padding: 10px 18px; border-top: 1px solid var(--rule); }
+.rx-dayline { display: flex; align-items: center; gap: 12px; }
+.rx-dayline[hidden], .rx-strip[hidden] { display: none; }
+.rx-prev, .rx-next { flex: none; min-width: 72px; background: none; border: 1px solid var(--rule); border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--soft); cursor: pointer; white-space: nowrap; }
+.rx-prev:hover:not(:disabled), .rx-next:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.rx-prev:disabled, .rx-next:disabled { opacity: 0.4; cursor: default; }
+.rx-timeline { position: relative; flex: 1; min-width: 0; height: 52px; cursor: pointer; border-radius: 4px; touch-action: none; }
+.rx-timeline:focus-visible { outline: 1px solid var(--accent); }
+.rx-timeline canvas { display: block; width: 100%; height: 100%; }
+.rx-head { position: absolute; top: 12px; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
+.rx-tip { position: absolute; bottom: calc(100% + 6px); max-width: 360px; padding: 4px 8px; font-size: 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 2; }
+.rx-tip[hidden] { display: none; }
+.rx-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scroll-padding-inline: 44px; }
+/* more days beyond an edge: it fades out (sideScroll) */
+.rx-strip.edge-l { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px); mask-image: linear-gradient(to right, transparent, #000 44px); }
+.rx-strip.edge-r { -webkit-mask-image: linear-gradient(to left, transparent, #000 44px); mask-image: linear-gradient(to left, transparent, #000 44px); }
+.rx-strip.edge-l.edge-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent); }
+.rx-strip.dragging, .rx-strip.dragging * { cursor: grabbing; user-select: none; }
+.rx-tile { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px; background: none; border: 1px solid var(--rule); border-radius: 6px; font-size: 11px; color: var(--soft); cursor: pointer; }
+.rx-tile[hidden] { display: none; }
+.rx-tile:hover { color: var(--ink); }
+.rx-tile[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+.rx-tile.rx-tagged::before { content: ""; position: absolute; top: 3px; right: 4px; border-left: 7px solid #e3c47e; border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent; }
+.rx-tile canvas { display: block; width: 46px; height: 46px; }
+.rx-tiledate { white-space: nowrap; }
+
+/* the controls, over the timeline; the header's buttons */
+.rx-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; }
+.rx-controls button, .rx-actions button { flex: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.rx-controls button:hover, .rx-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.rx-controls button[hidden] { display: none; }
+.rx-play, .rx-fast { min-width: 44px; }
+.rx-fast { letter-spacing: -3px; padding-right: 15px !important; }
+.rx-fast[aria-pressed="true"] { border-color: var(--accent) !important; color: var(--accent); }
+.rx-when { font-size: 12px; color: var(--soft); white-space: nowrap; }
+.rx-stamped { font-size: 12px; color: var(--stamp); white-space: nowrap; }
+.rx-stamped[hidden] { display: none; }
+.rx-ckbtn.ok::before { content: "✓ "; color: var(--ok); }
+.rx-ckbtn.bad::before { content: "✗ "; color: var(--bad); }
+
+/* the pop-ups: the evidence, and the checks */
+.rx-pop { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+.rx-pop[open] { display: flex; flex-direction: column; }
+.rx-pop::backdrop { background: rgba(0,0,0,0.45); }
+.rx-popbar { flex: none; display: flex; justify-content: flex-end; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.rx-close { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.rx-close:hover { border-color: var(--accent); color: var(--accent); }
+.rx-pop .rx-popbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; max-width: none; margin: 0; padding: 20px 26px 26px; font-size: 14px; }
+
+/* the checks */
+.rx-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.rx-list li { padding: 3px 0 3px 26px; position: relative; }
+.rx-list li::before { position: absolute; left: 0; width: 20px; text-align: center; font-weight: 700; }
+.rx-list li.ok::before, .rx-same.ok::before { content: "✓"; color: var(--ok); }
+.rx-list li.bad::before, .rx-same.bad::before { content: "✗"; color: var(--bad); }
+.rx-list li.info::before { content: "·"; color: var(--soft); }
+/* the first line: whether anything fixes the history in time */
+.rx-list li.rx-lead { margin-bottom: 6px; padding: 6px 10px; border-left: 3px solid #6fb7a8; font-weight: 500; }
+.rx-list li.rx-lead::before { content: none; }
+.rx-list li.rx-lead.rx-unfixed { border-left-color: #d9a46b; }
+.rx-ckbtn.unfixed::before { content: "✓ "; color: #d9a46b; }
+.rx-same::before { margin-right: 8px; font-weight: 700; }
+.rx-seals { margin: 8px 0; }
+.rx-seals summary { cursor: pointer; color: var(--accent); }
+.rx-seals table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; display: block; overflow-x: auto; }
+.rx-seals th, .rx-seals td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.rx-seals tr.bad td { color: var(--bad); }
+.rx-seals .rx-fp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
+.rx-file { color: var(--accent); word-break: break-all; }
+.rx-howto pre { background: var(--sheet); border: 1px solid var(--rule); padding: 8px 10px; overflow-x: auto; font-size: 13px; }
+.rx-small { font-size: 14px; color: var(--soft); }
+
+/* the report, as NEO wrote it (app.js, evidenceHtml) */
+.rx-report .ev-h { font-size: 19px; }
+.rx-report table { border-collapse: collapse; font-size: 14px; width: 100%; }
+.rx-report th, .rx-report td { text-align: left; vertical-align: top; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--rule); }
+.rx-report .ev-facts > tbody > tr > th { width: 120px; color: var(--soft); font-weight: 500; }
+.rx-report .ev-small { font-size: 13px; color: var(--soft); }
+.rx-report .ev-lead { margin: 6px 0 10px; padding: 8px 12px; border-left: 3px solid #6fb7a8; font-size: 15px; }
+.rx-report .ev-lead.ev-unfixed { border-left-color: #d9a46b; }
+.rx-report .ev-hist { margin: 8px 0 2px; font-size: 12px; }
+.rx-report .ev-hist caption { text-align: left; color: var(--soft); font-size: 11px; padding-bottom: 2px; }
+.rx-report .ev-hist th, .rx-report .ev-hist td { border: none; padding: 1px 8px 1px 0; }
+.rx-report .ev-hist th { width: 120px; font-weight: 400; color: var(--soft); white-space: nowrap; }
+.rx-report .ev-hist-bar span { display: block; height: 9px; min-width: 1px; background: var(--accent); opacity: 0.75; border-radius: 2px; }
+.rx-report .ev-hist-n { width: 44px; text-align: right; color: var(--soft); }
+.rx-report .ev-chapters { display: block; overflow-x: auto; }
+
+/* a script (data.script): set as NEO sets it (styles.css, SCREENPLAYS):
+   its page, 51 letters wide in its own type size, and each line where it
+   prints; on a phone, the editor's narrow layout */
+.rx-scroll.rx-script-scroll { container-type: inline-size; }
+.rx-sheet.rx-script {
+  width: 51em; max-width: none;
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace; line-height: 1;
+  font-size: min(16px, calc((100cqw - 32px) / 51));
+}
+.rx-script .rx-ch { padding: 6em 5.7em 6em 9em; margin-bottom: 44px; }
+.rx-script .rx-body { font-family: inherit; font-size: 1em; line-height: 1; }
+.rx-script .rx-chhead { display: none; }
+.rx-script .rx-body p { margin: 1em 0 0; text-indent: 0; width: 36.3em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
+.rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2em; }
+.rx-script .rx-body p:is(.sp-heading, .sp-character, .sp-transition, .sp-shot) { text-transform: uppercase; }
+.rx-script .rx-body p:is(.sp-heading, .sp-shot) { font-weight: bold; }
+.rx-script.rx-uline .rx-body p.sp-heading { text-decoration: underline; }
+.rx-script .rx-body p.sp-character { margin-left: 13.2em; width: 23.1em; }
+.rx-script .rx-body p.sp-paren { margin-left: 9.6em; width: 15.3em; }
+.rx-script .rx-body p.sp-dialogue { margin-left: 6em; width: 21.3em; }
+.rx-script .rx-body p.sp-transition { text-align: right; }
+@media (max-width: 700px) {
+  .rx-sheet.rx-script { width: calc(100% - 24px); font-size: 15px; line-height: 1.3; }
+  .rx-script .rx-ch { padding: 28px 18px 40px; }
+  .rx-script .rx-body { line-height: 1.3; }
+  .rx-script .rx-body p { width: auto; margin-top: 1.3em; }
+  .rx-script .rx-body p:first-child, .rx-script .rx-body p.sp-dialogue, .rx-script .rx-body p.sp-paren { margin-top: 0; }
+  .rx-script .rx-body p.sp-heading:not(:first-child), .rx-script .rx-body p.sp-shot:not(:first-child) { margin-top: 2.6em; }
+  .rx-script .rx-body p.sp-character { margin-left: 6.5em; width: auto; }
+  .rx-script .rx-body p.sp-paren { margin-left: 4.5em; margin-right: 3em; width: auto; }
+  .rx-script .rx-body p.sp-dialogue { margin-left: 2.5em; margin-right: 2em; width: auto; }
+}
+
+@media (max-width: 700px) {
+  .rx-top h1 { font-size: 26px; }
+  .rx-js .rx-app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }
+  .rx-js .rx-side { display: none; }
+  /* the side as a drawer: ☰ brings it over the page */
+  .rx-js .rx-menu { display: inline-flex; }
+  .rx-js.rx-drawer .rx-side { display: block; position: fixed; top: 0; bottom: 0; left: 0; width: min(300px, 85vw); z-index: 30; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+  .rx-js.rx-drawer .rx-scrim { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(0,0,0,0.35); }
+  .rx-js .rx-lede { display: none; }
+  /* the sheet as History's on a phone, as wide as the editor's page there */
+  .rx-sheet { width: calc(100% - 24px); }
+  .rx-ch { padding: 34px 26px 60px; }
+  .rx-bottom { padding: 8px 12px; }
+  .rx-prev, .rx-next { min-width: 0; }
+}

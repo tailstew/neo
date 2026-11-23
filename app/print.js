@@ -382,7 +382,7 @@ async function printPaperback() {
     const chId = newEntryId();
     book.chapterOrder.splice(at < 0 ? 0 : at, 0, chId);
     setChapterKind(chId, 'dedication');
-    chapterHTML[chId] = `<p>${escHtml(opts.dedication)}</p>`;
+    setChapterHTML(chId, `<p>${escHtml(opts.dedication)}</p>`, 'new');
     await persistChapter(chId);
     await saveMeta();
     renderChapters();
@@ -464,7 +464,7 @@ function buildTxt(data) {
 function buildMd(data) {
   const d = data || bookExportData();
   // a title like "Wool *Omnibus*" must not turn into markup (idea: nejcc, #70)
-  const mdMeta = (s) => String(s || '').replace(/([\\`*_\[\]#<>])/g, '\\$1');
+  const mdMeta = (s) => String(s || '').replace(/([\\`*_[\]#<>])/g, '\\$1');
   // wrap a run in emphasis markers, keeping boundary spaces outside them
   // Markdown has strikethrough; underline goes as HTML, which it allows
   const mdMarks = [{ key: 'b', open: '**', close: '**' }, { key: 'i', open: '*', close: '*' },
@@ -503,6 +503,37 @@ const exportBodyFont = () => (getComputedStyle(document.documentElement).getProp
 // the drop cap too: its face is the page's, bundled or the computer's
 const exportDropCapFont = () => (getComputedStyle(document.documentElement).getPropertyValue('--dropcap-font').trim() || 'Georgia, serif').replace(/[<>{};]/g, '');
 const firstFamily = (stack) => stack.split(',')[0].trim().replace(/^["']|["']$/g, '');
+// The exported Writing History sets its pages with the editor's own rules:
+// every rule in styles.css written for History's sheets (.sheet,
+// .rp-chapter, .rp-body; not the dialog's own, .hs-…, nor the page
+// themes', body.night),
+// the type it sets them in (the body face and the drop cap's, bundled ones
+// inside the file), its size, and its page's width. The page puts its own
+// rules after these, and its script layout (replay-page.css).
+async function sheetPageCss() {
+  const root = getComputedStyle(document.documentElement);
+  const v = (k, or) => (root.getPropertyValue(k).trim() || or).replace(/[<>{};]/g, '');
+  const noCap = (library.fonts || {}).dropcap === 'none';
+  let css = `:root { --body-font: ${exportBodyFont()}; --dropcap-font: ${exportDropCapFont()}; --editor-size: ${v('--editor-size', '17px')}; --page-zoom: 1; --page-w: ${v('--page-w', '760px')}; --page-pad-x: ${v('--page-pad-x', '72px')}; }\n`;
+  for (const sheet of document.styleSheets) {
+    let rules = [];
+    try { rules = [...sheet.cssRules]; } catch { continue; }
+    for (const r of rules) {
+      // (and .sheet: a page's margins; and the highlight that hides the
+      // letter under a drop cap, which sheet.js draws there too)
+      if (!(r instanceof CSSStyleRule) || !(r.selectorText === '.sheet' || /\.rp-(body|chapter)\b|::highlight\(neo-cap\)/.test(r.selectorText))) continue;
+      if (/\.hs-|body\.night|body\.focus-mode/.test(r.selectorText)) continue;
+      // the writer's drop cap turned off: the rules that draw one, and hide
+      // the letter it stands for, aren't there
+      if (noCap && /has-cap|neo-cap/.test(r.selectorText)) continue;
+      css += r.cssText + '\n';
+    }
+  }
+  // the type, italic and bold italic too: the history plays every word the page ever held
+  css += await exportFontFaces({ sections: [{ kind: 'dedication', paras: [{ html: '<i><b></b></i>' }] }] });
+  return css.replace(/<\//g, '<\\/');
+}
+
 async function exportFontFaces(d) {
   const family = firstFamily(exportBodyFont());
   // the drop cap sets one letter, upright and regular
@@ -560,9 +591,8 @@ async function embedFontFaces(pick) {
   return css;
 }
 
-// The pages of a book that aren't chapters, set the way books set them.
-// A line that opens with a dash says who said the lines above it.
-const isAttribution = (p) => /^(?:[—–]|--?\s)/.test(p.text || '');
+// The pages of a book that aren't chapters, set the way books set them
+// (a line that opens with a dash says who said the lines above it: isAttribution, sheet.js).
 // a section's heading level follows the contents: a part, the titles in
 // it, their chapters (a single book's chapters are all level 0)
 const headTag = (ch) => 'h' + Math.min(6, 2 + (ch.level || 0));
@@ -770,6 +800,7 @@ ${opts.stamp ? `<p class="prov">${t('{n} words · exported from NEO on {date}', 
 // (characters XML 1.0 forbids, pasted in from a PDF or a terminal, come
 // out: one of them makes a whole EPUB or Word file unreadable)
 const escXml = (s) => String(s)
+  // oxlint-disable-next-line no-control-regex
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -2105,10 +2136,18 @@ window.neo.onMenu(async (msg) => {
   // full screen and focus mode together hide the bottom bar until hovered
   // (styles.css); the window says when it goes in and out, whatever is open
   if (msg.type === 'fullScreen') { document.body.classList.toggle('full-screen', !!msg.value); return; }
+  // Writing History open: its own (Find, ⌘S to tag) and the news the main
+  // process sends of itself go on. Anything else picked from the menus
+  // closes it first and then happens; by its shortcut, it does nothing
+  // behind the dialog.
+  if (historyShown && !['find', 'snapshot', 'update', 'uiLanguage'].includes(msg.type)) {
+    if (msg.byKey || msg.type === 'history') return;
+    historyShown();
+  }
   if ($('#keyboard-shortcuts') && msg.type !== 'help') return;
   // a window the menu opens (⌘, for Goals, say) never stacks on one that's
   // already open: pressing it again used to pile up overlays
-  const WINDOWS = ['stats', 'about', 'emailSettings', 'coverArt', 'reshelve', 'checkUpdate', 'options'];
+  const WINDOWS = ['stats', 'about', 'emailSettings', 'coverArt', 'reshelve', 'checkUpdate', 'options', 'history'];
   if (WINDOWS.includes(msg.type) && document.querySelector('.modal-backdrop:not([hidden])')) {
     if (msg.type === 'checkUpdate' && updateDialog) updateDialog.focus();
     return;
@@ -2119,6 +2158,7 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'checkUpdate') checkForUpdate();
   if (msg.type === 'update') updateMessage(msg);
   if (msg.type === 'export') doExport(msg.format);
+  if (msg.type === 'exportHistory') { if (book && !$('#editor-view').hidden) exportWritingHistory(book.id); else toast(t('Open a book first')); }
   if (msg.type === 'scriptElement' && book && isScript()) spSetElement(msg.value);
   if (msg.type === 'scriptStyle') spToggleStyle(msg.value);
   if (msg.type === 'scriptPageBreak') spTogglePageBreak();
@@ -2133,9 +2173,10 @@ window.neo.onMenu(async (msg) => {
     await writeLibrary(library);
   }
   if (msg.type === 'emailDraft') doEmailDraft();
-  if (msg.type === 'snapshot' && book && !$('#editor-view').hidden) snapshotNow();
+  // (in Writing History, ⌘S tags the moment shown instead)
+  if (msg.type === 'snapshot') { if (historyShown && historyShown.tag) historyShown.tag(); else if (book && !$('#editor-view').hidden) snapshotNow(); }
   if (msg.type === 'emailSettings') emailSettings();
-  if (msg.type === 'find') openSearch();
+  if (msg.type === 'find') { if (historyShown) historyShown.focusFind(); else openSearch(); }
   if (msg.type === 'spellcheck') toggleSpellcheck();
   if (msg.type === 'spellLanguage') changeSpellLanguage(msg.value);
   if (msg.type === 'reshelve') reshelveBook();
@@ -2150,6 +2191,10 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'import') importBooks();
   if (msg.type === 'importChapters') importChapters();
   if (msg.type === 'stats') openStats();
+  if (msg.type === 'historyLevel') setHistoryLevel(msg.value);
+  if (msg.type === 'tsaServices') openTsaServices();
+  // never greyed out: with no book open it says so, as Export does
+  if (msg.type === 'history') { if (book && !$('#editor-view').hidden) openHistory(); else toast(t('Open a book first')); }
   if (msg.type === 'chapterStep') gotoChapter(msg.value);
   if (msg.type === 'writingStyle') {
     library.writingStyle = msg.value;

@@ -60,11 +60,19 @@
         <div id="fr-bodyfonts" class="fr-fontrow"></div>
         <p style="margin-bottom:6px" data-i18n>Drop cap</p>
         <div id="fr-dropcaps" class="fr-fontrow"></div>
-        <p id="fr-error" role="alert" hidden></p>
+        <div style="text-align:right;margin-top:20px">
+          <button id="fr-next" class="btn-gold" data-i18n>Next</button>
+        </div>
+      </div>
+      <div id="fr-step3" hidden>
+        <h2 data-i18n>Your writing history</h2>
+        <p data-i18n>NEO can record how you write, keystroke by keystroke, so you can watch any chapter being written and bring back any earlier version. Choose how. (Changeable anytime: ⋯ → Record Writing History.)</p>
+        <div id="fr-levels" class="fr-choices hl-cards"></div>
         <div style="text-align:right;margin-top:20px">
           <button id="fr-done" class="btn-gold" data-i18n>Start writing</button>
         </div>
       </div>
+      <p id="fr-error" role="alert" hidden></p>
     </div>
   </div>
 
@@ -121,6 +129,8 @@
         <div class="tab" data-tab="notes" data-i18n>Notes</div>
         <div class="tab" data-tab="outline" data-i18n>Outline</div>
         <div class="tab darlings" data-tab="darlings" data-i18n data-i18n-title title="Drag any selection here. It's saved, not gone.">Darlings</div>
+        <!-- not a tab: it opens the Writing History dialog over whichever tab is up -->
+        <div class="tab history-btn" role="button" tabindex="0" data-i18n data-i18n-title title="Watch this book being written" hidden>History</div>
       </div>
       <div id="counters">
         <span id="goal-counter" data-i18n-title title="Today's words — click for goals, sprints, and your progress chart"></span>
@@ -161,10 +171,15 @@
 
   <script src="jszip.min.js"></script>
   <script src="i18n.js"></script>
+  <script src="recording.js"></script>
+  <script src="recording-files.js"></script>
   <script src="pocket-bridge.js"></script>
   <script src="covers.js"></script>
+  <script src="sheet.js"></script>
   <script src="app/core.js"></script>
   <script src="app/shelf.js"></script>
+  <script src="app/recording.js"></script>
+  <script src="app/history.js"></script>
   <script src="app/editor.js"></script>
   <script src="app/typing.js"></script>
   <script src="app/paragraphs.js"></script>
@@ -256,13 +271,24 @@
         tick(t('Spellcheck'), typeof spellOn !== 'undefined' && spellOn, { type: 'spellcheck' }) +
         (script ? '' : tick(t('Flush paragraph') + '  ⇧Enter', st.flush, { type: 'flush' })) +
         (script || typeof featureOn !== 'function' || !featureOn('poetry') ? '' : tick(t('Poetry paragraph'), st.poetry, { type: 'poetry' })) +
+        // the File menu's Record Writing History: Pocket records, and can't
+        // timestamp, so it's on or off like the rows above (on leaves the
+        // desktop's timestamping as it is; off is off for every device)
+        (window.neo.recStart ? (() => {
+          const on = lib.historyAsked === true && lib.recordWriting !== false;
+          return tick(t('Record Writing History'), on, { type: 'historyLevel', value: on ? 'off' : 'record' });
+        })() : '') +
         (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios' ? '' :
           `<div class="pm-row"><span class="pm-label">${t('On-screen keyboard')}</span><span class="pm-seg"><button data-act="keyboard">${onOff(!(window.pocketSoftKeyboardOn && !window.pocketSoftKeyboardOn()))}</button></span></div>`) +
         (typeof book !== 'undefined' && book
           ? `<div class="pm-row"><span class="pm-label">${t('Export')}</span><span class="pm-seg pm-wrap">` +
             (script ? [['fountain', 'Fountain'], ['fdx', 'Final Draft']] : [['docx', 'Word'], ['epub', 'EPUB'], ...(typeof featureOn === 'function' && featureOn('exports') ? [['txt', t('Text')], ['md', 'Markdown'], ['html', 'HTML']] : [])]).map(([f, l]) => `<button data-msg='${JSON.stringify({ type: 'export', format: f })}'>${l}</button>`).join('') + '</span></div>'
           : '') +
-        `<div class="pm-row pm-actions"><button data-msg='${JSON.stringify({ type: 'options' })}'>${t('Options…')}</button><button data-msg='${JSON.stringify({ type: 'stats' })}'>${t('Goals…')}</button><button data-msg='${JSON.stringify({ type: 'help' })}'>${t('Keyboard shortcuts')}</button><button data-act="close">${t('Done')}</button></div>`;
+        // the footer's Darlings and History, which a narrow phone's tab strip has scrolled out of sight
+        `<div class="pm-row pm-actions">` +
+        (typeof book !== 'undefined' && book ? `<button data-act="darlings">${t('Darlings')}</button>` : '') +
+        (typeof book !== 'undefined' && book && !document.querySelector('#tabs .history-btn').hidden ? `<button data-act="history">${t('History')}</button>` : '') +
+        `<button data-msg='${JSON.stringify({ type: 'options' })}'>${t('Options…')}</button><button data-msg='${JSON.stringify({ type: 'stats' })}'>${t('Goals…')}</button><button data-msg='${JSON.stringify({ type: 'help' })}'>${t('Keyboard shortcuts')}</button><button data-act="close">${t('Done')}</button></div>`;
     }
     more.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -276,6 +302,13 @@
       if (!b) return;
       if (b.dataset.act === 'close') { closeMenu(); return; }
       if (b.dataset.act === 'keyboard') { window.pocketToggleSoftKeyboard(); buildMenu(); return; }
+      if (b.dataset.act === 'darlings' || b.dataset.act === 'history') {
+        closeMenu();
+        const tab = document.querySelector(b.dataset.act === 'darlings' ? '#tabs .tab.darlings' : '#tabs .history-btn');
+        tab.click();
+        tab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+        return;
+      }
       if (b.dataset.msg) {
         const msg = JSON.parse(b.dataset.msg);
         send(msg);
@@ -291,6 +324,20 @@
         if (menuWrap.hidden) more.click(); else closeMenu();
       }
     }, true);
+
+    // The footer's tab strip scrolls sideways with no scrollbar; on a narrow
+    // phone Darlings and History are past its edge. It fades at an edge with
+    // more tabs past it (.more-left, .more-right in pocket.css).
+    const tabStrip = document.getElementById('tabs');
+    const tabEdges = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = tabStrip;
+      tabStrip.classList.toggle('more-left', scrollLeft > 1);
+      tabStrip.classList.toggle('more-right', scrollLeft + clientWidth < scrollWidth - 1);
+    };
+    tabStrip.addEventListener('scroll', tabEdges, { passive: true });
+    new ResizeObserver(tabEdges).observe(tabStrip);
+    // (History's button shows once the book has a history, which changes the width)
+    new MutationObserver(tabEdges).observe(tabStrip, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
 
     // Undo / redo above the on-screen keyboard. Undo is ⌘Z, so everything
     // ⌘Z takes back (a capital, a dash, a section break) comes back the same

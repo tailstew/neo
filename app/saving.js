@@ -264,6 +264,7 @@ const chapterChain = {};
 function persistChapter(chId, html) {
   if (!book) return Promise.resolve(false);
   if (html === undefined) html = chapterHTML[chId] || '';
+  rec.reconcile(chId, html);
   const bookId = book.id;
   const key = bookId + '/' + chId;
   savedHTML[chId] = html;
@@ -316,14 +317,15 @@ function twinChapterTitle(title) {
   const when = new Date().toLocaleTimeString(NeoI18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
   return ((title || '') + ' ' + t('from other device, {time}', { time: when })).trim();
 }
-async function keepOtherDeviceVersion(bookId, chId, disk) {
-  const twinId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+async function keepOtherDeviceVersion(bookId, chId, disk, twinId) {
+  twinId = twinId || 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
   if (book && book.id === bookId) {
     const idx = book.chapterOrder.indexOf(chId);
     book.chapterOrder.splice(idx < 0 ? book.chapterOrder.length : idx + 1, 0, twinId);
     book.chapterTitles = book.chapterTitles || {};
     book.chapterTitles[twinId] = twinChapterTitle(book.chapterTitles[chId]);
-    chapterHTML[twinId] = disk;
+    setChapterHTML(twinId, disk, 'disk-twin');
+    rec.streams('disk-twin');
     wordsFromDisk(); // the other device's copy is not today's writing (#345)
     await persistChapter(twinId, disk);
     await saveMeta();
@@ -347,6 +349,200 @@ async function keepOtherDeviceVersion(bookId, chId, disk) {
   await writeBookMeta(bookId, meta);
 }
 
+// A sync program that found a chapter changed on two devices at once kept
+// one and left the other beside it as a copy of its own (Syncthing's
+// .sync-conflict-…, Dropbox's conflicted copy, iCloud's "… 2"; found by
+// chapter:conflicts), which NEO would never show: each device saved its own
+// words, then simply adopted the file it was handed. The copy's words become
+// the chapter after, as a version NEO finds itself does, and once that
+// chapter reads back from disk this device notes the copy as taken in
+// (conflictTaken) and never reads it again. The copy stays where the sync
+// program left it: NEO never moves or rewrites it, because two devices
+// moving the same copy at once write one file twice, and Syncthing's
+// encrypted peers can't settle that and wait on it forever. Its id
+// comes from the copy's name, so two devices taking in the same copy make
+// one chapter, not two. A copy of a chapter no longer in the book stays,
+// untaken.
+function conflictTwinId(file) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < file.length; i++) h = Math.imul(h ^ file.charCodeAt(i), 0x01000193) >>> 0;
+  return 'ch-sync-' + h.toString(36);
+}
+// book.json's own conflict copies (book:conflicts): the other device's
+// book.json, set aside when both saved it at once (every flush saves the
+// caret's place in it, so this is common). The book.json that stands wins,
+// as when both devices restructured (refreshFromDisk), but the chapters and
+// loose cards are joined by both files' removals (book.removed, above): a
+// chapter or card the copy took out goes here too, unless it holds words
+// written here since, and nothing holding words is dropped. A chapter in the
+// copy's order that this one lacks, that neither took out, whose file is
+// there with words in it (a chapter just made on the other device), goes
+// back in after the chapter before it there, with what the copy held for it
+// (its title, kind, notes); so does a loose card with words this book
+// lacks. The rest of the copy gives way, and the copy stays as it was,
+// noted as taken in on this device.
+async function takeBookConflictCopies(bookId) {
+  const all = await window.neo.bookConflicts(bookId, conflictsTaken(bookId, 'book'));
+  conflictsPresent(bookId, 'book', all);
+  for (const c of all) {
+    if (!book || book.id !== bookId) return;
+    if (c.taken) continue;
+    const meta = c.meta;
+    let back = 0;
+    let noted = false; // only its removals were news: saved, with nothing to show
+    if (meta && Array.isArray(meta.chapterOrder)) {
+      const removed = mergeRemoved(book.removed, meta.removed);
+      const files = {};
+      for (const chId of meta.chapterOrder) {
+        if (typeof chId !== 'string' || book.chapterOrder.includes(chId) || (removed[chId] && !removed[chId].back)) continue;
+        files[chId] = await window.neo.readChapter(bookId, chId);
+        if (!book || book.id !== bookId) return;
+      }
+      let stamps = null;
+      if (window.neo.chapterStamps) {
+        try { stamps = await window.neo.chapterStamps(bookId); } catch { stamps = null; }
+        if (!book || book.id !== bookId) return;
+      }
+      const cards = book.looseCards || [];
+      const j = joinStructure(book, meta, removed, stamps, (chId) => wordsBeyond(files[chId], ''));
+      const gone = book.chapterOrder.filter((chId) => !j.order.includes(chId));
+      const added = j.order.filter((chId) => !book.chapterOrder.includes(chId));
+      // a card the copy had with no words in it stays behind
+      const newCards = j.cards.filter((x) => cards.includes(x) || wordsBeyond((x.text || '') + ' ' + (x.html || ''), ''));
+      back = added.length + gone.length + j.back.length +
+        newCards.filter((x) => !cards.includes(x)).length + cards.filter((x) => !newCards.includes(x)).length;
+      noted = JSON.stringify(removed) !== JSON.stringify(book.removed || {});
+      for (const chId of added) {
+        carryChapterFields(book, meta, chId);
+        setChapterHTML(chId, files[chId], 'disk-new');
+        savedHTML[chId] = files[chId];
+        knowDisk(bookId, chId, files[chId]);
+      }
+      book.chapterOrder = j.order;
+      book.looseCards = newCards;
+      book.removed = removed;
+      knowCards();
+      if (gone.includes(currentChapterId)) currentChapterId = null;
+      // kept here against a removal there: its file goes back for them
+      for (const chId of j.back) if (j.order.includes(chId)) persistChapter(chId).catch(() => {});
+    }
+    if (back || noted) {
+      rec.streams('disk-new'); // the titles and cards that came back with them
+      await saveMeta();
+      if (!book || book.id !== bookId || metaSig(book) !== savedMetaSig) continue; // not on disk yet: next look
+    }
+    if (back) {
+      const caret = captureCaret();
+      const keepScroll = $('#paper-scroll').scrollTop;
+      renderChapters();
+      $('#paper-scroll').scrollTop = keepScroll;
+      if (caret) restoreCaret(caret);
+      renderLooseCards();
+      if (currentTab === 'outline') renderBoard();
+      updateCounters();
+      scheduleNavRefresh();
+      toast(t('Updated from your other device'));
+    }
+    conflictTaken(bookId, 'book', c.file);
+  }
+}
+
+// The copies this device has taken in, by book, in its own localStorage (a
+// copy is a file every device sees; what each has done with it is its own).
+// 'book' lists book.json's copies, 'chapters' the chapters'. Lost storage
+// only means a copy is looked at again, and taking one in twice changes
+// nothing: its chapter's id comes from its name.
+const CONFLICTS_KEY = 'neo.conflictsTaken';
+function conflictsKept() {
+  try { const v = JSON.parse(localStorage.getItem(CONFLICTS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+}
+function conflictsTaken(bookId, kind) {
+  const list = (conflictsKept()[bookId] || {})[kind];
+  return Array.isArray(list) ? list : [];
+}
+function conflictsWrite(bookId, kind, list) {
+  const all = conflictsKept();
+  const mine = all[bookId] = all[bookId] || {};
+  if (list.length) mine[kind] = list; else delete mine[kind];
+  if (!Object.keys(mine).length) delete all[bookId];
+  try { localStorage.setItem(CONFLICTS_KEY, JSON.stringify(all)); } catch { /* storage can be off */ }
+}
+function conflictTaken(bookId, kind, file) {
+  const list = conflictsTaken(bookId, kind);
+  if (!list.includes(file)) conflictsWrite(bookId, kind, [...list, file]);
+}
+// forget the ones no longer in the folder (someone tidied them away)
+function conflictsPresent(bookId, kind, found) {
+  const list = conflictsTaken(bookId, kind);
+  const here = new Set(found.map((c) => c.file));
+  const keep = list.filter((f) => here.has(f));
+  if (keep.length !== list.length) conflictsWrite(bookId, kind, keep);
+}
+
+let takingConflicts = false;
+async function takeConflictCopies(bookId) {
+  if (takingConflicts || !window.neo.chapterConflicts) return;
+  takingConflicts = true;
+  try {
+    if (window.neo.bookConflicts) await takeBookConflictCopies(bookId);
+    const all = await window.neo.chapterConflicts(bookId, conflictsTaken(bookId, 'chapters'));
+    conflictsPresent(bookId, 'chapters', all);
+    for (const c of all) {
+      if (!book || book.id !== bookId) return;
+      if (c.taken || !book.chapterOrder.includes(c.chapterId)) continue;
+      const twinId = conflictTwinId(c.file);
+      if (!book.chapterOrder.includes(twinId) && wordsBeyond(c.html, chapterHTML[c.chapterId])) {
+        await keepOtherDeviceVersion(bookId, c.chapterId, c.html, twinId);
+        if ((await window.neo.readChapter(bookId, twinId)) !== c.html) continue; // not on disk yet: next look
+      }
+      conflictTaken(bookId, 'chapters', c.file);
+    }
+  } catch (err) {
+    window.neo.logError('conflict copies: ' + ((err && err.message) || err));
+  } finally {
+    takingConflicts = false;
+  }
+}
+
+// Notes another program left for Writing History (book-…/history-notes/,
+// Draft Sleuth's feedback on a chapter): each becomes a tag on this moment,
+// id 'n-' + the note's id (so two devices that both take it in make one
+// tag), named when shown (tagName), with the note's text as its note and
+// where it came from as `made.from`. Only while this book is open and
+// recording: otherwise they wait. A note is marked taken (as conflict
+// copies are, in this device's localStorage) once its tag is on disk.
+// NEO never moves, rewrites or deletes the file, and says nothing.
+let takingNotes = false;
+async function takeHistoryNotes(bookId) {
+  if (takingNotes || !window.neo.bookNotes) return; // Pocket: the desktop takes them in
+  const recording = () => rec.on && rec.bookId === bookId && book && book.id === bookId;
+  if (!recording()) return;
+  takingNotes = true;
+  try {
+    const all = await window.neo.bookNotes(bookId, conflictsTaken(bookId, 'notes'));
+    conflictsPresent(bookId, 'notes', all);
+    for (const { file, note, taken } of all) {
+      if (taken || !note) continue;
+      if (!recording()) return;
+      const from = { app: note.app, kind: note.kind, at: note.at };
+      if (note.chapter) from.chapter = note.chapter;
+      if (note.model) from.model = note.model;
+      if (note.pasted) from.pasted = true;
+      // the chapter changed since the note was made: it hashes to neither
+      // what's on the page nor what was last saved
+      const ch = note.chapter;
+      if (ch && note.hash && chapterHTML[ch] !== undefined
+        && Rec.digest(chapterHTML[ch]) !== note.hash && (savedHTML[ch] === undefined || Rec.digest(savedHTML[ch]) !== note.hash)) from.since = true;
+      const tg = rec.tag(null, null, { from }, 'n-' + note.id, note.text);
+      if (tg && (await tg.saved)) conflictTaken(bookId, 'notes', file);
+    }
+  } catch (err) {
+    window.neo.logError('history notes: ' + ((err && err.message) || err));
+  } finally {
+    takingNotes = false;
+  }
+}
+
 function scheduleChapterSave(chId) {
   maybeDailySnapshot(); // SNAPSHOTS: the first change of the day keeps the day's start
   clearTimeout(saveTimers[chId]);
@@ -358,7 +554,9 @@ function scheduleChapterSave(chId) {
     // and writing now would only leave an empty stray file in chapters/
     if (book.id !== bookId || !book.chapterOrder.includes(chId)) return;
     // a flush (a blur, the 20 s tick) wrote these words while this save
-    // waited; a write still on its way may yet fail, so this one queues behind it
+    // waited; a write still on its way may yet fail, so this one queues behind it.
+    // (writing it again would only touch the file, and log a `w` that asks
+    // for another seal)
     if (!writing[chId] && chapterHTML[chId] === savedHTML[chId]) return;
     persistChapter(chId);
   }, 800);
@@ -398,6 +596,20 @@ function noteRemovedChapters() {
 async function saveMeta(again) {
   if (!book || shelfExport) return;
   const bookId = book.id;
+  // Nothing restructured here, only the caret moved: if another device has
+  // restructured the book meanwhile, this book.json is the old one, and
+  // writing it would put that back. The look at the disk takes theirs
+  // first; the caret's place goes with the next save.
+  if (metaSig(book) === savedMetaSig && !refreshing) {
+    const disk = await window.neo.readBookMeta(bookId).catch(() => null);
+    if (!book || book.id !== bookId) return;
+    if (disk && Array.isArray(disk.chapterOrder) && metaSig(disk) !== savedMetaSig && metaSig(book) === savedMetaSig) {
+      refreshFromDisk();
+      return;
+    }
+  }
+  noteStructure();
+  rec.streams('edit', [Rec.STREAMS.titles, Rec.STREAMS.outline]); // what book.json holds of the writing
   noteRemovedChapters();
   for (const c of book.chapterOrder) knownChapters.add(c);
   const sig = metaSig(book);
@@ -457,6 +669,7 @@ function flushAllSaves(e) {
   flushStickiesSave();
   flushSidecars();
   if (moved || metaSig(book) !== savedMetaSig) saveMeta();
+  rec.flush(); // the recording since the last flush
 }
 
 /* ================================================================== */
@@ -662,7 +875,7 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
   for (const c of order) texts[c] = htmlOf(c);
   const snaps = await loadSnaps(bookId);
   const wallTime = Date.now();
-  if (ifNoneToday && snaps.some((s) => new Date(s.at).toDateString() === new Date(wallTime).toDateString())) return null;
+  if (ifNoneToday && snaps.some((s) => writingDay(new Date(s.at)) === writingDay(new Date(wallTime)))) return null;
   const last = snaps[snaps.length - 1] || null;
   const lastMeta = last ? await snapMeta(bookId, last) : null;
   // Serialized snapshots must remain ordered even in the same millisecond
@@ -693,6 +906,8 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
   snap.files = new Set([...changed.map((c) => c + '.html'), 'snapshot.json']);
   snap.meta = meta;
   snaps.push(snap);
+  // while the book is recording, Writing History shows it as a tag on this moment
+  if (rec.on && rec.bookId === bookId) rec.tag(null, null, { snapshot: name });
   // NEO's own old ones go, each handing its chapters on to the next first. A
   // failure leaves them where they are; the next snapshot tries again.
   try {
@@ -705,11 +920,12 @@ async function takeSnapshotNow(kind, htmlOf, { ifNoneToday }) {
 }
 
 // The first change of a writing day keeps the book as the day found it
-// (what's on disk: savedHTML, before this change reaches it)
+// (what's on disk: savedHTML, before this change reaches it). The writer's
+// day, as the goals and Writing History count it (writingDay)
 const snapDay = {};
 function maybeDailySnapshot() {
   if (!book || !snapsCan() || shelfExport) return;
-  const today = new Date().toDateString();
+  const today = writingDay();
   if (snapDay[book.id] === today) return;
   snapDay[book.id] = today;
   takeSnapshot('d', (c) => (typeof savedHTML[c] === 'string' ? savedHTML[c] : chapterHTML[c] || ''), { ifNoneToday: true }).catch(logSnap);
@@ -808,6 +1024,7 @@ async function renderSnapList() {
     p.className = 'snap-empty';
     p.textContent = IS_MAC ? t('Press ⌘S to take a snapshot of your book. It costs only the chapters that changed.')
       : t('Press Ctrl+S to take a snapshot of your book. It costs only the chapters that changed.');
+    if (recordingWanted()) p.textContent += ' ' + t('Writing History keeps every moment in between, and shows your snapshots there as tags.');
     list.appendChild(p);
     return;
   }
@@ -830,6 +1047,16 @@ async function renderSnapList() {
     const on = snapShown && snapShown.name === s.name;
     const b = item(s.kind === SNAP_KEPT ? 'snap-k' : 'snap-a', when, snapWhy(s.kind) + ' · ' + what, on, () => showSnapshot(s.name));
     b.title = t('{n} words', { n: s.words });
+    b.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      const has = await snapHasHistory(bookId);
+      const choice = await popMenu(e.clientX, e.clientY, [
+        { label: t('Show This Snapshot'), value: 'show' },
+        { label: t('Watch from Here'), value: 'watch', disabled: !has }
+      ]);
+      if (choice === 'show') showSnapshot(s.name);
+      else if (choice === 'watch') snapWatch(s);
+    });
     if (on && snapShown.diff) {
       // the chapters that differ from today, to jump to
       const sub = document.createElement('div');
@@ -957,6 +1184,15 @@ async function showSnapshot(name) {
   all.textContent = t('Restore Whole Book');
   all.disabled = !diff.length && !extra && JSON.stringify(meta.chapterOrder) === JSON.stringify(book.chapterOrder);
   all.onclick = () => restoreSnapshot(null);
+  // Writing History from this snapshot's moment, while the book has one
+  const watch = document.createElement('button');
+  watch.className = 'snap-watch';
+  watch.textContent = t('Watch from Here');
+  watch.title = t('Writing History, playing from this snapshot');
+  watch.hidden = true;
+  watch.onclick = () => snapWatch(snap);
+  band.querySelector('.snap-band-do').prepend(watch);
+  snapHasHistory(bookId).then((has) => { watch.hidden = !has; });
   v.appendChild(band);
 
   const ranges = [];
@@ -1005,6 +1241,16 @@ async function showSnapshot(name) {
   const first = diff.length && v.querySelector(`.snap-chapter[data-id="${diff[0].chId}"]`);
   if (first) first.scrollIntoView({ block: 'start' });
   else $('#paper-scroll').scrollTop = 0;
+}
+
+// Whether a book has a Writing History to watch
+async function snapHasHistory(bookId) {
+  if (!historyCanOpen()) return false;
+  try { return ((await window.neo.recList(bookId)) || []).some((d) => d.sessions.length); } catch { return false; }
+}
+// Watch from Here: Writing History at the snapshot's tag
+function snapWatch(s) {
+  if (book) openHistory({ bookId: book.id, snapshot: { name: s.name, at: s.at } });
 }
 
 // ranges over the words of p at the given places (its text nodes end to end)
@@ -1058,21 +1304,22 @@ async function restoreSnapshot(chId) {
       if ((meta.chapterTitles || {})[chId]) book.chapterTitles[chId] = meta.chapterTitles[chId];
       if ((meta.chapterKinds || {})[chId]) book.chapterKinds[chId] = meta.chapterKinds[chId];
     }
-    chapterHTML[chId] = byId[chId];
+    setChapterHTML(chId, byId[chId], 'snapshot');
   } else {
     gone = book.chapterOrder.filter((c) => !meta.chapterOrder.includes(c));
     book.chapterOrder = [...meta.chapterOrder];
     for (const c of book.chapterOrder) {
-      chapterHTML[c] = byId[c];
+      setChapterHTML(c, byId[c], 'snapshot');
       if ((meta.chapterTitles || {})[c] !== undefined) book.chapterTitles[c] = meta.chapterTitles[c]; else delete book.chapterTitles[c];
       if ((meta.chapterKinds || {})[c] !== undefined) book.chapterKinds[c] = meta.chapterKinds[c]; else delete book.chapterKinds[c];
     }
   }
   wordCache = {};
+  rec.streams('snapshot');
   for (const c of chId ? [chId] : book.chapterOrder) await persistChapter(c);
   await saveMeta();
   // chapters added since: out of the book, their words in the snapshot just taken
-  for (const c of gone) { delete chapterHTML[c]; await window.neo.deleteChapter(book.id, c); }
+  for (const c of gone) { dropChapterHTML(c, 'snapshot'); await window.neo.deleteChapter(book.id, c); }
   showDarlingsAgain();
   switchTab('manuscript');
   renderChapters();
@@ -1121,6 +1368,131 @@ function onlyDrops(page, disk) {
   return false;
 }
 
+// book.removed: each chapter and loose card taken out of the book (deleted,
+// joined to another, set on a card, a card placed or deleted), by id, with
+// when and a fingerprint of what it held, { at, hash }; { at, back: true }
+// once it came back under the same id (⌘Z). Two book.json files that
+// disagree (the other device's, saved before it saw a change made here,
+// every flush saving the caret's place; or a copy a sync program set aside)
+// are joined by it: what either took out stays out, and what one lacks with
+// no entry is something it never knew of, so it stays in. A chapter taken
+// out there that has words here the other device may not have had (unsaved,
+// or its file newer than the removal) stays, and goes back in there too.
+// Entries go after a month.
+const REMOVED_DAYS = 30;
+function noteRemoved(id, hash) {
+  if (!book) return;
+  const removed = (book.removed = book.removed || {});
+  if (removed[id] && !removed[id].back) return;
+  removed[id] = { at: Date.now(), hash };
+}
+function noteBack(id) {
+  const r = book && book.removed && book.removed[id];
+  if (r && !r.back) book.removed[id] = { at: Date.now(), back: true };
+}
+function cardHash(card) {
+  return textHash(JSON.stringify([card.title || '', card.text || '', card.html || '']));
+}
+// the loose cards as this device last saved or read them, id → cardHash
+let cardsKnown = new Map();
+function knowCards() {
+  cardsKnown = new Map(((book && book.looseCards) || []).map((c) => [c.id, cardHash(c)]));
+}
+// Before book.json is written: the cards gone since it was last written,
+// and whatever is back. (A chapter's removal is noted as it goes, in
+// dropChapterHTML, while its text is still there to fingerprint.)
+function noteStructure() {
+  if (!book) return;
+  const cards = new Set();
+  for (const c of book.looseCards || []) { cards.add(c.id); noteBack(c.id); }
+  for (const [id, hash] of cardsKnown) if (!cards.has(id)) noteRemoved(id, hash);
+  knowCards();
+  for (const id of book.chapterOrder || []) noteBack(id);
+  const old = Date.now() - REMOVED_DAYS * 86400000;
+  for (const [id, r] of Object.entries(book.removed || {})) if (!r || !(r.at >= old)) delete book.removed[id];
+}
+function mergeRemoved(a, b) {
+  const out = { ...(a || {}) };
+  for (const [id, r] of Object.entries(b || {})) {
+    if (r && typeof r.at === 'number' && (!out[id] || out[id].at < r.at)) out[id] = r;
+  }
+  return out;
+}
+// A chapter taken out on another device, as this one holds it: can it go
+// here too? Not with words unsaved here, nor when its file was written
+// after (or just before) the removal with other text than went: those are
+// words the other device may not have had. `stamps` are the chapter
+// files' "mtime:size" (null when unknown: then it stays).
+function goesToo(chId, r, stamps) {
+  if (chapterHTML[chId] === undefined) return true;
+  if (chapterHTML[chId] !== savedHTML[chId]) return false;
+  // named only in a 1.6.5 book.json's removedChapters: no fingerprint, no
+  // time of its own, so its rule: saved here, it goes
+  if (r.listed) return true;
+  if (r.hash === textHash(String(chapterHTML[chId]))) return true;
+  if (!stamps) return false;
+  if (!(chId in stamps)) return true; // its file is gone here too
+  return parseFloat(stamps[chId]) < r.at - 120000;
+}
+// The chapters and loose cards of two book.json files, joined by `removed`
+// (both files' removals): `base`'s order leads, and a chapter only `other`
+// lists goes in after the one before it there when `wanted(id)` says so.
+// What stays against a removal is marked back in `removed`.
+function joinStructure(base, other, removed, stamps, wanted) {
+  const back = new Set();
+  const stays = (id) => {
+    const r = removed[id];
+    if (!r || r.back) return true;
+    if (chapterHTML[id] === undefined || goesToo(id, r, stamps)) return false;
+    back.add(id);
+    return true;
+  };
+  const order = (base.chapterOrder || []).filter(stays);
+  const from = Array.isArray(other.chapterOrder) ? other.chapterOrder : [];
+  from.forEach((id, i) => {
+    if (typeof id !== 'string' || order.includes(id) || !stays(id) || !wanted(id)) return;
+    const prev = from.slice(0, i).reverse().find((x) => order.includes(x));
+    order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, id);
+  });
+  const cards = [];
+  for (const c of [...(base.looseCards || []), ...(Array.isArray(other.looseCards) ? other.looseCards : [])]) {
+    if (!c || typeof c !== 'object' || cards.some((x) => x.id === c.id)) continue;
+    const r = removed[c.id];
+    if (r && !r.back) {
+      if (r.hash === cardHash(c)) continue;
+      back.add(c.id); // changed after it went: kept
+    }
+    // a chapter set on this card here, kept against that by the other
+    // device's words: the card goes, when the chapter holds all it held
+    if (c.held === 'chapter' && back.has(c.from) && order.includes(c.from) && heldIn(c, c.from, base, other)) {
+      removed[c.id] = { at: Date.now(), hash: cardHash(c) };
+      continue;
+    }
+    cards.push(c);
+  }
+  for (const id of back) removed[id] = { at: Date.now(), back: true };
+  return { order, cards, back: [...back] };
+}
+// True when chapter `chId` (its text here, its title and notes in either
+// book.json) holds every word of a card that held it: nothing goes with the card
+function heldIn(card, chId, a, b) {
+  const field = (k) => [a, b].map((m) => m && m[k] && m[k][chId]).filter(Boolean);
+  const titles = field('chapterTitles');
+  if (card.title && !titles.includes(card.title)) return false;
+  if (wordsBeyond(card.html, chapterHTML[chId])) return false;
+  if (wordsBeyond(card.text, field('chapterNotes').join(' '))) return false;
+  const noteWords = (n) => JSON.stringify(n || []).replace(/[[\]{}",:]/g, ' ');
+  return !wordsBeyond(noteWords(card.notes), field('sectionNotes').map(noteWords).join(' '));
+}
+// what `from` holds for a chapter (its title, kind, notes), where `into` has nothing
+function carryChapterFields(into, from, chId) {
+  for (const [k, v] of Object.entries(from)) {
+    if (k === 'removed' || !v || typeof v !== 'object' || Array.isArray(v) || !(chId in v)) continue;
+    if (into[k] === undefined) into[k] = {};
+    if (into[k] && typeof into[k] === 'object' && !(chId in into[k])) into[k][chId] = v[chId];
+  }
+}
+
 // True when `a` holds a word (or more of one) that `b` doesn't
 function wordsBeyond(a, b) {
   const bag = (html) => {
@@ -1150,6 +1522,12 @@ async function refreshFromDisk() {
         if (gen !== libraryGeneration || libraryWritesPending) return;
         if (lib && lib.firstRunDone && JSON.stringify(lib) !== JSON.stringify(library)) {
           library = lib;
+          libraryBase = libraryCopy(lib);
+          // proof, and the timestamp services, as another computer left them
+          if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+          if (window.neo.recState) window.neo.recState();
+          // answered there: the question here goes
+          if (library.historyAsked === true && $('#history-ask')) $('#history-ask').remove();
           const shelf = $('#bookshelf-view');
           const keep = shelf.scrollTop;
           await renderShelves();
@@ -1213,56 +1591,46 @@ async function refreshFromDisk() {
     const days = mergeDayCounts(book.dailyCounts, meta.dailyCounts);
     const dayMoved = dayWords(days[today]) !== dayWords((book.dailyCounts || {})[today]);
     if (theirs && metaSig(book) === sigHere) {
-      // The other device added, renamed or moved chapters. Whichever
-      // book.json stands, no chapter holding words is dropped: theirs keeps
-      // the chapters with unsaved words here, and ours (when this device
+      // The other device added, renamed or moved chapters, or saved a
+      // book.json from before it saw a change made here. Whichever stands,
+      // the chapters and loose cards are joined by both files' removals
+      // (book.removed): what either took out stays out, and no chapter
+      // holding words is dropped. Theirs keeps the chapters here they never
+      // knew of (a file, or unsaved words), and ours (when this device
       // restructured too and hasn't saved yet) takes in the chapters they wrote.
-      const hasWords = (h) => /[^\s]/.test(String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' '));
+      // a NEO from before `removed` (1.6.5) names the chapters it took out in
+      // removedChapters, with no time: as removed when its book.json was written
       const theirRemoved = new Set(Array.isArray(meta.removedChapters) ? meta.removedChapters : []);
       const myRemoved = new Set(Array.isArray(book.removedChapters) ? book.removedChapters : []);
-      // (a chapter taken out here, its file gone, that a book.json written
-      // before it heard of that still lists: it stays out)
-      const order = mine ? [...book.chapterOrder] : meta.chapterOrder.filter((c) => !(myRemoved.has(c) && chapterHTML[c] === undefined && !hasWords(incoming[c])));
-      const other = mine ? meta.chapterOrder : book.chapterOrder;
-      const kept = []; // chapters of this device's that their book.json doesn't list, and stay
-      other.forEach((chId, i) => {
-        if (order.includes(chId)) return;
-        if (mine) {
-          if (!hasWords(incoming[chId])) return;
-        } else if (chapterHTML[chId] === savedHTML[chId]) {
-          // Saved here, and not in their list. They took it out (they say
-          // so, or its file is gone from the disk): it goes. Otherwise their
-          // book.json was written without ever having heard of it (both
-          // devices added a chapter while apart, or an older NEO saved over
-          // the list): a chapter with words in it stays in the book.
-          if (!hasWords(chapterHTML[chId]) || theirRemoved.has(chId) || (stamps && stamps[chId] === undefined)) return;
-        }
-        if (!mine) kept.push(chId);
-        const prev = other.slice(0, i).reverse().find((c) => order.includes(c));
-        order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, chId);
-      });
-      if (!mine || order.length !== book.chapterOrder.length) {
+      const listed = {};
+      for (const id of theirRemoved) if (typeof id === 'string' && !(meta.removed && meta.removed[id])) listed[id] = { at: Date.parse(meta.modified) || 0, listed: true };
+      const removed = mergeRemoved(mergeRemoved(book.removed, meta.removed), listed);
+      const j = mine
+        ? joinStructure(book, meta, removed, stamps, (chId) => /[^\s]/.test(String(incoming[chId] || '').replace(/<[^>]*>/g, '')))
+        : joinStructure(meta, book, removed, stamps, (chId) => chapterHTML[chId] !== savedHTML[chId] || !stamps || chId in stamps);
+      const order = j.order;
+      const same = order.join('\n') === book.chapterOrder.join('\n') &&
+        JSON.stringify(j.cards) === JSON.stringify(book.looseCards || []) &&
+        JSON.stringify(removed) === JSON.stringify(book.removed || {});
+      if (!mine || !same) {
         for (const chId of order) {
           if (!(chId in incoming)) continue;
-          chapterHTML[chId] = incoming[chId];
+          setChapterHTML(chId, incoming[chId], 'disk-new');
           savedHTML[chId] = incoming[chId];
           knowDisk(bookId, chId, incoming[chId]);
         }
         if (mine) {
+          for (const chId of order) if (!book.chapterOrder.includes(chId)) carryChapterFields(book, meta, chId);
           book.chapterOrder = order;
+          book.looseCards = j.cards;
+          book.removed = removed;
           // what they took out stays named, with what this device took out
-          const removed = [...new Set([...myRemoved, ...theirRemoved])].filter((c) => !order.includes(c));
-          if (removed.length) book.removedChapters = removed; else delete book.removedChapters;
+          const named = [...new Set([...myRemoved, ...theirRemoved])].filter((c) => !order.includes(c));
+          if (named.length) book.removedChapters = named; else delete book.removedChapters;
         } else {
-          const was = book;
-          book = { ...meta, chapterOrder: order, lastPosition: book.lastPosition, dailyCounts: book.dailyCounts };
-          // a chapter kept keeps its name, its kind and its notes
-          for (const chId of kept) {
-            for (const key of ['chapterTitles', 'chapterKinds', 'chapterNotes', 'sectionNotes', 'sceneNotes']) {
-              if (!was[key] || was[key][chId] === undefined) continue;
-              book[key] = { ...(book[key] || {}), [chId]: was[key][chId] };
-            }
-          }
+          const here = book;
+          book = { ...meta, chapterOrder: order, looseCards: j.cards, removed, lastPosition: book.lastPosition, dailyCounts: book.dailyCounts };
+          for (const chId of order) if (!meta.chapterOrder.includes(chId)) carryChapterFields(book, here, chId);
           if (Array.isArray(book.removedChapters)) {
             book.removedChapters = book.removedChapters.filter((c) => !order.includes(c));
             if (!book.removedChapters.length) delete book.removedChapters;
@@ -1270,6 +1638,10 @@ async function refreshFromDisk() {
           savedMetaSig = metaSig(meta);
           savedOrder = [...meta.chapterOrder];
         }
+        rec.streams('disk-adopt'); // their titles and outline
+        knowCards();
+        // kept here against a removal there: its file goes back for them
+        for (const chId of j.back) if (order.includes(chId)) persistChapter(chId).catch(() => {});
         if (metaSig(book) !== savedMetaSig) scheduleMetaSave();
         if (!book.chapterOrder.includes(currentChapterId)) currentChapterId = null;
         undoStack = []; redoStack = []; // snapshots of the old structure must not replay over the new one
@@ -1297,6 +1669,7 @@ async function refreshFromDisk() {
       sideChanged = true;
     }
     if (sideChanged) {
+      rec.streams('disk-adopt'); // their stickies
       renderStickies();
       if (currentTab === 'darlings') renderDarlings();
     }
@@ -1329,7 +1702,7 @@ async function refreshFromDisk() {
             date: new Date().toISOString()
           });
         }
-        chapterHTML[chId] = disk;
+        setChapterHTML(chId, disk, 'disk-adopt');
         savedHTML[chId] = disk;
         knowDisk(bookId, chId, disk);
         wordCache[chId] = null;
@@ -1347,7 +1720,8 @@ async function refreshFromDisk() {
         book.chapterOrder.splice(idx + 1, 0, twinId);
         book.chapterTitles = book.chapterTitles || {};
         book.chapterTitles[twinId] = twinChapterTitle(book.chapterTitles[chId]);
-        chapterHTML[twinId] = disk;
+        setChapterHTML(twinId, disk, 'disk-twin');
+        rec.streams('disk-twin');
         persistChapter(twinId, disk);
         persistChapter(chId);
         scheduleMetaSave();
@@ -1386,6 +1760,9 @@ async function refreshFromDisk() {
       updateCounters();
     }
 
+    await takeConflictCopies(bookId);
+    await takeHistoryNotes(bookId);
+
     // The writer moved on to the other device since last touching this one:
     // the caret goes where they left off there. (Its chapter's words may
     // still be crossing over; the spot waits a little for its paragraph.)
@@ -1415,7 +1792,7 @@ document.addEventListener('visibilitychange', () => {
   else if (book) flushAllSaves(); // iOS may end a backgrounded app without warning
 });
 
-window.addEventListener('beforeunload', flushAllSaves);
+window.addEventListener('beforeunload', () => { flushAllSaves(); rec.end(); });
 // flush whenever focus leaves NEO, and every 20 seconds
 window.addEventListener('blur', () => { if (book) flushAllSaves(); });
 setInterval(() => { if (book) flushAllSaves('tick'); }, 20000);
@@ -1423,6 +1800,7 @@ setInterval(() => { if (book) flushAllSaves('tick'); }, 20000);
 async function backToShelf() {
   if (reading) stopReadAloud(false);
   flushAllSaves();
+  rec.end();
   tabPlaces = {};
   book = null;
   showWindowTitle();

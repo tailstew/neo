@@ -263,10 +263,10 @@ function insertPlaceholder() {
   sel.addRange(range);
 
   stickies.push({ id: sid, chapterId: currentChapterId, text: '', resolved: false });
-  writeSidecar(book.id, 'stickies', stickies);
-  chapterHTML[currentChapterId] = captureBody(document.querySelector(
+  writeStickies(book.id, stickies);
+  setChapterHTML(currentChapterId, captureBody(document.querySelector(
     `.chapter[data-id="${currentChapterId}"] .chapter-body`
-  ));
+  )), 'mark');
   scheduleChapterSave(currentChapterId);
   renderStickies();
   scheduleNavRefresh();
@@ -352,15 +352,21 @@ function scheduleStickiesSave() {
   clearTimeout(saveTimers.stickies);
   saveTimers.stickies = setTimeout(() => {
     delete saveTimers.stickies;
-    writeSidecar(bookId, 'stickies', list);
+    writeStickies(bookId, list);
   }, 600);
+}
+
+// stickies.json, and its text in the recording
+function writeStickies(bookId, list, cause = 'edit') {
+  if (book && book.id === bookId && list === stickies) rec.streams(cause, [Rec.STREAMS.stickies]);
+  return writeSidecar(bookId, 'stickies', list);
 }
 
 function flushStickiesSave() {
   if (!saveTimers.stickies || !book) return;
   clearTimeout(saveTimers.stickies);
   delete saveTimers.stickies;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
 }
 
 // Pair every mark in the manuscript with a note: pasted duplicates get their
@@ -371,7 +377,7 @@ function reconcileMarks() {
   const seen = new Set();
   let changed = false;
   for (const m of document.querySelectorAll('.chapter-body .ph-mark')) {
-    let sid = m.dataset.sid;
+    const sid = m.dataset.sid;
     if (!sid) continue;
     const chEl = m.closest('.chapter');
     const chId = chEl ? chEl.dataset.id : null;
@@ -394,7 +400,7 @@ function reconcileMarks() {
     seen.add(sid);
   }
   if (changed) {
-    writeSidecar(book.id, 'stickies', stickies);
+    writeStickies(book.id, stickies);
     renderStickies();
     renderNav();
   }
@@ -417,11 +423,11 @@ function resolveSticky(sid) {
     }
     const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
     try { body.normalize(); } catch { /* fine */ }
-    chapterHTML[chId] = captureBody(body);
+    setChapterHTML(chId, captureBody(body), 'mark');
     scheduleChapterSave(chId);
   }
   stickies = stickies.filter((s) => s.id !== sid);
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
   renderStickies();
   scheduleNavRefresh();
 }

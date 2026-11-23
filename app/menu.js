@@ -242,7 +242,7 @@ function applyAlign(value) {
     else p.style.textAlign = value;
     if (!p.getAttribute('style')) p.removeAttribute('style');
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'format');
   reportViewState(); // the Format menu's alignment tick
 }
 

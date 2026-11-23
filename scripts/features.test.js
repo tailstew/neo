@@ -140,7 +140,8 @@ describe('the menu bar follows the features', () => {
   test('a script open in simple NEO keeps its own export and elements', () => {
     const template = menuBar('darwin', false, { script: true });
     const exp = Array.from(menu(template, 'File').find((i) => i.label === 'Export').submenu, (i) => i.label);
-    assert.deepEqual(exp, ['PDF (.pdf)', 'Fountain (.fountain)', 'Final Draft (.fdx)']);
+    // (and Writing History, which simple NEO keeps: every library is asked whether to record)
+    assert.deepEqual(exp, ['PDF (.pdf)', 'Fountain (.fountain)', 'Final Draft (.fdx)', undefined, 'Writing History…']);
     assert.ok(labels(menu(template, 'Format')).includes('Scene Heading'));
   });
 });

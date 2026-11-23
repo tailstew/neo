@@ -731,7 +731,7 @@ function saveCard(cell, val) {
     list.push(sec);
     placeGhost(body, sec, next ? (next.brk || next.ps[0]) : null);
     orderSectionNotes(chId);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'outline');
     scheduleMetaSave();
     delete cell.dataset.new;
     cell.dataset.sec = sec.id;
@@ -756,7 +756,7 @@ function saveCard(cell, val) {
   anchor.dataset.secId = sec.id;
   list.push(sec);
   orderSectionNotes(chId);
-  syncChapter(chapterBodyEl(chId), chId);
+  syncChapter(chapterBodyEl(chId), chId, 'outline');
   scheduleMetaSave();
   cell.dataset.sec = sec.id;
 }
@@ -1149,13 +1149,13 @@ async function deleteSectionToDarlings(chId, segIdx, quiet = false) {
   liftSegment(body, seg);
   if (seg.id) book.sectionNotes[chId] = (book.sectionNotes[chId] || []).filter((s) => s.id !== seg.id);
   orderSectionNotes(chId);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'darling-out');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('section delete: ' + (err && err.message || err)));
   renderBoard();
   updateCounters();
-  if (seg.words && !quiet) toast(t('Section removed — its words are in Darlings, or {key} to undo', { key: KZ }));
+  if (seg.words && !quiet) undoToast(t('Section removed — its words are in Darlings, or {key} to undo', { key: KZ }));
 }
 
 // ---- moving cards ----
@@ -1206,7 +1206,7 @@ function repointStickies(ps, chId) {
       if (s && s.chapterId !== chId) { s.chapterId = chId; changed = true; }
     }
   }
-  if (changed) { writeSidecar(book.id, 'stickies', stickies); renderStickies(); }
+  if (changed) { writeStickies(book.id, stickies); renderStickies(); }
 }
 
 // to = { ch, before }: before is a section's index in that chapter, or null for the end
@@ -1233,9 +1233,9 @@ function moveSection(fromCh, segIdx, to) {
   }
   orderSectionNotes(fromCh);
   if (fromCh !== to.ch) orderSectionNotes(to.ch);
-  syncChapter(fromBody, fromCh);
+  syncChapter(fromBody, fromCh, 'outline');
   if (fromCh !== to.ch) {
-    syncChapter(toBody, to.ch);
+    syncChapter(toBody, to.ch, 'outline');
     // the chapter it lands in is saved before the one it left, so a save
     // that fails never leaves the section in neither
     clearTimeout(saveTimers[fromCh]);
@@ -1269,7 +1269,7 @@ function sectionToChapter(chId, segIdx) {
   snapshotStructure('card to chapter');
   const settle = holdDay();
   liftSegment(body, seg);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   const note = seg.id ? sectionNote(chId, seg.id) : null;
   if (seg.id) book.sectionNotes[chId] = book.sectionNotes[chId].filter((s) => s.id !== seg.id);
   const prose = seg.ps.filter((p) => !p.classList.contains('ghost'));
@@ -1277,11 +1277,11 @@ function sectionToChapter(chId, segIdx) {
   const html = prose.length ? prose.map((p) => p.outerHTML).join('') : '<p><br></p>';
   const newId = newEntryId();
   book.chapterOrder.splice(book.chapterOrder.indexOf(chId) + 1, 0, newId);
-  chapterHTML[newId] = html;
+  setChapterHTML(newId, html, 'outline');
   book.chapterNotes = book.chapterNotes || {};
   if (note && note.text) book.chapterNotes[newId] = note.text;
   for (const s of stickies) if (prose.some((p) => p.querySelector(`.ph-mark[data-sid="${s.id}"]`))) s.chapterId = newId;
-  writeSidecar(book.id, 'stickies', stickies);
+  writeStickies(book.id, stickies);
   // the new chapter's file, then book.json naming it, and only then the
   // chapter it came out of: a failed save never leaves the words nowhere
   clearTimeout(saveTimers[chId]);
@@ -1346,7 +1346,7 @@ async function writtenSectionToLoose(chId, seg) {
   liftSegment(body, seg);
   if (seg.id) book.sectionNotes[chId] = book.sectionNotes[chId].filter((s) => s.id !== seg.id);
   orderSectionNotes(chId);
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   saveMeta().then(() => persistChapter(chId))
     .catch((err) => window.neo.logError('section to loose: ' + (err && err.message || err)));
@@ -1377,7 +1377,7 @@ function looseToSection(looseId, to) {
       setSegmentDown(body, ps, null, target);
     }
     orderSectionNotes(to.ch);
-    syncChapter(body, to.ch);
+    syncChapter(body, to.ch, 'outline');
     // the chapter with the words is saved before the card leaves book.json
     clearTimeout(saveTimers[to.ch]);
     persistChapter(to.ch).then(() => saveMeta())
@@ -1389,7 +1389,7 @@ function looseToSection(looseId, to) {
   (book.sectionNotes[to.ch] = book.sectionNotes[to.ch] || []).push(sec);
   if (sec.text) placeGhost(body, sec, target ? (target.brk || target.ps[0]) : null);
   orderSectionNotes(to.ch);
-  syncChapter(body, to.ch);
+  syncChapter(body, to.ch, 'outline');
   scheduleMetaSave();
   renderLooseCards();
 }
@@ -1434,12 +1434,13 @@ async function joinChapter(chId, intoCh) {
   delete book.sectionNotes[chId];
   if (!hasLines && sec.text) placeGhost(into, sec, null);
   orderSectionNotes(intoCh);
-  syncChapter(into, intoCh);
+  syncChapter(into, intoCh, 'outline');
   // the words are safe in the other chapter before this one's file goes
   try { await persistChapter(intoCh); } catch (err) { window.neo.logError('join: ' + (err && err.message || err)); return null; }
   if (book.chapterTitles) delete book.chapterTitles[chId];
+  rec.streams('outline');
   await foldNotesPage(chId, intoCh);
-  await deleteChapterQuiet(chId);
+  await deleteChapterQuiet(chId, 'merge');
   updateCounters();
   return sec.id;
 }
@@ -1602,7 +1603,7 @@ async function deleteSelectedCards() {
   renderLooseCards();
   if (currentTab === 'outline') renderOutline();
   updateCounters();
-  toast(t('{n} cards removed — their writing is in Darlings, or {key} to undo', { n: cells.length, key: KZ }), 6000);
+  undoToast(t('{n} cards removed — their writing is in Darlings, or {key} to undo', { n: cells.length, key: KZ }), 6000);
 }
 
 function beginCardDrag(st) {
@@ -1993,7 +1994,7 @@ function insertScene(k, slug) {
     if (last && !last.textContent.trim() && spType(last) === 'action' && body.children.length > 1) last.remove();
     body.append(h, a);
   }
-  syncChapter(body, body.closest('.chapter').dataset.id);
+  syncChapter(body, body.closest('.chapter').dataset.id, 'outline');
   breakRun++;
   spRepaginate();
   return h;
@@ -2012,7 +2013,7 @@ function saveSceneCard(cell, note, slug) {
       const id = newSceneId();
       (book.sceneNotes = book.sceneNotes || {})[id] = note;
       h.dataset.sceneId = id;
-      syncChapter(spBodyOf(h), spChapterOf(h));
+      syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
       scheduleMetaSave();
     }
     renderNav();
@@ -2043,7 +2044,7 @@ function saveSceneCard(cell, note, slug) {
     scheduleMetaSave();
   }
   if (changed) {
-    syncChapter(spBodyOf(h), spChapterOf(h));
+    syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
     spRepaginate();
     renderNav();
   }
@@ -2060,7 +2061,7 @@ function looseToScene(looseId, before) {
     const id = newSceneId();
     (book.sceneNotes = book.sceneNotes || {})[id] = card.text;
     h.dataset.sceneId = id;
-    syncChapter(spBodyOf(h), spChapterOf(h));
+    syncChapter(spBodyOf(h), spChapterOf(h), 'outline');
   }
   scheduleMetaSave();
   renderLooseCards();
@@ -2235,11 +2236,12 @@ async function chapterToLoose(chId) {
   const body = chapterBodyEl(chId);
   if (body && body.querySelector('.ph-mark')) { toast(t('That chapter has a placeholder in it. Move the placeholder first.')); return; }
   snapshotStructure('card to loose');
-  if (body) syncChapter(body, chId);
+  if (body) syncChapter(body, chId, 'outline');
   const kind = chapterKind(chId);
   const card = {
     id: 'lc-' + Date.now().toString(36),
     held: 'chapter',
+    from: chId, // so the card can go if another device keeps the chapter (joinStructure)
     title: (book.chapterTitles || {})[chId] || '',
     text: (book.chapterNotes || {})[chId] || '',
     html: chapterHTML[chId] || '',
@@ -2251,7 +2253,7 @@ async function chapterToLoose(chId) {
   if (!(await saveHeldCard(card))) return;
   if (book.chapterTitles) delete book.chapterTitles[chId];
   if (currentChapterId === chId) currentChapterId = null;
-  await deleteChapterQuiet(chId);
+  await deleteChapterQuiet(chId, 'outline');
   renderLooseCards();
   if (currentTab === 'outline') renderBoard();
   updateCounters();
@@ -2264,7 +2266,7 @@ function looseToChapter(looseId, index) {
   snapshotStructure('loose card placed');
   const chId = 'ch-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
   book.chapterOrder.splice(Math.max(0, Math.min(index, book.chapterOrder.length)), 0, chId);
-  chapterHTML[chId] = card.html || '<p><br></p>';
+  setChapterHTML(chId, card.html || '<p><br></p>', 'outline');
   if (card.title) (book.chapterTitles = book.chapterTitles || {})[chId] = card.title;
   if (card.text) (book.chapterNotes = book.chapterNotes || {})[chId] = card.text;
   if (card.notes && card.notes.length) (book.sectionNotes = book.sectionNotes || {})[chId] = card.notes;
@@ -2301,7 +2303,7 @@ async function sceneToLoose(cell) {
   for (const n of nodes) n.remove();
   if (!body.querySelector('p')) body.innerHTML = '<p><br></p>';
   if (cell.dataset.sid && book.sceneNotes) delete book.sceneNotes[cell.dataset.sid];
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('scene to loose: ' + (err && err.message || err)));
@@ -2335,7 +2337,7 @@ function heldSceneBack(card, before) {
   for (const n of nodes) { if (target) target.before(n); else dest.appendChild(n); }
   book.looseCards = book.looseCards.filter((c) => c.id !== card.id);
   const chId = dest.closest('.chapter').dataset.id;
-  syncChapter(dest, chId);
+  syncChapter(dest, chId, 'outline');
   clearTimeout(saveTimers[chId]);
   persistChapter(chId).then(() => saveMeta())
     .catch((err) => window.neo.logError('loose to scene: ' + (err && err.message || err)));
@@ -2625,8 +2627,9 @@ window.addEventListener('resize', queueWalkNote);
 
 let auxDirty = false;
 $('#aux-editor').addEventListener('keydown', (e) => { if (styleKeepScroll(e)) return; smartKeys(e, e.currentTarget); });
-$('#aux-editor').addEventListener('input', () => {
+$('#aux-editor').addEventListener('input', (e) => {
   auxDirty = true;
+  if (recIsNotesKind(e.currentTarget.dataset.kind)) recNotesInput(e);
   scheduleAuxSave();
   notesTyped();
   if (spellOn) {
@@ -2671,6 +2674,7 @@ function auxRead(bookId, kind) {
 function flushAux() {
   const ed = $('#aux-editor');
   if (auxDirty && ed.dataset.kind && ed.dataset.book) {
+    if (recIsNotesKind(ed.dataset.kind) && rec.bookId === ed.dataset.book) rec.reconcile(recNotesId(ed.dataset.kind), ed.innerHTML);
     const key = ed.dataset.book + '/' + ed.dataset.kind;
     auxPending[key] = { bookId: ed.dataset.book, kind: ed.dataset.kind, html: ed.innerHTML, inFlight: false };
     auxDirty = false;
@@ -2711,7 +2715,10 @@ async function refreshOpenAux() {
   if (ed.dataset.book !== bookId || ed.dataset.kind !== kind || auxDirty || auxPending[key]) return;
   if ((auxSeq[key] || 0) !== seq || html === auxBase[key]) return;
   auxBase[key] = html;
+  // (another device's words: Writing History takes them as the page's new text)
+  if (recIsNotesKind(kind)) recNotesRead(html, bookId, kind);
   ed.innerHTML = html;
+  if (recIsNotesKind(kind)) recNotesShown = ed.innerHTML;
 }
 
 // The same promise for the JSON beside a book (comments, Darlings): the
@@ -2786,7 +2793,7 @@ function renderDarlings() {
         const body = anchor.closest('.chapter-body');
         const chId = anchor.closest('.chapter').dataset.id;
         anchor.remove();
-        syncChapter(body, chId);
+        syncChapter(body, chId, 'darling-delete');
       }
       darlings = darlings.filter((x) => x.id !== d.id);
       await writeSidecar(book.id, 'darlings', darlings);
@@ -2835,7 +2842,7 @@ async function restoreDarling(id) {
           // inline content: slot it right where the caret was
           at.insertNode(document.createRange().createContextualFragment(d.html || d.text));
         }
-        syncChapter(body, d.chapterId);
+        syncChapter(body, d.chapterId, 'darling-in');
         // the chapter holding it again is saved before Darlings lets it go
         if (!(await savedBeforeLettingGo(d.chapterId))) return;
         darlings = darlings.filter((x) => x.id !== id);
@@ -2855,7 +2862,7 @@ async function restoreDarling(id) {
   const body = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
   const frag = d.html ? d.html : '<p>' + d.text.replace(/\n+/g, '</p><p>') + '</p>';
   body.insertAdjacentHTML('beforeend', frag);
-  chapterHTML[chId] = captureBody(body);
+  setChapterHTML(chId, captureBody(body), 'darling-in');
   if (!(await savedBeforeLettingGo(chId))) return;
   darlings = darlings.filter((x) => x.id !== id);
   await writeSidecar(book.id, 'darlings', darlings);

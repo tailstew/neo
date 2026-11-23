@@ -143,6 +143,7 @@ test('a Ukrainian suggestion goes onto the page with a typographic apostrophe', 
     },
     Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, Range: TextRange, Highlight: Set, CSS: { highlights },
     $: () => null, t: (text) => text, tk: (text) => text, toast() {},
+    rec: { mark() {} }, // Writing History's recorder: a suggestion picked is marked
     captureMenu: (_x, _y, word, suggestions, actions) => { menu = { word, suggestions, actions }; },
     window: {
       getSelection: () => ({ removeAllRanges() {}, addRange: (r) => { selected = r; } }),
@@ -170,19 +171,18 @@ test('a Ukrainian suggestion goes onto the page with a typographic apostrophe', 
 });
 
 function spellWorker() {
-  let handle, reply;
+  let handle;
   const context = vm.createContext({
     require: localRequire,
     process: { parentPort: {
       on: (_name, callback) => { handle = callback; },
-      postMessage: (message) => { reply = message; }
+      postMessage: () => {} // (set below, once the worker has loaded)
     } }
   });
   // The string is the file on disk. filename is how Node attributes coverage to it.
   vm.runInContext(source('spell-worker.js'), context, { filename: path.join(root, 'spell-worker.js') });
   let id = 0;
   const waiting = new Map();
-  reply = null;
   // the worker answers asynchronously and in order
   context.process.parentPort.postMessage = (message) => {
     const done = waiting.get(message.id);
@@ -495,6 +495,7 @@ test('a hyphenated word underlined whole opens the menu; a stammer is no misspel
   }
   let contextmenu, menu, selected;
   const highlights = new Map();
+  const marks = [];
   const context = vm.createContext({
     document: {
       addEventListener: (name, callback) => { if (name === 'contextmenu') contextmenu = callback; },
@@ -507,6 +508,7 @@ test('a hyphenated word underlined whole opens the menu; a stammer is no misspel
     },
     Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4 }, Range: TextRange, Highlight: Set, CSS: { highlights },
     $: () => null, t: (text) => text, tk: (text) => text, toast() {},
+    rec: { mark: (cause) => marks.push(cause) },
     captureMenu: (_x, _y, word, suggestions, actions) => { menu = { word, suggestions, actions }; },
     window: {
       getSelection: () => ({ removeAllRanges() {}, addRange: (r) => { selected = r; } }),
@@ -526,4 +528,5 @@ test('a hyphenated word underlined whole opens the menu; a stammer is no misspel
   assert.ok(menu.suggestions.includes('autoestima'));
   menu.actions.replace('autoestima');
   assert.equal(node.data, '— E-eu não sei. N-não. Ch-chega! Ela tinha autoestima, sim.');
+  assert.deepEqual(marks, ['spell']); // recorded as a suggestion picked, not as text with no key
 });

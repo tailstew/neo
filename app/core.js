@@ -58,28 +58,14 @@ const tabName = (kind) => {
 // the numbering starts, say. Prologues, epilogues and chapters (numbered or
 // not) are the story: they count toward the words. book.restartNumbering
 // starts the chapter count again at 1 after every part.
-const CHAPTER_KINDS = ['copyright', 'dedication', 'epigraph', 'contents', 'prologue', 'part', 'chapter', 'unnumbered', 'epilogue', 'acknowledgments', 'about'];
-const STORY_KINDS = ['chapter', 'unnumbered', 'prologue', 'epilogue'];
+// a sheet's kinds and how it's set are sheet.js's, shared with the exported page
+const { CHAPTER_KINDS, STORY_KINDS, ATTRIBUTED_PAGES, OPENING_DASH, isAttribution, markDialogueOpening, refreshDropCaps, capRange, sheetLook, markSheet } = window.NeoSheet;
+const chapterKind = (chId, meta = book) => NeoSheet.chapterKind(chId, meta);
+const isStory = (chId, meta = book) => NeoSheet.isStory(chId, meta);
+const chapterRole = (chId, meta = book) => NeoSheet.chapterRole(chId, meta);
+const soloStory = (meta = book) => NeoSheet.soloStory(meta);
 // what comes after the story, where a new chapter never goes
 const BACK_KINDS = ['epilogue', 'acknowledgments', 'about'];
-function chapterKind(chId, meta = book) {
-  const k = meta && meta.chapterKinds && meta.chapterKinds[chId];
-  if (k && CHAPTER_KINDS.includes(k)) return k;
-  // NEO 1.0 kept a prologue and an epilogue as roles of the first and last
-  // chapters (a book not opened since reads that way until it is)
-  const order = (meta && meta.chapterOrder) || [];
-  if (order.length >= 2) {
-    if (meta.prologue === chId && order[0] === chId) return 'prologue';
-    if (meta.epilogue === chId && order[order.length - 1] === chId) return 'epilogue';
-  }
-  return 'chapter';
-}
-const isStory = (chId, meta = book) => STORY_KINDS.includes(chapterKind(chId, meta));
-// a prologue or an epilogue: story that stands outside the numbering
-function chapterRole(chId, meta = book) {
-  const k = chapterKind(chId, meta);
-  return k === 'prologue' || k === 'epilogue' ? k : null;
-}
 // a chapter's number counts chapters only; a part's, parts only
 function kindCount(chId, kind, meta = book) {
   let n = 0;
@@ -155,13 +141,6 @@ function numberedChapters(meta = book, chId = null) {
   }
   return chId && meta.restartNumbering ? n : total;
 }
-// A story of one chapter is just "the story": no heading, no number, until a
-// second chapter (or a prologue, an epilogue or a part) joins it. The pages
-// around it don't count.
-function soloStory(meta = book) {
-  const story = meta.chapterOrder.filter((c) => isStory(c, meta) || chapterKind(c, meta) === 'part');
-  return story.length === 1 && chapterKind(story[0], meta) === 'chapter' ? story[0] : null;
-}
 // NEO 1.0's roles become kinds the first time a book opens here, and a kind
 // whose entry is gone is let go
 function settleChapterKinds() {
@@ -208,13 +187,13 @@ let savedMetaSig = '';       // book.json as last read/written, minus the volati
 let knownChapters = new Set();
 let savedOrder = [];
 let diskStamps = {};         // chapterId -> file mtime as of the last look at the disk
-let writing = {};            // chapterId -> chapter writes still on their way to disk
+const writing = {};          // chapterId -> chapter writes still on their way to disk
 let stickies = [];           // [{id, chapterId, text, resolved}]
 let darlings = [];           // [{id, html, text, chapterId, chapterLabel, date}]
 let currentTab = 'manuscript';
 let currentChapterId = null; // chapter the caret/scroll is in
 let wordMode = 'book';       // 'book' | 'chapter'
-let saveTimers = {};
+const saveTimers = {};
 
 // Every library.json write from this window goes through here. A look at the
 // disk (refreshFromDisk) can then tell its own writes from another device's:
@@ -222,12 +201,99 @@ let saveTimers = {};
 // its way, is older than the library in memory and must not replace it.
 let libraryGeneration = 0;
 let libraryWritesPending = 0;
+// The library as this window last read it from disk or wrote it. Another
+// device (the phone, the other computer) writes library.json too, and this
+// window re-reads it only on the shelf: a write here from what it holds in
+// memory would undo that device's change (its timestamp services, a book it
+// put on a shelf), and the sync program would set ours or theirs aside as a
+// conflict copy. So each write looks at the disk first and merges
+// (libraryMerged): what changed here since this base is ours, what changed
+// there is theirs. Writes go one at a time.
+let libraryBase = null;
+let libraryChain = Promise.resolve();
+const libraryCopy = (lib) => (lib ? JSON.parse(JSON.stringify(lib)) : null);
 function writeLibrary(lib = library) {
   rememberDeviceLook(lib);
   libraryGeneration++;
   libraryWritesPending++;
-  return new Promise((resolve) => resolve(window.neo.writeLibrary(lib)))
-    .finally(() => { libraryWritesPending--; });
+  const run = libraryChain.then(async () => {
+    const theirs = await libraryMerged(lib);
+    const ok = await window.neo.writeLibrary(lib);
+    libraryBase = libraryCopy(lib);
+    if (theirs) libraryTookTheirs();
+    return ok;
+  });
+  libraryChain = run.catch(() => {});
+  return run.finally(() => { libraryWritesPending--; });
+}
+// Merges into lib (the library in memory) what another device changed in
+// library.json since libraryBase, and says whether it took anything. A key
+// changed here keeps ours; one changed only there takes theirs. This
+// device's look (DEVICE_LOOK) is its own. Shelves merge shelf by shelf.
+async function libraryMerged(lib) {
+  if (!libraryBase || !lib) return false;
+  let disk;
+  try { disk = await window.neo.readLibrary(); } catch { return false; }
+  if (!disk || typeof disk !== 'object' || !Array.isArray(disk.shelves)) return false;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (same(disk, libraryBase)) return false;
+  let took = false;
+  for (const k of new Set([...Object.keys(disk), ...Object.keys(libraryBase)])) {
+    if (k === 'shelves' || DEVICE_LOOK.includes(k)) continue;
+    if (same(lib[k], libraryBase[k]) && !same(disk[k], libraryBase[k])) {
+      if (disk[k] === undefined) delete lib[k]; else lib[k] = libraryCopy(disk[k]);
+      took = true;
+    }
+  }
+  const shelves = mergeShelves(libraryBase.shelves || [], lib.shelves || [], disk.shelves);
+  if (!same(shelves, lib.shelves)) { lib.shelves = shelves; took = true; }
+  return took;
+}
+// Shelves changed here (ours) and there (theirs) since base: a shelf one side
+// added stays, one a side took out goes (unless the other changed it); on a
+// shelf both have, its name and the like are whoever changed them, and its
+// books are ours, less those theirs took off, plus those theirs put on.
+// (A plain function: scripts/library-merge.test.js)
+function mergeShelves(base, ours, theirs) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (same(theirs, base)) return ours;
+  if (same(ours, base)) return JSON.parse(JSON.stringify(theirs));
+  const byId = (l) => new Map(l.map((s) => [s.id, s]));
+  const B = byId(base), O = byId(ours), T = byId(theirs);
+  const out = [];
+  for (const o of ours) {
+    const b = B.get(o.id), th = T.get(o.id);
+    if (!th) { if (!b || !same(o, b)) out.push(o); continue; } // taken out there: goes, unless new or changed here
+    if (!b) { out.push(o); continue; }
+    const s = { ...o };
+    for (const k of new Set([...Object.keys(th), ...Object.keys(b)])) {
+      if (k === 'bookIds' || k === 'id') continue;
+      if (same(o[k], b[k]) && !same(th[k], b[k])) { if (th[k] === undefined) delete s[k]; else s[k] = th[k]; }
+    }
+    const was = new Set(b.bookIds || []), there = new Set(th.bookIds || []);
+    const ids = (o.bookIds || []).filter((id) => !(was.has(id) && !there.has(id)));
+    for (const id of th.bookIds || []) if (!was.has(id) && !ids.includes(id)) ids.push(id);
+    s.bookIds = ids;
+    out.push(s);
+  }
+  // a shelf added there, or one taken out here that was changed there
+  theirs.forEach((th, i) => {
+    if (O.has(th.id)) return;
+    const b = B.get(th.id);
+    if (b && same(th, b)) return;
+    out.splice(Math.min(i, out.length), 0, JSON.parse(JSON.stringify(th)));
+  });
+  // a book moved between shelves on one side and left on the other: once
+  const seen = new Set();
+  for (const s of out) s.bookIds = (s.bookIds || []).filter((id) => !seen.has(id) && seen.add(id));
+  return out;
+}
+// What another device changed reached this window: the proof flags, and
+// the shelf, as a look at the disk would have it
+function libraryTookTheirs() {
+  if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
+  if (window.neo.recState) window.neo.recState();
+  if (!book && !$('#bookshelf-view').hidden) renderShelves();
 }
 
 // How NEO looks is each device's own: dark on the iPad, light on the PC.
@@ -448,6 +514,125 @@ function askInput(title, placeholder, value = '') {
   });
 }
 
+// A tag's name and, below it, a longer note (Writing History's tags). With
+// `named` false only the note is asked. Enter in the name saves, Enter in
+// the note is a new line (⌘/Ctrl+Enter there saves), Esc cancels. Resolves
+// { name, note } (trimmed; note '' for none) or null.
+function askTagNote({ title, named = true, name = '', namePlaceholder = '', note = '' }) {
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop tag-note-modal';
+    bd.innerHTML = `
+      <div class="modal">
+        <h2 style="font-size:16px"></h2>
+        <input class="tn-name" type="text" spellcheck="false">
+        <label class="tn-label"><span></span><textarea class="tn-note" rows="6" spellcheck="false"></textarea></label>
+        <div style="text-align:right;margin-top:14px">
+          <button class="m-cancel btn-quiet" style="margin-right:10px">${escHtml(t('Cancel'))}</button>
+          <button class="m-ok btn-gold">${escHtml(t('OK'))}</button>
+        </div>
+      </div>`;
+    bd.querySelector('h2').textContent = title;
+    const nameEl = bd.querySelector('.tn-name');
+    const noteEl = bd.querySelector('.tn-note');
+    bd.querySelector('.tn-label span').textContent = named ? t('Note (optional)') : t('Note');
+    nameEl.hidden = !named;
+    nameEl.value = name;
+    nameEl.placeholder = namePlaceholder;
+    nameEl.setAttribute('aria-label', t('Name'));
+    noteEl.value = note;
+    document.body.appendChild(bd);
+    if (named) { nameEl.focus(); nameEl.select(); } else noteEl.focus();
+    const done = (val) => { bd.remove(); resolve(val); };
+    const ok = () => done({ name: nameEl.value.trim(), note: noteEl.value.trim() });
+    bd.querySelector('.m-ok').onclick = ok;
+    bd.querySelector('.m-cancel').onclick = () => done(null);
+    bd.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      // gone by the time Esc bubbles up: without this the History dialog
+      // behind it, or the editor, takes the Esc too
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(null); return; }
+      if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
+      if (e.target === nameEl || e.metaKey || e.ctrlKey) { e.preventDefault(); ok(); }
+    });
+  });
+}
+
+// A note read whole, as plain text: a tag's in Writing History. `head`
+// lines go above it, in gray.
+function showNoteModal(title, head, note) {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop tag-note-modal';
+  bd.innerHTML = `
+    <div class="modal">
+      <h2 style="font-size:16px"></h2>
+      <div class="tn-head"></div>
+      <div class="tn-read" tabindex="0"></div>
+      <div style="text-align:right;margin-top:14px">
+        <button class="tn-copy btn-quiet" style="margin-right:10px">${escHtml(t('Copy'))}</button>
+        <button class="m-ok btn-gold">${escHtml(t('Close'))}</button>
+      </div>
+    </div>`;
+  bd.querySelector('h2').textContent = title;
+  const headEl = bd.querySelector('.tn-head');
+  for (const line of head) { const p = document.createElement('p'); p.textContent = line; headEl.appendChild(p); }
+  headEl.hidden = !head.length;
+  bd.querySelector('.tn-read').textContent = note;
+  const done = () => bd.remove();
+  bd.querySelector('.m-ok').onclick = done;
+  bd.querySelector('.tn-copy').onclick = () => { navigator.clipboard.writeText(note).then(() => toast(t('Copied.')), () => {}); };
+  bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(); });
+  bd.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); done(); } });
+  document.body.appendChild(bd);
+  bd.querySelector('.m-ok').focus();
+}
+
+// A yes or no that says, point by point, what will happen. With `phrase`,
+// the writer types it before the button works: for what can't be taken
+// back from inside NEO. True on yes.
+function confirmModal({ title, points = [], ok, danger = false, phrase = '' }) {
+  return new Promise((resolve) => {
+    const bd = document.createElement('div');
+    bd.className = 'modal-backdrop confirm-modal';
+    const typeIt = phrase
+      ? escHtml(t('To confirm, type {phrase} below.', { phrase: '\u0000' })).replace('\u0000', '<strong></strong>')
+      : '';
+    bd.innerHTML = `
+      <div class="modal" role="alertdialog" aria-modal="true" style="width:460px">
+        <h2 style="font-size:16px"></h2>
+        <ul class="cm-points">${points.map(() => '<li></li>').join('')}</ul>
+        ${phrase ? `<p class="cm-type">${typeIt}</p><input type="text" spellcheck="false" autocomplete="off">` : ''}
+        <div style="text-align:right;margin-top:16px">
+          <button class="m-cancel btn-quiet" style="margin-right:10px">${t('Cancel')}</button>
+          <button class="m-ok ${danger ? 'btn-danger' : 'btn-gold'}"></button>
+        </div>
+      </div>`;
+    bd.querySelector('h2').textContent = title;
+    bd.querySelector('.modal').setAttribute('aria-label', title);
+    bd.querySelectorAll('.cm-points li').forEach((li, i) => { li.textContent = points[i]; });
+    if (phrase) bd.querySelector('.cm-type strong').textContent = phrase;
+    const okBtn = bd.querySelector('.m-ok');
+    okBtn.textContent = ok;
+    const input = bd.querySelector('input');
+    const typed = () => !input || input.value.trim().toLocaleLowerCase() === phrase.toLocaleLowerCase();
+    if (input) {
+      okBtn.disabled = true;
+      input.setAttribute('aria-label', t('To confirm, type {phrase} below.', { phrase }));
+      input.addEventListener('input', () => { okBtn.disabled = !typed(); });
+    }
+    document.body.appendChild(bd);
+    const done = (val) => { bd.remove(); resolve(val); };
+    okBtn.onclick = () => { if (typed()) done(true); };
+    bd.querySelector('.m-cancel').onclick = () => done(false);
+    bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(false); });
+    bd.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); done(false); } else if (e.key === 'Enter' && typed() && e.target.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
+    });
+    (input || bd.querySelector('.m-cancel')).focus();
+  });
+}
+
 // A list of choices, null on cancel.
 function optionModal(title, message, options) {
   return new Promise((resolve) => {
@@ -474,6 +659,8 @@ function optionModal(title, message, options) {
     });
     bd.querySelector('.m-cancel').onclick = () => done(null);
     bd.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } });
+    // (the keys come here, not to whatever was behind it)
+    bd.querySelector('.m-cancel').focus();
   });
 }
 
@@ -579,12 +766,44 @@ function showWindowTitle() {
   if (strip) strip.textContent = title;
 }
 
-function toast(msg, ms = 4000) {
+function toast(msg, ms = 4000, { warn = false, action = null } = {}) {
   const h = $('#hint');
   h.textContent = msg;
+  h.classList.toggle('hint-warn', warn);
+  // a button in the toast (Undo, below): the toast takes taps while it has one
+  h.classList.toggle('hint-has-act', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'hint-act';
+    b.textContent = action.label;
+    b.addEventListener('click', () => { h.hidden = true; action.run(); });
+    h.append(' ', b);
+  }
   h.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { h.hidden = true; }, ms);
+}
+
+// A toast for something ⌘Z undoes, with an Undo button for a hand with no
+// keyboard (Pocket's undo above the keyboard is gone once it's down). The
+// button is there only while the newest undo is fresh, the action's own,
+// and it undoes only that one: nothing else undone or done since.
+// Typing again puts it away: the writer has moved on (and an Undo then would
+// send what they typed to Darlings).
+function undoToast(msg, ms = 6000) {
+  const snap = undoStack[undoStack.length - 1];
+  const fresh = snap && performance.now() - snap.made < 15000;
+  toast(msg, ms, fresh ? { action: { label: t('Undo'), run: () => { if (undoStack[undoStack.length - 1] === snap) structuralUndo(); } } } : {});
+  if (!fresh) return;
+  const h = $('#hint');
+  const shown = h.firstChild && h.firstChild.data;
+  const away = () => {
+    document.removeEventListener('input', away, true);
+    if (!h.hidden && h.firstChild && h.firstChild.data === shown && h.querySelector('.hint-act')) h.hidden = true;
+  };
+  document.addEventListener('input', away, true);
+  setTimeout(() => document.removeEventListener('input', away, true), ms);
 }
 
 // Scripts that do not separate words with spaces: a whitespace count reports

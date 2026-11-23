@@ -12,7 +12,13 @@ function reportError(msg) {
     toast(t('Something hiccuped — your words are safe, and the details were logged'));
   }
 }
-window.addEventListener('error', (e) => reportError(`${e.message} @ ${e.filename}:${e.lineno}`));
+window.addEventListener('error', (e) => {
+  // The browser's word that a size observer's change moved the layout again
+  // before the frame ended (History's drawer as a chapter redraws, say): the
+  // rest is delivered next frame. Not an error, and Pocket showed it as one.
+  if (/^ResizeObserver loop/.test(String(e.message))) return;
+  reportError(`${e.message} @ ${e.filename}:${e.lineno}`);
+});
 window.addEventListener('unhandledrejection', (e) => reportError('Unhandled: ' + (e.reason && e.reason.stack || e.reason)));
 
 /* ================================================================== */
@@ -147,6 +153,32 @@ new MutationObserver((muts) => {
   }
 }).observe(document.body, { childList: true });
 $$('.modal-backdrop').forEach(dialogify);
+
+// Tab goes round the topmost dialog's controls and never out of it: behind
+// a dialog is the book (or the dialog it opened from), which keys must not
+// reach while it's open. One trap for every dialog (.modal-backdrop).
+function topDialog() {
+  const open = [...document.querySelectorAll('.modal-backdrop')].filter((b) => !b.hidden && b.getClientRects().length);
+  return open[open.length - 1] || null;
+}
+function tabStops(root) {
+  return [...root.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [contenteditable="true"], [tabindex]')]
+    .filter((x) => !x.disabled && x.tabIndex >= 0 && x.getClientRects().length && getComputedStyle(x).visibility !== 'hidden' && !x.closest('[hidden], [inert]'));
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+  const bd = topDialog();
+  const at = document.activeElement;
+  if (!bd || (at && at.closest('[role="menu"]'))) return; // (a menu keeps its own keys)
+  const all = tabStops(bd);
+  const i = all.indexOf(at);
+  // (the browser also stops on a scrolling box inside: from there it goes on as usual)
+  const inside = at && at !== bd && bd.contains(at);
+  if (!all.length || (i < 0 && !inside) || (i >= 0 && (e.shiftKey ? i === 0 : i === all.length - 1))) {
+    e.preventDefault();
+    if (all.length) all[e.shiftKey ? all.length - 1 : 0].focus();
+  }
+}, true);
 
 // F6 walks the regions a mouse finds by hovering: the page, the chapters
 // pane, the notes pane, the bottom bar. ⇧F6 walks back; Esc returns to

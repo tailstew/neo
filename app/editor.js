@@ -8,7 +8,7 @@ let openGeneration = 0;
 async function openBook(bookId) {
   // a book being exported from the shelf finishes first (it borrows the
   // open book's place for the moment it takes)
-  while (shelfExport) await new Promise((r) => setTimeout(r, 50));
+  while (shelfExport) await new Promise((resolve) => setTimeout(resolve, 50));
   // Everything is read first and only then becomes the open book, so a
   // second book opened while this one loads (a double click, a slow cloud
   // read) never ends up with a mix of the two.
@@ -25,14 +25,21 @@ async function openBook(bookId) {
   if (gen !== openGeneration) return;
   tabPlaces = {}; // a fresh book starts with fresh places
   book = meta;
+  knowCards();
   showWindowTitle();
   forgetSnapshots();
   forgetSpelling();
   sideCardsKey = '';
   currentChapterId = null; // never carry a chapter reference across books
   undoStack = []; redoStack = [];
-  chapterHTML = html;
-  savedHTML = { ...html };
+  // Writing History: this book's session starts (the last one closes) once
+  // everything is read, before any of it becomes the open book
+  await rec.begin(bookId);
+  if (gen !== openGeneration) return;
+  proofWarnStale(bookId);
+  chapterHTML = {};
+  for (const chId of Object.keys(html)) setChapterHTML(chId, html[chId], 'open');
+  savedHTML = { ...chapterHTML };
   for (const chId of Object.keys(html)) knowDisk(bookId, chId, html[chId]);
   diskStamps = {};
   savedMetaSig = metaSig(book); // what disk holds; NEO's own defaults don't count as edits
@@ -42,6 +49,8 @@ async function openBook(bookId) {
   darlings = sideDarlings;
   sidecarBase[bookId + '/stickies'] = JSON.stringify(stickies);
   sidecarBase[bookId + '/darlings'] = JSON.stringify(darlings);
+  await recOpenStreams(bookId);
+  if (gen !== openGeneration) return;
 
   $('#bookshelf-view').hidden = true;
   $('#editor-view').hidden = false;
@@ -59,6 +68,8 @@ async function openBook(bookId) {
   renderChapters();
   wordsFromDisk(); // what the book holds is not today's writing (#345)
   renderStickies();
+  takeConflictCopies(bookId); // what a sync program set aside while the book was closed
+  takeHistoryNotes(bookId);   // notes another program left for Writing History
   migrateDarlingAnchors(); // sweep legacy invisible markers out of the prose
   reconcileMarks();        // re-adopt any note marks orphaned by cut/paste
   updateCounters();
@@ -112,13 +123,13 @@ function renderChapters() {
   // at which point both appear, numbered in retrospect
   const solo = soloStory();
   book.chapterOrder.forEach((chId) => {
-    const kind = chapterKind(chId);
+    // how the sheet and its text are set, as History sets them (sheetLook)
+    const look = sheetLook(chId, book, { script: isScript(), narrow: $('#paper').classList.contains('narrow') });
+    const kind = look.kind;
     const story = STORY_KINDS.includes(kind);
     const sec = document.createElement('section');
-    sec.className = `chapter sheet kind-${kind}` + (chId === solo ? ' solo' : '') + (story ? '' : ' bookpage');
+    sec.className = 'chapter ' + look.sec.join(' ');
     sec.dataset.id = chId;
-    const role = chapterRole(chId);
-    if (role) sec.classList.add(role);
     const head = document.createElement('div');
     head.className = 'chapter-head';
     if (kind === 'unnumbered') head.classList.add('no-number');
@@ -183,9 +194,7 @@ function renderChapters() {
     if (chId === solo) body.setAttribute('aria-label', book.title ? shownTitle(book.title) : t('The story'));
     else body.setAttribute('aria-labelledby', head.id);
     body.spellcheck = false; // NEO runs its own spellcheck pass
-    if (!story) body.classList.add('no-cap');
-    // a script's lines are set as they print (styles.css, SCREENPLAYS)
-    if (isScript()) body.classList.add('script-body', $('#paper').classList.contains('narrow') ? 'sp-narrow' : 'sp-geom', 'no-cap');
+    body.classList.add(...look.body);
     body.innerHTML = chapterHTML[chId] || '<p><br></p>';
     // a script saved with its last line element deleted comes back from disk
     // as bare text with no lines at all — Return and Tab do nothing on it and
@@ -199,7 +208,7 @@ function renderChapters() {
       body.appendChild(line);
       if (SP_HEAD_RE.test(line.textContent)) line.classList.add('sp-heading');
     }
-    markDialogueOpening(body);
+    markSheet(body, kind);
     if (PAGE_PROMPTS[kind]) {
       body.dataset.ph = PAGE_PROMPTS[kind]();
       const blank = () => body.classList.toggle('blank', !body.textContent.trim());
@@ -207,17 +216,8 @@ function renderChapters() {
       body.addEventListener('input', blank);
     }
     // a line that opens with a dash is set as the name of whoever said the
-    // lines above it, as it will print
-    if (ATTRIBUTED_PAGES.includes(kind)) {
-      const settle = () => {
-        for (const p of body.querySelectorAll('p')) {
-          const attr = isAttribution({ text: p.textContent.trim() });
-          if (p.hasAttribute('data-attr') !== attr) p.toggleAttribute('data-attr', attr);
-        }
-      };
-      settle();
-      body.addEventListener('input', settle);
-    }
+    // lines above it, as it will print (markSheet), again as it's typed
+    if (ATTRIBUTED_PAGES.includes(kind)) body.addEventListener('input', () => markSheet(body, kind));
     // older marks used a "?" that read as a broken image — normalize to the flag
     body.querySelectorAll('.ph-mark').forEach((m) => { m.textContent = '⚑'; });
     // heal the engine's style-junk spans left by past merges and splits
@@ -251,7 +251,6 @@ async function deleteChapterToDarlings(chId, quiet = false) {
   if (!quiet) snapshotStructure('chapter delete');
   const kind = chapterKind(chId);
   const name = chapterName(chId);
-  const index = book.chapterOrder.indexOf(chId);
   const text = chapterText(chId).trim();
   if (text) {
     const bodyEl = document.querySelector(`.chapter[data-id="${chId}"] .chapter-body`);
@@ -270,7 +269,7 @@ async function deleteChapterToDarlings(chId, quiet = false) {
   if (currentChapterId === chId) currentChapterId = null;
   await deleteChapterQuiet(chId);
   if (text && !quiet) {
-    toast(kind === 'chapter'
+    undoToast(kind === 'chapter'
       ? t('Chapter removed — its words are in Darlings, or {key} to undo', { key: KZ })
       : t('{name} removed — its words are in Darlings, or {key} to undo', { name, key: KZ }));
   } else if (noted && !quiet) {
@@ -334,7 +333,7 @@ async function chapterMenu(chId, x = 0, y = 0, from = null) {
   wordsFromDisk();
   // a copyright page starts with what every copyright page says
   if (choice === 'copyright' && !chapterText(chId).trim()) {
-    chapterHTML[chId] = copyrightStarter();
+    setChapterHTML(chId, copyrightStarter(), 'kind');
     persistChapter(chId);
   }
   await saveMeta();

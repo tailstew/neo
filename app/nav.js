@@ -172,7 +172,7 @@ function addEntry(at, kind) {
   justAddedEntry = chId;
   book.chapterOrder.splice(at, 0, chId);
   setChapterKind(chId, kind);
-  chapterHTML[chId] = kind === 'copyright' ? copyrightStarter() : '<p><br></p>';
+  setChapterHTML(chId, kind === 'copyright' ? copyrightStarter() : '<p><br></p>', 'new');
   persistChapter(chId);
   saveMeta();
   renderChapters();
@@ -771,6 +771,7 @@ async function foldNotesPage(fromId, intoId) {
     const [from, into] = await Promise.all([readNotesPage(bookId, fromId), readNotesPage(bookId, intoId)]);
     if (!htmlText(from)) return;
     const html = (into || '') + from;
+    recNotesWrite(bookId, notesKind(intoId), into, html, 'merge');
     const key = bookId + '/' + notesKind(intoId);
     auxPending[key] = { bookId, kind: notesKind(intoId), html, inFlight: false };
     flushAux();

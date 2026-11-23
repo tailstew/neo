@@ -143,6 +143,7 @@ const UNDO_DEPTH = 50;
 function captureStructure(label, opts) {
   return {
     armed: false, // the action's own edits, in this same moment, don't seal it
+    made: performance.now(), // (undoToast's Undo is for a snapshot just made)
     label,
     rejoin: !!(opts && opts.rejoin),
     outlineFocus: (opts && opts.outlineFocus) || null, // the outline line to return to
@@ -203,7 +204,8 @@ async function structuralUndo(fromRedo) {
     && Object.keys(restored).every((c) => restored[c] === chapterHTML[c]);
   book.chapterOrder = snap.chapterOrder;
   book.chapterKinds = snap.chapterKinds;
-  chapterHTML = restored;
+  for (const chId of Object.keys(chapterHTML)) if (!(chId in restored)) dropChapterHTML(chId, 'undo-structural');
+  for (const [chId, html] of Object.entries(restored)) setChapterHTML(chId, html, 'undo-structural');
   if (kindsOnly) wordsFromDisk();
   for (const { chId, html } of displaced) {
     const holder = document.createElement('div');
@@ -226,13 +228,15 @@ async function structuralUndo(fromRedo) {
   // removed since stays that way (the displaced text above included)
   darlings = mergeSidecar(after.darlings, snap.darlings, darlings, true);
   stickies = mergeSidecar(after.stickies, snap.stickies, stickies, false);
+  rec.streams('undo-structural');
   // resurrect any chapter files the action may have deleted
   for (const chId of book.chapterOrder) {
+    if (chapterHTML[chId] === undefined) setChapterHTML(chId, '<p><br></p>', 'undo-structural');
     await persistChapter(chId, chapterHTML[chId] || '<p><br></p>');
   }
   // (a list that can't be written now stays queued, and is tried again)
   await writeSidecar(book.id, 'darlings', darlings).catch(() => {});
-  await writeSidecar(book.id, 'stickies', stickies).catch(() => {});
+  await writeStickies(book.id, stickies, 'undo-structural').catch(() => {});
   await saveMeta();
   currentChapterId = book.chapterOrder.includes(currentChapterId) ? currentChapterId : null;
   renderChapters();
@@ -311,7 +315,7 @@ function rejoinAtCaret() {
     sel.removeAllRanges();
     sel.addRange(r);
   }
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'undo-structural');
 }
 
 // ⇧⌘Z (Ctrl+Shift+Z, and Ctrl+Y outside the Mac) puts back what ⌘Z took back

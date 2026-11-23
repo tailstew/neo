@@ -33,7 +33,7 @@ function sceneBreakDelete(e, body, chId) {
     if (back && above) caretToEnd(above);
     else if (below) caretIntoStart(below);
     else if (above) caretToEnd(above);
-    syncChapter(body, chId);
+    syncChapter(body, chId, 'break');
     resetNativeUndo();
     breakRun++;
     return true;
@@ -50,11 +50,40 @@ function sceneBreakDelete(e, body, chId) {
   e.preventDefault();
   snapshotStructure('section break removed');
   target.remove();
-  syncChapter(body, chId);
+  syncChapter(body, chId, 'break');
   resetNativeUndo();
   breakRun++;
   return true;
 }
+
+// The drop cap is drawn by sheet.js (setDropCap, from markDialogueOpening),
+// as History's player and the exported page draw it. What's the editor's
+// own is here.
+// Words copied, cut or dragged out to another program take the paragraph's
+// look with them, and the opening paragraph's would carry the little pull
+// back that tucks its letter under the cap: in Word or an email, a first
+// line hanging out to the left. For the moment the copy is made, that
+// paragraph is set flush (nothing is drawn in between).
+for (const type of ['copy', 'cut', 'dragstart']) {
+  document.addEventListener(type, () => {
+    document.body.classList.add('cap-copying');
+    setTimeout(() => document.body.classList.remove('cap-copying'), 0);
+  }, true);
+}
+// In focus mode selected text is given its full ink back, and the unseen
+// letter with it. While a selection takes that letter in, the cap stands on a
+// patch of the page's own colour, over it (cap-sel, styles.css).
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  const r = focusLevel !== 'off' && sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+  if (!r && !document.querySelector('#chapters .chapter-body.cap-sel')) return;
+  for (const body of document.querySelectorAll('#chapters .chapter-body.has-cap, #chapters .chapter-body.cap-sel')) {
+    const cr = capRange(body);
+    const over = !!(r && cr && cr.startContainer.isConnected && r.isPointInRange(cr.startContainer, 0));
+    if (body.classList.contains('cap-sel') !== over) body.classList.toggle('cap-sel', over);
+  }
+});
+
 
 // Read a body's HTML for saving:
 function captureBody(body) {
@@ -83,229 +112,9 @@ function dropJunkSpans(html) {
   });
 }
 
-// A chapter that opens on a line of dialogue sets no drop cap: the dash
-// itself would be the letter enlarged. That line, and one that follows a
-// scene break, keep their indent where prose is set flush, so the speech
-// lines up with the lines that answer it. The marks are never saved.
-const OPENING_DASH = /^\s*[-‐‑‒–—―]/;
-// A chapter's opening paragraph — the one with the drop cap and no indent —
-// is its first paragraph with words in it, past a blank line or a *** at the
-// top (the exports skip those too). Poetry and LitRPG boxes stand apart. In an empty
-// chapter it's the paragraph waiting for the first word. Marked data-first,
-// for the screen only.
-function openingPara(body) {
-  const ps = [...body.children].filter((p) => p.tagName === 'P' && !p.classList.contains('poetry') && !p.classList.contains('litrpg') && !p.classList.contains('scene-break') && !p.classList.contains('ghost'));
-  return ps.find((p) => p.textContent.trim() !== '') || ps[0] || null;
-}
-function markDialogueOpening(body) {
-  // the engine, joining or emptying paragraphs, writes the indent a paragraph
-  // had at that moment onto it for good (the opening one's most of all). The
-  // indent is the stylesheet's to give; an alignment the writer chose stays.
-  for (const p of body.querySelectorAll(':scope > p[style*="text-indent"]')) {
-    p.style.removeProperty('text-indent');
-    if (!p.getAttribute('style')) p.removeAttribute('style');
-  }
-  const first = openingPara(body);
-  for (const p of body.querySelectorAll('p[data-first]')) if (p !== first) p.removeAttribute('data-first');
-  if (first && !first.hasAttribute('data-first')) first.setAttribute('data-first', '');
-  body.classList.toggle('opens-dialogue', !!first && OPENING_DASH.test(first.textContent));
-  for (const p of body.querySelectorAll('p[data-speech]')) if (!p.matches('.scene-break + p')) p.removeAttribute('data-speech');
-  for (const p of body.querySelectorAll('p.scene-break + p')) {
-    const speech = OPENING_DASH.test(p.textContent);
-    if (p.hasAttribute('data-speech') !== speech) p.toggleAttribute('data-speech', speech);
-  }
-  setDropCap(body, first);
-}
-
-// THE DROP CAP is a letter NEO draws beside the opening paragraph (that
-// paragraph's ::before, its letter and width handed over in --cap and --cap-w
-// on the chapter body, which is never saved). It is not a ::first-letter:
-// that makes the engine split the paragraph's text in two behind the scenes,
-// and typing or deleting beside the split left doubled letters on the page,
-// so for a long time the cap had to step aside whenever the caret was in its
-// paragraph. Now the words are one plain run of text to edit. The real first
-// letter is still there, unseen (the neo-cap highlight paints it clear) and
-// drawn back under the cap by its own width, so the line starts where it
-// always did.
-const capHidden = window.Highlight && window.CSS && CSS.highlights ? new Highlight() : null;
-if (capHidden) {
-  capHidden.priority = 50; // over the focus, search and spelling highlights: none of them may ink it in
-  CSS.highlights.set('neo-cap', capHidden);
-}
-const capState = new WeakMap(); // chapter body → { range, cap, sig }
-const capWidths = new Map(); // what a letter measures, in em, when its chapter isn't laid out
-const CAP_LEAD = /^[\p{Ps}\p{Pi}\p{Pf}\p{Pe}\p{Po}]*/u; // an opening quote or ¿ is set with its letter
-const capSegmenter = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
-
-// The letter (with any mark that opens it) a paragraph's text begins with;
-// '' when it begins with a space or with nothing a cap can be made of
-function capOf(text) {
-  const lead = CAP_LEAD.exec(text)[0];
-  const rest = text.slice(lead.length);
-  if (!rest) return '';
-  const g = capSegmenter ? capSegmenter.segment(rest)[Symbol.iterator]().next().value.segment : String.fromCodePoint(rest.codePointAt(0));
-  return /[\p{L}\p{N}]/u.test(g) ? lead + g : '';
-}
-
-// Where the paragraph's words begin: its first text nodes, in order. A flag
-// or a footnote number standing before the first word means no cap.
-function capOpening(p) {
-  const nodes = [];
-  let text = '';
-  const walker = document.createTreeWalker(p, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.nodeType === Node.ELEMENT_NODE && n.matches(UNCOUNTED) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT)
-  });
-  // (a rejected element's subtree is skipped; one that takes up room ends the search)
-  for (let n = p.firstChild; n; n = n.nextSibling) {
-    if (n.nodeType === Node.ELEMENT_NODE && n.matches('.ph-mark, .fn')) return null;
-    if (n.nodeType !== Node.ELEMENT_NODE || !n.matches(UNCOUNTED)) break;
-  }
-  let n;
-  while (text.length < 16 && (n = walker.nextNode())) {
-    // a line break before the first word: the letter isn't on the first line to be tucked away
-    if (n.nodeName === 'BR' && !text) return null;
-    if (n.nodeType !== Node.TEXT_NODE || !n.data) continue;
-    nodes.push(n);
-    text += n.data;
-  }
-  return nodes.length ? { nodes, text } : null;
-}
-
-function clearDropCap(body) {
-  const st = capState.get(body);
-  if (!st) return;
-  if (capHidden) capHidden.delete(st.range);
-  capState.delete(body);
-  body.classList.remove('has-cap');
-  body.style.removeProperty('--cap');
-  body.style.removeProperty('--cap-w');
-  if (!body.getAttribute('style')) body.removeAttribute('style');
-}
-
-// `remeasure`: the type changed (a font chosen, or one that just arrived)
-function setDropCap(body, first, remeasure = false) {
-  const open = capHidden && first && !body.classList.contains('no-cap') && !body.classList.contains('opens-dialogue') &&
-    !document.body.classList.contains('no-dropcap') && capOpening(first);
-  const cap = open ? capOf(open.text) : '';
-  if (!cap) { clearDropCap(body); return; }
-  // the cap's own letters, from the paragraph's first character on
-  let left = cap.length;
-  let end = open.nodes[0];
-  let endAt = 0;
-  for (const n of open.nodes) {
-    end = n;
-    endAt = Math.min(left, n.data.length);
-    left -= endAt;
-    if (!left) break;
-  }
-  // how the letter is set where it stands (in an italic, say) decides its width
-  // (and the letter after it: a pair like "To" is set closer than "Th")
-  let sig = cap + '~' + open.text.slice(cap.length, cap.length + 2);
-  for (const n of open.nodes) {
-    // (the engine's own spans carry their weight and slant in a style)
-    for (let el = n.parentElement; el && el !== first; el = el.parentElement) sig += '>' + el.tagName + (el.getAttribute('style') || '');
-    if (n === end) break;
-    sig += '|';
-  }
-  let st = capState.get(body);
-  if (!st) {
-    st = { range: document.createRange(), cap: '', sig: '' };
-    capState.set(body, st);
-    if (capHidden.size > 400) for (const r of [...capHidden]) if (!r.startContainer.isConnected) capHidden.delete(r); // chapters since redrawn
-  }
-  const r = st.range;
-  if (r.startContainer !== open.nodes[0] || r.startOffset !== 0 || r.endContainer !== end || r.endOffset !== endAt) {
-    r.setStart(open.nodes[0], 0);
-    r.setEnd(end, endAt);
-  }
-  if (!capHidden.has(r)) capHidden.add(r);
-  if (st.cap !== cap) body.style.setProperty('--cap', JSON.stringify(cap));
-  if (!body.classList.contains('has-cap')) body.classList.add('has-cap');
-  if (st.sig !== sig || remeasure) {
-    const host = open.nodes[0].parentElement;
-    const cs = getComputedStyle(host);
-    const size = parseFloat(cs.fontSize) || 17;
-    // as laid out on the page; from the font's own figures while the chapter isn't on screen
-    let w = r.getBoundingClientRect().width / size;
-    if (!w) {
-      const font = `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
-      const key = font + '|' + cap;
-      if (remeasure || !capWidths.has(key)) {
-        const ctx = (setDropCap.canvas || (setDropCap.canvas = document.createElement('canvas'))).getContext('2d');
-        ctx.font = font;
-        capWidths.set(key, ctx.measureText(cap).width / size);
-      }
-      w = capWidths.get(key);
-      sig = ''; // measured for real the next time it's looked at
-    }
-    body.style.setProperty('--cap-w', w.toFixed(4) + 'em');
-  }
-  st.cap = cap;
-  st.sig = sig;
-  queueCapCheck(body);
-}
-
-// The letter's width also turns on things no key above can name: whether the
-// engine has just joined two runs of text, so that "AT" is now set as a pair.
-// So once the page has settled after an edit the width is read again, as laid
-// out, and put right if it's off (a pixel, when it is).
-const capChecks = new Set();
-let capCheckFrame = 0;
-function queueCapCheck(body) {
-  capChecks.add(body);
-  if (capCheckFrame) return;
-  capCheckFrame = requestAnimationFrame(() => {
-    capCheckFrame = 0;
-    const bodies = [...capChecks];
-    capChecks.clear();
-    const found = [];
-    for (const body of bodies) {
-      const st = capState.get(body);
-      if (!st || !body.isConnected || !st.range.startContainer.isConnected) continue;
-      const w = st.range.getBoundingClientRect().width;
-      const size = w && parseFloat(getComputedStyle(st.range.startContainer.parentElement).fontSize);
-      if (w && size) found.push([body, (w / size).toFixed(4) + 'em']);
-    }
-    for (const [body, em] of found) if (body.style.getPropertyValue('--cap-w') !== em) body.style.setProperty('--cap-w', em);
-  });
-}
-
-// every chapter's cap, looked at again (the cap turned on or off, a new font)
-function refreshDropCaps(remeasure = false) {
-  for (const body of document.querySelectorAll('#chapters .chapter-body')) {
-    const first = body.querySelector(':scope > p[data-first]');
-    if (first) setDropCap(body, first, remeasure); else clearDropCap(body);
-  }
-}
-if (document.fonts) document.fonts.addEventListener('loadingdone', () => refreshDropCaps(true));
-// Words copied, cut or dragged out to another program take the paragraph's
-// look with them, and the opening paragraph's would carry the little pull
-// back that tucks its letter under the cap: in Word or an email, a first
-// line hanging out to the left. For the moment the copy is made, that
-// paragraph is set flush (nothing is drawn in between).
-for (const type of ['copy', 'cut', 'dragstart']) {
-  document.addEventListener(type, () => {
-    document.body.classList.add('cap-copying');
-    setTimeout(() => document.body.classList.remove('cap-copying'), 0);
-  }, true);
-}
-// In focus mode selected text is given its full ink back, and the unseen
-// letter with it. While a selection takes that letter in, the cap stands on a
-// patch of the page's own colour, over it (cap-sel, styles.css).
-document.addEventListener('selectionchange', () => {
-  const sel = window.getSelection();
-  const r = focusLevel !== 'off' && sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
-  if (!r && !document.querySelector('#chapters .chapter-body.cap-sel')) return;
-  for (const body of document.querySelectorAll('#chapters .chapter-body.has-cap, #chapters .chapter-body.cap-sel')) {
-    const st = capState.get(body);
-    const over = !!(r && st && st.range.startContainer.isConnected && r.isPointInRange(st.range.startContainer, 0));
-    if (body.classList.contains('cap-sel') !== over) body.classList.toggle('cap-sel', over);
-  }
-});
-
-function syncChapter(body, chId) {
+function syncChapter(body, chId, cause = 'program') {
   markDialogueOpening(body);
-  chapterHTML[chId] = captureBody(body);
+  setChapterHTML(chId, captureBody(body), cause, { hint: (html) => caretHtmlOffset(body, html) });
   wordCache[chId] = null;
   scheduleChapterSave(chId);
   updateCounters();
@@ -718,9 +527,9 @@ function autoCapKey(e, body) {
   const lang = writingLanguage();
   // a lowercase letter where a sentence starts
   if (e.key !== e.key.toLocaleUpperCase(lang) && /\p{L}/u.test(e.key)) {
-    let starts = /^[\s"'“‘„«»(\[¿¡—–-]*$/.test(before);
-    if (!starts && /(?<!\.)\.\s+["'“‘„«(\[]?$/.test(before)) {
-      const word = (before.replace(/\.\s+["'“‘„«(\[]?$/, '.').match(/([\p{L}.]+)\.$/u) || [])[1] || '';
+    let starts = /^[\s"'“‘„«»([¿¡—–-]*$/.test(before);
+    if (!starts && /(?<!\.)\.\s+["'“‘„«([]?$/.test(before)) {
+      const word = (before.replace(/\.\s+["'“‘„«([]?$/, '.').match(/([\p{L}.]+)\.$/u) || [])[1] || '';
       starts = !CAPS_ABBREV.has(word.toLowerCase()) && !/^\p{L}$/u.test(word);
     }
     if (!starts) return;
@@ -822,7 +631,7 @@ function smartKeys(e, body) {
 
 // Is a quotation open at the caret, in the paragraph so far?
 function quoteIsOpen(range, q, straight) {
-  let el = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
+  const el = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentElement : range.startContainer;
   const block = el && el.closest ? el.closest('p, div') : null;
   if (!block) return false;
   const pre = document.createRange();
