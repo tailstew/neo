@@ -23,13 +23,18 @@ async function editKey(wc, letter, { shift = false } = {}) {
     await wc.executeJavaScript('window.__editKeyPrevented = null', true);
   }
   wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+  if (mac) {
+    // the menu acts while the key is still down, as on a real Mac, so the
+    // cut or paste is the key's (Writing History counts it as typed)
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const prevented = await wc.executeJavaScript('window.__editKeyPrevented', true);
+    const role = letter.toLowerCase() === 'z' && shift ? 'redo' : ROLES[letter.toLowerCase()];
+    if (!prevented && role) {
+      wc[role]();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+  }
   wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
-  if (!mac) return;
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  const prevented = await wc.executeJavaScript('window.__editKeyPrevented', true);
-  if (prevented) return;
-  const role = letter.toLowerCase() === 'z' && shift ? 'redo' : ROLES[letter.toLowerCase()];
-  if (role) wc[role]();
 }
 
 module.exports = { editKey };

@@ -73,7 +73,7 @@ Export an industry-format PDF, or a Fountain or Final Draft (.fdx) file. Drop a 
 
 **Writing History** 
 
-NEO can record how you write, keystroke by keystroke. Open **File → Writing History…** and watch any chapter being written, day by day, at any speed. Find the day a line first appeared, and bring back any earlier version of a chapter or a paragraph. It all stays in your book's folder on your computer. NEO asks once whether you want it: **Off**, **Record only**, or **Record and timestamp**, which also sends a fingerprint of the history (never your words) to two timestamp services every hour you write, so you can show when the writing existed. Change it any time under **File → Record Writing History**.
+NEO can record how you write, keystroke by keystroke. Open **File → Writing History…** and watch any chapter being written, day by day, at any speed. Find the day a line first appeared, and bring back any earlier version of a chapter or a paragraph. It all stays in your book's folder on your computer. It's on from the start, since a history can't be made afterwards. NEO also asks once whether to timestamp it: yes sends a fingerprint of the history (never your words) to two timestamp services as you write, so you can show when the writing existed; **Record Only** sends nothing. Change either any time in **Options… → Writing History**.
 
 **Exports** 
 
