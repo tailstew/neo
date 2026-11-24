@@ -27,12 +27,16 @@ const REC_ROLLUP = 10 * 60000;  // chunks joined into one file this often
 // Writing History's one setting (Options → Writing History) has three
 // levels: 'off', 'record', and 'timestamp' (recorded, then sealed and
 // timestamped: Proof of when I wrote). It's kept as recordWriting and
-// proveWriting. Unlike a feature, it's on (Record Only) from the start: a
-// history can't be recorded afterwards, so a writer who turns it on later
-// has lost what came before. Timestamping waits until the writer chooses it.
+// proveWriting. Unlike a feature, it's on (Record and Timestamp) from the
+// start: neither a history nor a timestamp can be made afterwards, so a
+// writer who turned them on later would have nothing for what came before.
+// Recording is off only once the writer turns it off (recordWriting false).
+// Timestamping sends fingerprints out, so nothing is sent until the writer
+// has said yes once (proveWriting true; unset, Options shows it as chosen
+// and askProofOnce asks). Pocket can't timestamp: there it's Record Only.
 const historyCan = () => !!(Rec && window.neo.recStart);
 const recordingWanted = () => !!(historyCan() && library && library.recordWriting !== false);
-const historyLevel = () => (!recordingWanted() ? 'off' : window.neo.proofSet && library.proveWriting === true ? 'timestamp' : 'record');
+const historyLevel = () => (!recordingWanted() ? 'off' : window.neo.proofSet && library.proveWriting !== false ? 'timestamp' : 'record');
 
 function recSessionId() {
   return new Date().toISOString().replace(/\.\d+Z$/, 'Z').replace(/:/g, '-') + '-' +
@@ -743,8 +747,9 @@ async function setHistoryLevel(level, { asked = false } = {}) {
   return level;
 }
 
-// Proof of when I wrote (docs/neo-recording-plan.md, part 2): off unless
-// the writer turns it on in Writing History. The main process seals and
+// Proof of when I wrote (docs/neo-recording-plan.md, part 2): on with
+// Writing History once the writer has said yes (askProofOnce), unless they
+// turn it off in Options. The main process seals and
 // stamps (proof.js); the window only says whether it's wanted. Pocket has
 // no proofSet, so it never offers it.
 const proofFlags = () => ({
@@ -753,9 +758,10 @@ const proofFlags = () => ({
   tsas: library && Array.isArray(library.proofTsas) ? library.proofTsas : null
 });
 
-// Record and timestamp, from the menu or History's footer: asked in plain
-// words before anything is sent. Returns whether the writer said yes.
-async function proofConsent() {
+// Record and timestamp, from Options or asked once (askProofOnce): asked in
+// plain words before anything is sent. True on yes; with `first`, false on
+// Record Only and null when put aside (Esc, a click beside it).
+async function proofConsent({ first = false } = {}) {
   const sure = await confirmModal({
     title: t('Timestamp your writing history?'),
     points: [
@@ -763,12 +769,34 @@ async function proofConsent() {
       ...await proofWhoSays(),
       t('Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. The timestamps can be verified without NEO.'),
       t('Timestamps can’t be added retrospectively: they cover what you write from now on, as you write it. What you wrote before stays in your Writing History, but there’s no timestamp that fixes it in time.'),
-      t('A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.')
+      t('A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.'),
+      ...(first ? [t('You can change this at any time in {options} → Writing History.', { options: t('Options…') })] : [])
     ],
-    ok: t('Turn on timestamping')
+    ok: t('Turn on timestamping'),
+    cancel: first ? t('Record Only') : ''
   });
-  return !!sure;
+  return first ? sure : !!sure;
 }
+
+// Timestamping is NEO's default, but nothing leaves the computer until the
+// writer has said yes, once, for every device on the library: asked on the
+// shelf with nothing else open (first run, What's New), never over a book
+// being written. Yes is Record and Timestamp, Record Only is that; put
+// aside, it's asked again the next time NEO starts. Pocket never asks.
+let proofAskDone = false;
+async function askProofOnce() {
+  if (proofAskDone || !window.neo.proofSet || !library || 'proveWriting' in library || !recordingWanted()) return;
+  if ($('#bookshelf-view').hidden || !$('#firstrun').hidden) return;
+  if ([...document.querySelectorAll('.modal-backdrop')].some((b) => !b.hidden && b.getClientRects().length > 0)) return;
+  proofAskDone = true;
+  const yes = await proofConsent({ first: true });
+  if (yes === null || 'proveWriting' in library) return; // (or another device answered meanwhile)
+  library.proveWriting = yes;
+  await writeLibrary(library);
+  await window.neo.proofSet(proofFlags()).catch(() => {});
+  if (window.neo.recState) window.neo.recState();
+}
+setInterval(() => { askProofOnce().catch(() => {}); }, 1000);
 
 // Who the opt-in says the fingerprint goes to: the services the writer's
 // library asks first (Timestamp services…), DigiCert and Sectigo unless changed

@@ -39,7 +39,7 @@ module.exports = function e2e(name, library = {}, opts = {}) {
   app.setPath('documents', tmp);
   fs.mkdirSync(LIB);
   fs.writeFileSync(path.join(LIB, 'library.json'), JSON.stringify({
-    authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
+    authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, proveWriting: false, pageTheme: 'night',
     shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }],
     ...library
   }));
@@ -143,7 +143,11 @@ module.exports = function e2e(name, library = {}, opts = {}) {
 
   /* ---------- the writer's hands ---------- */
 
+  const { editKey } = require('./e2e-keys');
   const key = neo.key = (keyCode, modifiers = []) => {
+    // ⌘X, ⌘V, ⌘Z and the rest are the Edit menu's on a Mac: sent there as a writer's would be (e2e-keys.js)
+    const edit = /^[xcvaz]$/i.test(keyCode) && modifiers[0] === neo.CTRL && (modifiers.length === 1 || (modifiers.length === 2 && modifiers[1] === 'shift' && /^z$/i.test(keyCode)));
+    if (edit) return editKey(wc, keyCode, { shift: modifiers.includes('shift') });
     wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
     wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
   };

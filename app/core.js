@@ -492,7 +492,7 @@ function askInput(title, placeholder, value = '') {
         <h2 style="font-size:16px">${title}</h2>
         <input type="text" spellcheck="false" placeholder="${placeholder}" />
         <div style="text-align:right;margin-top:14px">
-          <button class="m-cancel btn-quiet" style="margin-right:10px">${t('Cancel')}</button>
+          <button class="m-cancel btn-quiet" style="margin-right:10px"></button>
           <button class="m-ok btn-gold">${t('OK')}</button>
         </div>
       </div>`;
@@ -589,8 +589,9 @@ function showNoteModal(title, head, note) {
 
 // A yes or no that says, point by point, what will happen. With `phrase`,
 // the writer types it before the button works: for what can't be taken
-// back from inside NEO. True on yes.
-function confirmModal({ title, points = [], ok, danger = false, phrase = '' }) {
+// back from inside NEO. True on yes, false on the other button (`cancel`,
+// Cancel unless named), null when it's put aside (Esc, a click beside it).
+function confirmModal({ title, points = [], ok, cancel = '', danger = false, phrase = '' }) {
   return new Promise((resolve) => {
     const bd = document.createElement('div');
     bd.className = 'modal-backdrop confirm-modal';
@@ -613,6 +614,7 @@ function confirmModal({ title, points = [], ok, danger = false, phrase = '' }) {
     if (phrase) bd.querySelector('.cm-type strong').textContent = phrase;
     const okBtn = bd.querySelector('.m-ok');
     okBtn.textContent = ok;
+    bd.querySelector('.m-cancel').textContent = cancel || t('Cancel');
     const input = bd.querySelector('input');
     const typed = () => !input || input.value.trim().toLocaleLowerCase() === phrase.toLocaleLowerCase();
     if (input) {
@@ -624,10 +626,10 @@ function confirmModal({ title, points = [], ok, danger = false, phrase = '' }) {
     const done = (val) => { bd.remove(); resolve(val); };
     okBtn.onclick = () => { if (typed()) done(true); };
     bd.querySelector('.m-cancel').onclick = () => done(false);
-    bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(false); });
+    bd.addEventListener('mousedown', (e) => { if (e.target === bd) done(null); });
     bd.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Escape') { e.preventDefault(); done(false); } else if (e.key === 'Enter' && typed() && e.target.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
+      if (e.key === 'Escape') { e.preventDefault(); done(null); } else if (e.key === 'Enter' && typed() && e.target.tagName !== 'BUTTON') { e.preventDefault(); done(true); }
     });
     (input || bd.querySelector('.m-cancel')).focus();
   });

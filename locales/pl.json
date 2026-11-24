@@ -966,6 +966,7 @@
   "a stamp it covers isn’t what it covered": "znacznik, który obejmuje, nie jest tym objętym",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Znacznik czasu pokazuje, że historia istniała do tego czasu, a runda drand, że zapieczętowano ją później. Żadne z nich nie pokazuje, kto ją napisał: mówią o tym odtworzona historia i raport, a to poszlaki, nie dowód.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Znacznik czasu pokazuje, kiedy twój tekst istniał, a nie kto go napisał. Twoja historia pisania pokazuje, jak go pisałeś.",
+  "You can change this at any time in {options} → Writing History.": "Możesz to zmienić w każdej chwili w {options} → Historia pisania.",
   "a timestamp token stamps something else": "token znacznika czasu dotyczy czegoś innego",
   "Add a service…": "Dodaj usługę…",
   "Add anyway": "Dodaj mimo to",

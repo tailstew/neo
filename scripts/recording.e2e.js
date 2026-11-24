@@ -39,7 +39,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(LIB);
 fs.writeFileSync(path.join(LIB, 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, historyAsked: true, pageTheme: 'night',
+  authorName: '', penNames: [], firstRunDone: true, moreFeatures: true, proveWriting: false, pageTheme: 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 // Seals are made in the proof worker: the test one, which reaches no
@@ -66,7 +66,11 @@ const js = (code) => wc.executeJavaScript(code, true);
 const tick = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
 const CTRL = process.platform === 'darwin' ? 'meta' : 'control';
 
+const { editKey } = require('./e2e-keys');
 function key(keyCode, modifiers = []) {
+  // ⌘X, ⌘V, ⌘Z and the rest are the Edit menu's on a Mac: sent there as a writer's would be (e2e-keys.js)
+  const edit = /^[xcvaz]$/i.test(keyCode) && modifiers[0] === CTRL && (modifiers.length === 1 || (modifiers.length === 2 && modifiers[1] === 'shift' && /^z$/i.test(keyCode)));
+  if (edit) return editKey(wc, keyCode, { shift: modifiers.includes('shift') });
   wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
   wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
 }
@@ -178,7 +182,7 @@ test('native undo of typing', async () => {
   await tick(1200); // a pause closes the engine's undo run
   await type(' undone');
   await tick(1200);
-  key('Z', [CTRL]);
+  await key('Z', [CTRL]);
   await tick(300);
   assert.doesNotMatch(await html(0), /undone/);
 });
@@ -204,7 +208,7 @@ test('three Enters split the chapter', async () => {
 
 test('⌘Z puts the split back', async () => {
   const before = (await chapterIds()).length;
-  key('Z', [CTRL]);
+  await key('Z', [CTRL]);
   await tick(500);
   assert.equal((await chapterIds()).length, before - 1);
 });
@@ -230,7 +234,7 @@ test('a passage sent to Darlings, and ⌘Z bringing it back', async () => {
   await js('darlingFromKeyboard()');
   await tick(500);
   assert.equal(await js('darlings.length'), darlings + 1);
-  key('Z', [CTRL]);
+  await key('Z', [CTRL]);
   await tick(500);
   assert.equal(await js('darlings.length'), darlings);
 });
@@ -268,9 +272,9 @@ test('undo and redo, again and again', async () => {
     await tick(1200); // each its own undo step
     states.push(await html(0));
   }
-  for (let i = 3; i > 0; i--) { key('Z', [CTRL]); await tick(300); assert.equal(await html(0), states[i - 1], `undo to ${i - 1}`); }
-  for (let i = 1; i <= 2; i++) { key('Z', [CTRL, 'shift']); await tick(300); assert.equal(await html(0), states[i], `redo to ${i}`); }
-  key('Z', [CTRL]);
+  for (let i = 3; i > 0; i--) { await key('Z', [CTRL]); await tick(300); assert.equal(await html(0), states[i - 1], `undo to ${i - 1}`); }
+  for (let i = 1; i <= 2; i++) { await key('Z', [CTRL, 'shift']); await tick(300); assert.equal(await html(0), states[i], `redo to ${i}`); }
+  await key('Z', [CTRL]);
   await tick(300);
   assert.equal(await html(0), states[1]);
 });
@@ -504,7 +508,7 @@ test('Backspace merging a chapter, and ⌘Z splitting it again', async () => {
   key('Backspace');
   await tick(500);
   assert.equal((await chapterIds()).length, ids.length - 1);
-  key('Z', [CTRL]);
+  await key('Z', [CTRL]);
   await tick(500);
   assert.deepEqual(await chapterIds(), ids);
   assert.deepEqual(await bodies(), before);
@@ -826,15 +830,20 @@ test('turning the recording off stops it; turning it on catches up', async () =>
   assert.equal(menuItem('Writing History…').enabled, true);
 });
 
-test('a library from before Writing History is asked nothing, and records from the start (Record Only, no timestamps)', async () => {
+test('a library from before Writing History records from the start, and is asked once, on the shelf, about timestamping, the default', async () => {
   await js('backToShelf()');
   await tick(800);
   // as an older NEO left it: never chosen
   await js('delete library.historyAsked; delete library.recordWriting; delete library.proveWriting; writeLibrary(library).then(() => window.neo.recState()); renderShelves(); 0');
   await tick(400);
-  assert.equal(await js('historyLevel()'), 'record', 'records');
-  assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asks');
+  assert.equal(await js('historyLevel()'), 'timestamp', 'records, and timestamping is the default');
+  assert.equal(await js('proofFlags().on'), false, 'nothing sent until asked');
   assert.equal(menuItem('Writing History…').enabled, true);
+  // asked once, on the shelf; Record Only for the rest (these tests have no stand-in timestamp services)
+  await waitFor('!!document.querySelector(".confirm-modal")');
+  await js('document.querySelector(".confirm-modal .m-cancel").click()');
+  await tick(400);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8')).proveWriting, false);
   await js(`openBook(${JSON.stringify(BOOK)})`);
   await tick(800);
   assert.equal(await js('rec.on'), true);

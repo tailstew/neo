@@ -910,6 +910,7 @@
   "a stamp it covers isn’t what it covered": "um carimbo que ele cobre não é o que ele cobriu",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Um carimbo de tempo mostra que o histórico já existia naquele momento, e a rodada drand, que ele foi selado depois disso. Nenhum dos dois mostra quem o escreveu: disso falam o histórico reproduzido e o relatório, e eles são indícios, não prova.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Um carimbo de tempo mostra quando seu texto existia, não quem o escreveu. Seu histórico de escrita mostra como você o escreveu.",
+  "You can change this at any time in {options} → Writing History.": "Você pode mudar isso a qualquer momento em {options} → Histórico de escrita.",
   "a timestamp token stamps something else": "um token de carimbo de tempo carimba outra coisa",
   "Add a service…": "Adicionar um serviço…",
   "Add anyway": "Adicionar mesmo assim",

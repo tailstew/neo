@@ -681,6 +681,7 @@
   "a stamp it covers isn’t what it covered": "egy általa lefedett bélyeg már nem az, amit lefedett",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Az időbélyeg azt mutatja, hogy az előzmény addigra létezett, a drand-kör pedig azt, hogy utána pecsételték le. Egyik sem mutatja, ki írta: erről a visszajátszott előzmény és a jelentés szól, és ezek bizonyítékok, nem cáfolhatatlan bizonyítás.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Az időbélyeg azt mutatja, mikor létezett az írásod, nem azt, hogy ki írta. Az Írástörténeted megmutatja, hogyan írtad.",
+  "You can change this at any time in {options} → Writing History.": "Ezt bármikor megváltoztathatod itt: {options} → Írástörténet.",
   "a timestamp token stamps something else": "egy időbélyeg-token valami mást bélyegez",
   "Add a service…": "Szolgáltatás hozzáadása…",
   "Add anyway": "Hozzáadás mégis",

@@ -1177,6 +1177,7 @@
   "a stamp it covers isn’t what it covered": "un horodatage qu’il couvre n’est plus celui qu’il a couvert",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Un horodatage montre que l’historique existait à ce moment-là, et la ronde drand qu’il a été scellé après. Aucun des deux ne montre qui l’a écrit : l’historique rejoué et le rapport en témoignent, et ce sont des indices, pas une preuve.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Un horodatage montre quand votre texte existait, pas qui l’a écrit. Votre historique d’écriture montre comment vous l’avez écrit.",
+  "You can change this at any time in {options} → Writing History.": "Vous pouvez le modifier à tout moment dans {options} → Historique d’écriture.",
   "a timestamp token stamps something else": "un jeton d’horodatage porte sur autre chose",
   "Add a service…": "Ajouter un service…",
   "Add anyway": "Ajouter quand même",

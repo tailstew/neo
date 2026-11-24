@@ -915,6 +915,7 @@
   "a stamp it covers isn’t what it covered": "một dấu thời gian nó bao gồm không còn như lúc bao gồm",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Dấu thời gian cho thấy lịch sử đã tồn tại vào lúc đó, và vòng drand cho thấy nó được niêm phong sau thời điểm ấy. Cả hai đều không cho thấy ai đã viết: lịch sử được phát lại và bản báo cáo nói lên điều đó, và chúng là chứng cứ, không phải bằng chứng tuyệt đối.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Dấu thời gian cho thấy bài viết của bạn tồn tại khi nào, không cho thấy ai đã viết. Lịch sử viết cho thấy bạn đã viết như thế nào.",
+  "You can change this at any time in {options} → Writing History.": "Bạn có thể thay đổi điều này bất cứ lúc nào trong {options} → Lịch sử viết.",
   "a timestamp token stamps something else": "một mã dấu thời gian đóng dấu cho thứ khác",
   "Add a service…": "Thêm dịch vụ…",
   "Add anyway": "Vẫn thêm",

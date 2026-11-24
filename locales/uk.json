@@ -1110,6 +1110,7 @@
   "a stamp it covers isn’t what it covered": "мітка часу, яку вона охоплює, не така, як охоплено",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Мітка часу показує, що історія вже існувала на той момент, а раунд drand — що її запечатано після нього. Жодне з них не показує, хто писав: про це свідчать відтворена історія та звіт, і це свідчення, а не доказ.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Мітка часу показує, коли ваш текст існував, але не хто його написав. Ваша історія письма показує, як ви писали.",
+  "You can change this at any time in {options} → Writing History.": "Це можна змінити будь-коли: {options} → Історія письма.",
   "a timestamp token stamps something else": "токен мітки часу засвідчує щось інше",
   "Add a service…": "Додати службу…",
   "Add anyway": "Все одно додати",

@@ -151,7 +151,7 @@ async function spellingPick(chTitle, wrong) {
 // What a writer's Ctrl+V does: the system clipboard holds it, the key pastes it
 async function pasteKey(data) {
   clipboard.write(data);
-  key('v', [neo.CTRL]);
+  await key('v', [neo.CTRL]);
   await tick(400);
 }
 
@@ -173,10 +173,10 @@ test('day one: typing and fixing, pastes from outside and from the book, dictati
     chapterBodyEl(${JSON.stringify(ID.Lamps)}).focus();
     getSelection().removeAllRanges(); getSelection().addRange(r);
   })()`);
-  key('x', [neo.CTRL]);
+  await key('x', [neo.CTRL]);
   await tick(400);
   await caretAt(await idx('Tides'), 1, -1);
-  key('v', [neo.CTRL]);
+  await key('v', [neo.CTRL]);
   await tick(400);
   // back from another app, and a paste within ten seconds
   await js('window.dispatchEvent(new Event("blur"))');

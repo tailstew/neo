@@ -1186,6 +1186,7 @@
   "a stamp it covers isn’t what it covered": "un sello que cubre no es el que cubrió",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Un sello de tiempo muestra que el historial existía para entonces, y la ronda de drand, que se selló después de entonces. Ninguno muestra quién lo escribió: de eso hablan el historial reproducido y el informe, y son indicios, no pruebas.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Un sello de tiempo muestra cuándo existía tu escritura, no quién la escribió. Tu historial de escritura muestra cómo la escribiste.",
+  "You can change this at any time in {options} → Writing History.": "Puedes cambiarlo en cualquier momento en {options} → Historial de escritura.",
   "a timestamp token stamps something else": "un token de sello de tiempo sella otra cosa",
   "Add a service…": "Añadir un servicio…",
   "Add anyway": "Añadir de todos modos",

@@ -984,6 +984,7 @@
   "a stamp it covers isn’t what it covered": "охваченная ею метка уже не та, что была охвачена",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Метка времени показывает, что история существовала к тому моменту, а раунд drand — что её запечатали позже. Ни то ни другое не показывает, кто её написал: об этом говорят воспроизведённая история и отчёт, и это свидетельства, а не доказательство.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Метка времени показывает, когда существовал ваш текст, а не кто его написал. Ваша история письма показывает, как вы его писали.",
+  "You can change this at any time in {options} → Writing History.": "Это можно изменить в любой момент: {options} → История письма.",
   "a timestamp token stamps something else": "токен метки времени заверяет что-то другое",
   "Add a service…": "Добавить службу…",
   "Add anyway": "Всё равно добавить",

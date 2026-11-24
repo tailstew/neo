@@ -17,7 +17,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: '', penNames: [], firstRunDone: true, historyAsked: true, pageTheme: 'night', nbspMarks: true,
+  authorName: '', penNames: [], firstRunDone: true, proveWriting: false, pageTheme: 'night', nbspMarks: true,
   features: { cards: true, notesPages: true, poetry: true, footnotes: true, formatting: true, penNames: true, covers: true, pages: true, focus: true, readAloud: true, vim: false, exports: true },
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));

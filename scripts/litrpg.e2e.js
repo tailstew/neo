@@ -24,7 +24,7 @@ app.setPath('userData', path.join(tmp, 'app'));
 app.setPath('documents', tmp);
 fs.mkdirSync(path.join(tmp, 'NEO Library'));
 fs.writeFileSync(path.join(tmp, 'NEO Library', 'library.json'), JSON.stringify({
-  authorName: 'Test Writer', penNames: [], firstRunDone: true, historyAsked: true, moreFeatures: true, pageTheme: process.env.THEME || 'night',
+  authorName: 'Test Writer', penNames: [], firstRunDone: true, proveWriting: false, moreFeatures: true, pageTheme: process.env.THEME || 'night',
   shelves: [{ id: 'shelf-1', name: 'Works in Progress', bookIds: [] }]
 }));
 const loadFile = BrowserWindow.prototype.loadFile;
@@ -78,7 +78,8 @@ test('[[ at the start of an empty line makes a box line, and the brackets go', a
 
 test('undo right after brings back the [[ as typed', async () => {
   await press('z', 'z', [MOD]);
-  await tick(150);
+  // (the undo saves the book before it draws the page: a slow machine takes a while)
+  for (let i = 0; i < 100 && (await paras())[0].cls === 'litrpg'; i++) await tick(20);
   let ps = await paras();
   assert.equal(ps[0].cls, '');
   assert.equal(ps[0].text, '[[');

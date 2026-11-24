@@ -63,7 +63,7 @@ async function importScript(name, fountain) {
 
 /* ---------- the setting ---------- */
 
-test('first run asks nothing about Writing History: it records from the start (Record Only), its setting only in Options; Record and Timestamp asks first, and the first book is timestamped', async () => {
+test('first run has no Writing History step: it records from the start, and timestamping, the default, is asked once on the shelf before anything is sent (Esc asks again next time, Record Only answers it); its setting only in Options, where Record and Timestamp asks first, and the first book is timestamped', async () => {
   await js('backToShelf()');
   await tick(600);
   await js('library.firstRunDone = false; delete library.historyAsked; delete library.recordWriting; delete library.proveWriting; showFirstRun()');
@@ -73,15 +73,41 @@ test('first run asks nothing about Writing History: it records from the start (R
   assert.equal(await js(`!!document.getElementById('fr-step3') || !!document.getElementById('fr-next')`), false, 'no Writing History step');
   await js(`document.getElementById('fr-done').click()`);
   await waitFor('document.getElementById("firstrun").hidden');
+  // on the shelf: the timestamp question, once; nothing sent until it's answered
+  assert.equal(await js('historyLevel()'), 'timestamp', 'Record and Timestamp is the default');
+  assert.equal(await js('proofFlags().on'), false, 'nothing sent before the writer says yes');
+  assert.equal(await js('rec.on || recordingWanted()'), true, 'recording all the same');
+  await waitFor('!!document.querySelector(".confirm-modal")');
+  const asked = await js('({ text: document.querySelector(".confirm-modal").textContent, cancel: document.querySelector(".confirm-modal .m-cancel").textContent, ok: document.querySelector(".confirm-modal .m-ok").textContent })');
+  assert.match(asked.text, /Timestamp your writing history\?/);
+  assert.match(asked.text, /You can change this at any time in Options… → Writing History\./);
+  assert.equal(asked.cancel, 'Record Only');
+  assert.equal(asked.ok, 'Turn on timestamping');
+  // Esc puts it aside: nothing chosen, and not asked again while NEO is open
+  await js('document.querySelector(".confirm-modal").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))');
+  await waitFor('!document.querySelector(".confirm-modal")');
+  await tick(2500);
+  assert.equal(await js('!!document.querySelector(".confirm-modal")'), false, 'not asked again this time');
+  assert.equal('proveWriting' in lib(), false);
+  assert.equal(await js('proofFlags().on'), false);
+  // the next time NEO starts it asks again; Record Only answers it, for every device
+  await js('proofAskDone = false');
+  await waitFor('!!document.querySelector(".confirm-modal")');
+  await js('document.querySelector(".confirm-modal .m-cancel").click()');
+  await waitFor('!document.querySelector(".confirm-modal")');
   await tick(400);
-  assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asked');
-  assert.equal(await js('historyLevel()'), 'record', 'Record Only from the start');
+  assert.equal(lib().proveWriting, false);
+  assert.equal(await js('historyLevel()'), 'record');
+  await js('proofAskDone = false');
+  await tick(1500);
+  assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'answered: never asked again');
   assert.ok(neo.menuItem('File', 'Writing History…'), 'Writing History… in File');
   assert.throws(() => neo.menuItem('File', 'Record Writing History'), 'the setting is only in Options');
   // Options: Record and Timestamp asks first, and yes turns it on
   // (open no book yet: the first one is the one timestamped)
   await js(`openOptions()`);
   await tick(300);
+  assert.equal(await js(`document.querySelector('.options-modal [data-opt="historyLevel"]').value`), 'record');
   await js(`(() => { const s = document.querySelector('.options-modal [data-opt="historyLevel"]'); s.value = 'timestamp'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor('!!document.querySelector(".confirm-modal")');
   await js(`document.querySelector('.confirm-modal .m-ok').click()`);

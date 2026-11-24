@@ -255,6 +255,7 @@
   "{name} answered with a good timestamp. Its root, {root}, is in Mozilla’s list of trusted roots.": "{name} respondeu com um carimbo de tempo válido. A sua raiz, {root}, está na lista de raízes fidedignas da Mozilla.",
   "1 character typed": "1 carácter escrito",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Um carimbo de tempo mostra quando o seu texto existia, não quem o escreveu. O seu histórico de escrita mostra como o escreveu.",
+  "You can change this at any time in {options} → Writing History.": "Pode alterar isto a qualquer momento em {options} → Histórico de escrita.",
   "Added by you. Its root, {root}, is in Mozilla’s list.": "Adicionado por si. A sua raiz, {root}, está na lista da Mozilla.",
   "Added by you. Its root, {root}, is in no public list, so its stamps are proof only to someone who trusts {name}.": "Adicionado por si. A sua raiz, {root}, não está em nenhuma lista pública, por isso os seus carimbos só são prova para quem confia em {name}.",
   "Asking it for a timestamp…": "A pedir um carimbo de tempo…",

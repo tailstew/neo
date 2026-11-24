@@ -910,6 +910,7 @@
   "a stamp it covers isn’t what it covered": "una marca che copre non è quella che ha coperto",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Una marca temporale mostra che la cronologia esisteva a quel punto, e il round drand che è stata sigillata dopo. Nessuno dei due mostra chi l’ha scritta: di questo parlano la cronologia riprodotta e il rapporto, e sono indizi, non prove.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Una marca temporale mostra quando esisteva il tuo testo, non chi l’ha scritto. La tua cronologia di scrittura mostra come l’hai scritto.",
+  "You can change this at any time in {options} → Writing History.": "Puoi cambiarlo in qualsiasi momento in {options} → Cronologia di scrittura.",
   "a timestamp token stamps something else": "un token di marca temporale marca qualcos’altro",
   "Add a service…": "Aggiungi un servizio…",
   "Add anyway": "Aggiungi comunque",

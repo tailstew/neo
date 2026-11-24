@@ -834,6 +834,7 @@
   "a stamp it covers isn’t what it covered": "kapsadığı bir damga artık kapsadığı şey değil",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Zaman damgası geçmişin o zamana kadar var olduğunu, drand turu ise ondan sonra mühürlendiğini gösterir. İkisi de kimin yazdığını göstermez: bunu oynatılan geçmiş ve rapor anlatır; bunlar kanıt değil, delildir.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Bir zaman damgası yazınızın ne zaman var olduğunu gösterir, kimin yazdığını değil. Yazım Geçmişiniz nasıl yazdığınızı gösterir.",
+  "You can change this at any time in {options} → Writing History.": "Bunu istediğiniz zaman {options} → Yazım Geçmişi bölümünden değiştirebilirsiniz.",
   "a timestamp token stamps something else": "bir zaman damgası belirteci başka bir şeyi damgalıyor",
   "Add a service…": "Hizmet ekle…",
   "Add anyway": "Yine de ekle",

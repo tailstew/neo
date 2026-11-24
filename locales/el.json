@@ -848,6 +848,7 @@
   "a stamp it covers isn’t what it covered": "μια χρονοσήμανση που καλύπτει δεν είναι αυτή που κάλυψε",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Μια χρονοσήμανση δείχνει ότι το ιστορικό υπήρχε ως τότε, και ο γύρος drand ότι σφραγίστηκε μετά από τότε. Κανένα από τα δύο δεν δείχνει ποιος το έγραψε: γι’ αυτό μιλούν η αναπαραγωγή του ιστορικού και η αναφορά, και είναι τεκμήρια, όχι απόδειξη.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Μια χρονοσήμανση δείχνει πότε υπήρχε το κείμενό σας, όχι ποιος το έγραψε. Το Ιστορικό γραφής σας δείχνει πώς το γράψατε.",
+  "You can change this at any time in {options} → Writing History.": "Μπορείτε να το αλλάξετε οποτεδήποτε στο {options} → Ιστορικό γραφής.",
   "a timestamp token stamps something else": "ένα διακριτικό χρονοσήμανσης χρονοσημαίνει κάτι άλλο",
   "Add a service…": "Προσθήκη υπηρεσίας…",
   "Add anyway": "Προσθήκη παρ’ όλα αυτά",

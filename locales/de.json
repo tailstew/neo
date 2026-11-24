@@ -1189,6 +1189,7 @@
   "a stamp it covers isn’t what it covered": "ein Stempel, den es abdeckt, ist nicht mehr der abgedeckte",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Ein Zeitstempel zeigt, dass der Verlauf zu diesem Zeitpunkt existierte, und die drand-Runde, dass er danach versiegelt wurde. Keines von beiden zeigt, wer ihn geschrieben hat: Dafür sprechen der abgespielte Verlauf und der Bericht, und sie sind Indizien, keine Beweise.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Ein Zeitstempel zeigt, wann dein Text existierte, nicht wer ihn geschrieben hat. Dein Schreibverlauf zeigt, wie du ihn geschrieben hast.",
+  "You can change this at any time in {options} → Writing History.": "Du kannst das jederzeit unter {options} → Schreibverlauf ändern.",
   "a timestamp token stamps something else": "ein Zeitstempel-Token stempelt etwas anderes",
   "Add a service…": "Dienst hinzufügen…",
   "Add anyway": "Trotzdem hinzufügen",

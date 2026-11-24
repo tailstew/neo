@@ -1741,7 +1741,7 @@ ipcMain.handle('rec:export', async (_e, bookId, opts = {}) => {
 
 // ---------------------------------------------------------------------------
 // Proof of when I wrote (docs/neo-recording-plan.md, part 2; proof.js):
-// opt-in, off unless library.proveWriting. Seals of this device's recording
+// on unless the writer turned it off (library.proveWriting false). Seals of this device's recording
 // of a book once the writing stops for a while (or has gone on for an
 // hour), when a session closes with words unsealed, and when the writer
 // names a tag, each signed with this computer's key and

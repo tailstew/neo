@@ -907,6 +907,7 @@
   "a stamp it covers isn’t what it covered": "een stempel die het dekt is niet meer wat het dekte",
   "A timestamp shows the history existed by then, and the drand round that it was sealed after then. Neither shows who wrote it: the history played back and the report speak to that, and they are evidence, not proof.": "Een tijdstempel laat zien dat de geschiedenis toen al bestond, en de drand-ronde dat ze daarna verzegeld werd. Geen van beide laat zien wie ze schreef: daarover spreken de afgespeelde geschiedenis en het rapport, en die zijn aanwijzingen, geen bewijs.",
   "A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.": "Een tijdstempel laat zien wanneer je tekst bestond, niet wie hem schreef. Je schrijfgeschiedenis laat zien hoe je hem schreef.",
+  "You can change this at any time in {options} → Writing History.": "Je kunt dit altijd wijzigen via {options} → Schrijfgeschiedenis.",
   "a timestamp token stamps something else": "een tijdstempeltoken stempelt iets anders",
   "Add a service…": "Een dienst toevoegen…",
   "Add anyway": "Toch toevoegen",
