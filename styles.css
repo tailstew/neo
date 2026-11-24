@@ -2810,6 +2810,19 @@ body.light #notes-outline { color: #6f6b63; }
 }
 .fn-row { padding: 2px 0; cursor: pointer; border-radius: 3px; outline: none; }
 .fn-row:hover, .fn-row:focus-visible { background: color-mix(in srgb, var(--accent) 9%, var(--paper)); }
+/* History's and the exported page's (NeoSheet.footnoteList): the same, read
+   only, written for .rp-chapter so sheetPageCss sends them to the page */
+.rp-chapter > .fn-list {
+  margin: 2.4em 0 0; padding-top: 0.8em; position: relative;
+  font-family: var(--body-font); line-height: 1.5; color: var(--ink);
+  font-size: calc(var(--editor-size, 17px) * 0.8 * var(--page-zoom, 1));
+}
+.rp-chapter > .fn-list::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 30%;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 25%, var(--paper));
+}
+.rp-chapter > .fn-list .fn-row { padding: 2px 0; cursor: default; background: none; }
+.rp-chapter > .fn-list .fn-n { color: var(--accent); font: 600 0.75em -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; margin-right: 8px; }
 .fn-row .fn-n { color: var(--accent); font: 600 0.75em -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; margin-right: 8px; }
 
 /* Korean interface. Hangul breaks between any two letters unless told to

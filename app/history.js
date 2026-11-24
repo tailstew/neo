@@ -447,6 +447,7 @@ async function exportWritingHistory(bookId = book && book.id) {
 // their English: every T('…') there is here (scripts/replay-page.test.js
 // checks it), and goes into the page in the writer's language
 const REPLAY_PAGE_WORDS = [
+  tk('Footnotes'),
   tk('This tag has a note'), tk('Note'), tk('Changed: {chapters}'), tk('{n} more'),
   tk('Feedback · {app}'), tk('Note · {app}'), tk('As given by {app}'), tk('As given by {app}, {when}'), tk('Model: {model}'),
   tk('Pasted in by the writer'), tk('About {chapter}'), tk('The chapter had changed by the time NEO recorded this.'),
@@ -2069,7 +2070,7 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
         sec.dataset.ch = ch;
         sec.innerHTML = '<div class="chapter-head"></div><div class="rp-body"></div>';
       }
-      const rb = sec.lastElementChild;
+      const rb = sec.querySelector(':scope > .rp-body'); // (not its last child: the footnotes' list follows it)
       // set as the editor sets it (sheetLook): the same classes on the sheet and its text
       const look = sheetLook(ch, meta, { script, narrow: spSet === 'sp-narrow', order });
       const kind = look.kind;
@@ -2087,7 +2088,10 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
       if (where !== sec) paper.insertBefore(sec, where);
       prev = sec;
       // (a sheet set anew, a page become another kind, is marked again too)
-      if (drawBody(rb, ch) || restyled) markSheet(rb, kind);
+      if (drawBody(rb, ch) || restyled) {
+        markSheet(rb, kind);
+        NeoSheet.footnoteList(rb, t('Footnotes'));
+      }
     }
     // a caret line's caret, put in where the paragraph and letter say
     for (const c of paper.querySelectorAll('.rp-caret.rp-dom')) c.remove();

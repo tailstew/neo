@@ -973,6 +973,8 @@ test('History in the footer opens on the whole book as it is, over its days; the
   // the footnote typed earlier is numbered on the sheet, as in the editor
   const fn = await js(`(() => { const f = historyShown.player.paper.querySelector('.rp-body .fn'); return f && getComputedStyle(f, '::after').content; })()`);
   assert.equal(fn, 'counter(neo-fn)', 'a footnote’s number in History');
+  const rows = await js(`[...historyShown.player.paper.querySelectorAll('.rp-chapter > .fn-list .fn-row')].map((r) => r.textContent)`);
+  assert.ok(rows.includes('1Ibid tide.'), 'its words listed under the chapter: ' + JSON.stringify(rows));
   const cache = fs.readdirSync(path.join(tmp, 'app', 'recording-cache', BOOK));
   for (const n of OLD_CACHE) assert.ok(!cache.includes(n), n + ' is still there');
 });

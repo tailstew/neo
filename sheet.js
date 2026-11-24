@@ -286,7 +286,44 @@
     }
   }
 
-  const api = { CHAPTER_KINDS, STORY_KINDS, ATTRIBUTED_PAGES, OPENING_DASH, chapterKind, isStory, chapterRole, soloStory, isAttribution, openingPara, markDialogueOpening, setDropCap, clearDropCap, refreshDropCaps, capRange, sheetLook, markSheet };
+  // A played sheet's footnotes, under its last line as the editor lists them
+  // (FOOTNOTES in app/footnotes.js), so a note typed in its box is seen as
+  // it's written: a footnote's words are its mark's data-note, never on the
+  // page itself. Numbered on from the sheets before it, as the marks are.
+  function footnoteList(body, label) {
+    const sec = body.parentElement;
+    if (!sec) return;
+    let list = sec.querySelector(':scope > .fn-list');
+    const marks = [...body.querySelectorAll('.fn')];
+    if (!marks.length) { if (list) list.remove(); return; }
+    if (!list) {
+      list = document.createElement('div');
+      list.className = 'fn-list';
+      if (label) list.setAttribute('aria-label', label);
+      body.after(list);
+    }
+    let before = 0;
+    const sheet = sec.parentElement;
+    if (sheet) {
+      for (const b of sheet.querySelectorAll('.rp-body')) {
+        if (b === body) break;
+        before += b.querySelectorAll('.fn').length;
+      }
+    }
+    list.replaceChildren(...marks.map((mark, i) => {
+      const row = document.createElement('div');
+      row.className = 'fn-row';
+      const n = document.createElement('span');
+      n.className = 'fn-n';
+      n.textContent = String(before + i + 1);
+      const txt = document.createElement('span');
+      txt.textContent = mark.dataset.note || '';
+      row.append(n, txt);
+      return row;
+    }));
+  }
+
+  const api = { footnoteList, CHAPTER_KINDS, STORY_KINDS, ATTRIBUTED_PAGES, OPENING_DASH, chapterKind, isStory, chapterRole, soloStory, isAttribution, openingPara, markDialogueOpening, setDropCap, clearDropCap, refreshDropCaps, capRange, sheetLook, markSheet };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.NeoSheet = api;
 })(typeof self !== 'undefined' ? self : this);

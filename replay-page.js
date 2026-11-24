@@ -1270,6 +1270,7 @@
         body.innerHTML = shown || '';
         if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t in the book at this moment.') : ''));
         else NeoSheet.markSheet(body, sec.dataset.kind);
+        NeoSheet.footnoteList(body, T('Footnotes'));
       }
       if (follow) {
         const c = sheet.querySelector('.rx-caret');
