@@ -759,11 +759,11 @@ async function proofConsent() {
   const sure = await confirmModal({
     title: t('Timestamp your writing history?'),
     points: [
-      t('Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
+      t('NEO can record timestamps to prove when your writing happened. Every hour you write, NEO sends a fingerprint of your writing history (never your words) to two independent timestamp services. Their signed receipts show your writing existed by that time.'),
       ...await proofWhoSays(),
-      t('Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. Anyone can check them, without NEO.'),
-      t('Timestamps can’t be added afterwards: they cover what you write from now on. What you wrote before stays in your Writing History, but nothing fixes it in time.'),
-      t('A timestamp shows when your writing existed, not who wrote it. Your Writing History, which shows how you wrote it, speaks to that.')
+      t('Your timestamps are signed with a key kept on this computer, and stay with your book in its Writing History. The timestamps can be verified without NEO.'),
+      t('Timestamps can’t be added retrospectively: they cover what you write from now on, as you write it. What you wrote before stays in your Writing History, but there’s no timestamp that fixes it in time.'),
+      t('A timestamp shows when your writing existed, not who wrote it. Your Writing History shows how you wrote it.')
     ],
     ok: t('Turn on timestamping')
   });
@@ -783,7 +783,7 @@ async function proofWhoSays() {
 }
 
 // Timestamp services… (docs/neo-recording-plan.md, The writer's own
-// services): who stamps the seals, opened from File → Record Writing
+// services): who stamps the seals, opened from Options → Writing
 // History → Timestamp Services…. NEO's three and any the writer added, in the order they're
 // asked; the first two that answer stamp each seal. Every change is kept at
 // once, in library.proofTsas, so the writer's other computers ask the same
