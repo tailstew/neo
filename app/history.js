@@ -2063,6 +2063,7 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
     paper.classList.toggle('sp-uline', script && !!meta.underlineHeadings);
     scroller.classList.toggle('hs-script-scroll', script);
     let prev = null;
+    let fnLive = null; // a footnote this step typed in: followed, not the caret
     for (const ch of showing) {
       let sec = secs[ch];
       if (!sec) {
@@ -2090,7 +2091,7 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
       // (a sheet set anew, a page become another kind, is marked again too)
       if (drawBody(rb, ch) || restyled) {
         markSheet(rb, kind);
-        NeoSheet.footnoteList(rb, t('Footnotes'));
+        fnLive = NeoSheet.footnoteList(rb, t('Footnotes')) || fnLive;
       }
     }
     // a caret line's caret, put in where the paragraph and letter say
@@ -2119,7 +2120,7 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
     }
     CSS.highlights.set('neo-replay-sel', hlSel);
     if (follow) {
-      const c = paper.querySelector('.rp-caret');
+      const c = fnLive || paper.querySelector('.rp-caret');
       if (c) {
         const box = scroller.getBoundingClientRect();
         const r = c.getBoundingClientRect();

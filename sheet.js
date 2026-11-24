@@ -290,12 +290,15 @@
   // (FOOTNOTES in app/footnotes.js), so a note typed in its box is seen as
   // it's written: a footnote's words are its mark's data-note, never on the
   // page itself. Numbered on from the sheets before it, as the marks are.
+  // Returns the row of the footnote this draw changed (or added), so the
+  // player can follow it as it follows the caret; null when none did.
   function footnoteList(body, label) {
     const sec = body.parentElement;
-    if (!sec) return;
+    if (!sec) return null;
     let list = sec.querySelector(':scope > .fn-list');
     const marks = [...body.querySelectorAll('.fn')];
-    if (!marks.length) { if (list) list.remove(); return; }
+    if (!marks.length) { if (list) list.remove(); return null; }
+    const was = list ? [...list.children].map((r) => r.lastChild.textContent) : null;
     if (!list) {
       list = document.createElement('div');
       list.className = 'fn-list';
@@ -310,7 +313,7 @@
         before += b.querySelectorAll('.fn').length;
       }
     }
-    list.replaceChildren(...marks.map((mark, i) => {
+    const rows = marks.map((mark, i) => {
       const row = document.createElement('div');
       row.className = 'fn-row';
       const n = document.createElement('span');
@@ -320,7 +323,12 @@
       txt.textContent = mark.dataset.note || '';
       row.append(n, txt);
       return row;
-    }));
+    });
+    list.replaceChildren(...rows);
+    // (a list drawn for the first time, a sheet newly shown, changed nothing)
+    if (!was) return null;
+    const i = rows.findIndex((r, k) => r.lastChild.textContent !== was[k]);
+    return i >= 0 ? rows[i] : null;
   }
 
   const api = { footnoteList, CHAPTER_KINDS, STORY_KINDS, ATTRIBUTED_PAGES, OPENING_DASH, chapterKind, isStory, chapterRole, soloStory, isAttribution, openingPara, markDialogueOpening, setDropCap, clearDropCap, refreshDropCaps, capRange, sheetLook, markSheet };

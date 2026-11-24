@@ -1260,6 +1260,7 @@
           sheet.append(sec);
         });
       }
+      let fnLive = null; // a footnote this step typed in: followed, not the caret
       for (const sec of sheet.children) {
         const ch = sec.dataset.ch;
         const html = cur[ch] ? cur[ch].toString() : '';
@@ -1270,10 +1271,10 @@
         body.innerHTML = shown || '';
         if (!html) body.append(el('p', 'rx-empty', mode ? T('This chapter isn’t in the book at this moment.') : ''));
         else NeoSheet.markSheet(body, sec.dataset.kind);
-        NeoSheet.footnoteList(body, T('Footnotes'));
+        fnLive = NeoSheet.footnoteList(body, T('Footnotes')) || fnLive;
       }
       if (follow) {
-        const c = sheet.querySelector('.rx-caret');
+        const c = fnLive || sheet.querySelector('.rx-caret');
         if (c) {
           const r = c.getBoundingClientRect();
           const b = scroll.getBoundingClientRect();
