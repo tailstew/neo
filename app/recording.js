@@ -24,14 +24,14 @@ const REC_IDLE = 60000;         // no keys or edits this long: an `idle` line
 const REC_WALL = 5 * 60000;     // a wall-clock line this often
 const REC_ROLLUP = 10 * 60000;  // chunks joined into one file this often
 
-// Writing History's one setting (Options' Writing History, and File → Record
-// Writing History) has three levels: 'off', 'record', and 'timestamp'
-// (recorded, then sealed and timestamped: Proof of when I wrote). It's kept
-// as recordWriting and proveWriting. Off until the writer turns it on, as a
-// feature is: nothing asks, and nothing records in a library where it was
-// never chosen (historyAsked, set the first time it is).
+// Writing History's one setting (Options → Writing History) has three
+// levels: 'off', 'record', and 'timestamp' (recorded, then sealed and
+// timestamped: Proof of when I wrote). It's kept as recordWriting and
+// proveWriting. Unlike a feature, it's on (Record Only) from the start: a
+// history can't be recorded afterwards, so a writer who turns it on later
+// has lost what came before. Timestamping waits until the writer chooses it.
 const historyCan = () => !!(Rec && window.neo.recStart);
-const recordingWanted = () => !!(historyCan() && library && library.historyAsked === true && library.recordWriting !== false);
+const recordingWanted = () => !!(historyCan() && library && library.recordWriting !== false);
 const historyLevel = () => (!recordingWanted() ? 'off' : window.neo.proofSet && library.proveWriting === true ? 'timestamp' : 'record');
 
 function recSessionId() {
@@ -708,20 +708,18 @@ document.addEventListener('visibilitychange', () => rec.context(document.visibil
 setInterval(() => rec.wallClock(), REC_WALL);
 setInterval(() => rec.rollup(), REC_ROLLUP);
 
-// Off, Record only, or Record and timestamp: from the File menu, History's
-// footer, Pocket's ⋯ sheet, and the question NEO asks once. With `asked`
-// the writer chose it there, having read what each level means; otherwise
-// timestamping asks first, in plain words, before anything is sent.
+// Off, Record only, or Record and timestamp, from Options. With `asked` the
+// writer chose it having read what each level means; otherwise timestamping
+// asks first, in plain words, before anything is sent.
 // Returns the level it's at now.
 async function setHistoryLevel(level, { asked = false } = {}) {
   if (level === 'timestamp' && !window.neo.proofSet) level = 'record';
   const wasRecording = recordingWanted();
   const wasProving = proofFlags().on;
   if (level === 'timestamp' && !wasProving && !asked && !await proofConsent()) {
-    if (window.neo.recState) window.neo.recState(); // the menu's tick goes back
+    if (window.neo.recState) window.neo.recState();
     return historyLevel();
   }
-  library.historyAsked = true;
   library.recordWriting = level !== 'off';
   // (Pocket can't timestamp: it leaves the desktop's choice alone, unless off)
   if (window.neo.proofSet || level === 'off') library.proveWriting = level === 'timestamp';

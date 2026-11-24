@@ -249,15 +249,17 @@ test('Options settings: Markdown emphasis and the interface size', async () => {
   assert.equal(await js(`!!document.querySelector('.options-modal')`), false);
 });
 
-test('Options: Writing History’s level is there, and is the File menu’s', async () => {
+test('Options: Writing History’s level is there, and the File menu follows it', async () => {
   const level = (v) => js(`(() => { try { const s = document.querySelector('.options-modal [data-opt="historyLevel"]'); if (!s) return 'missing'; const v = ${JSON.stringify(v || '')}; if (v) { s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); } return s.value; } catch (err) { return "ERR " + err.message; } })()`);
-  const ticked = () => { const out = []; const walk = (mm) => { for (const i of mm.items) { if (i.type === 'radio' && i.checked) out.push(i.label); if (i.submenu) walk(i.submenu); } }; walk(Menu.getApplicationMenu()); return out; };
+  // File → Writing History… is there only while it records; the setting itself is only in Options
+  const fileHas = (label) => Menu.getApplicationMenu().items.find((x) => x.label === 'File').submenu.items.some((x) => x.label === label);
+  assert.equal(fileHas('Record Writing History'), false, 'no setting in the File menu');
   await openOpts();
   assert.equal(await level(), 'record');
   assert.equal(await level('off'), 'off');
   await tick(400);
   assert.equal(onDisk().recordWriting, false);
-  assert.ok(ticked().includes('Off'), 'the menu follows');
+  assert.equal(fileHas('Writing History…'), false, 'the menu follows');
   await closeOpts();
   await openOpts();
   assert.equal(await level(), 'off');
@@ -265,7 +267,7 @@ test('Options: Writing History’s level is there, and is the File menu’s', as
   await tick(400);
   assert.equal(onDisk().recordWriting, true);
   assert.equal(onDisk().proveWriting, false);
-  assert.ok(ticked().includes('Record Only'));
+  assert.equal(fileHas('Writing History…'), true);
   // Record and Timestamp asks first; a no leaves it as it was
   await level('timestamp');
   await tick(300);

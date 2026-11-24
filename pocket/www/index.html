@@ -263,13 +263,7 @@
         tick(t('Spellcheck'), typeof spellOn !== 'undefined' && spellOn, { type: 'spellcheck' }) +
         (script ? '' : tick(t('Flush paragraph') + '  ⇧Enter', st.flush, { type: 'flush' })) +
         (script || typeof featureOn !== 'function' || !featureOn('poetry') ? '' : tick(t('Poetry paragraph'), st.poetry, { type: 'poetry' })) +
-        // the File menu's Record Writing History: Pocket records, and can't
-        // timestamp, so it's on or off like the rows above (on leaves the
-        // desktop's timestamping as it is; off is off for every device)
-        (window.neo.recStart ? (() => {
-          const on = lib.historyAsked === true && lib.recordWriting !== false;
-          return tick(t('Record Writing History'), on, { type: 'historyLevel', value: on ? 'off' : 'record' });
-        })() : '') +
+        // (Writing History is on or off in Options…, below)
         (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios' ? '' :
           `<div class="pm-row"><span class="pm-label">${t('On-screen keyboard')}</span><span class="pm-seg"><button data-act="keyboard">${onOff(!(window.pocketSoftKeyboardOn && !window.pocketSoftKeyboardOn()))}</button></span></div>`) +
         (typeof book !== 'undefined' && book

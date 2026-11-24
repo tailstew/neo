@@ -45,7 +45,8 @@ function menuBar(platform, more, { script = false, features = null, history = fa
   context.library = library;
   vm.runInContext('LIBRARY_DIR = library; LIBRARY_FILE = require("path").join(library, "library.json");', context);
   // (padded: Windows keeps a tiny file inside its index, which looks like iCloud's "no blocks on disk")
-  if (history) fs.writeFileSync(path.join(library, 'library.json'), JSON.stringify({ historyAsked: true }) + ' '.repeat(8192));
+  // (Writing History is on unless turned off: history false writes it off; null leaves no library.json)
+  if (history !== null) fs.writeFileSync(path.join(library, 'library.json'), JSON.stringify(history ? {} : { recordWriting: false }) + ' '.repeat(8192));
   try {
     vm.runInContext('buildMenu()', context);
     listeners.get('features:state')(null, features || Object.fromEntries(KEYS.map((k) => [k, more])));
@@ -154,9 +155,11 @@ describe('the menu bar follows the features', () => {
       for (const [history, n] of [[false, 0], [true, 2]]) {
         const all = labels(menu(menuBar('win32', more, { history }), 'File'));
         assert.equal(all.filter((l) => l === 'Writing History…').length, n, `features ${more}, recording ${history}`);
-        assert.ok(all.includes('Record Writing History'), 'the setting itself stays');
+        assert.ok(!all.includes('Record Writing History'), 'the setting is only in Options');
       }
     }
+    // a new library, never set: on from the start
+    assert.equal(labels(menu(menuBar('win32', false, { history: null }), 'File')).filter((l) => l === 'Writing History…').length, 2);
   });
 });
 

@@ -165,7 +165,7 @@ async function openOptions() {
       if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
       return;
     }
-    // one setting with the File menu's Record Writing History (setHistoryLevel);
+    // Writing History's one setting (setHistoryLevel);
     // Record and Timestamp asks first, and a no leaves the level as it was
     if (opt === 'historyLevel' || opt === 'historyOn') {
       const got = await setHistoryLevel(opt === 'historyOn' ? (on ? 'record' : 'off') : on);

@@ -965,8 +965,8 @@ async function proofWarnStale(bookId) {
   try { st = await window.neo.proofStatus(bookId, true); } catch { return; }
   if (!st || !st.waitingSince || Date.now() - Date.parse(st.waitingSince) < PROOF_STALE) return;
   if (!book || book.id !== bookId || $('#editor-view').hidden || rec.lastKeyAt > opened || historyShown) return;
-  toast(t('Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in File → Record Writing History → Timestamp Services….', {
-    when: snapWhen(Date.parse(st.waitingSince))
+  toast(t('Your writing since {when} hasn’t been timestamped: no timestamp service has answered for over a week. It is still recorded. Check your connection, or choose other services in {options} → Writing History → Timestamp Services….', {
+    options: t('Options…'), when: snapWhen(Date.parse(st.waitingSince))
   }), 12000, { warn: true });
 }
 
@@ -1375,10 +1375,7 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
     steps = [];
     shown = {};
     loaded = { state: S.error ? 'failed' : S.building ? 'loading' : 'empty', error: S.error };
-    const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : library.recordWriting === false
-      ? (IS_POCKET ? t('Writing History is off. Turn it on in ⋯ → Record Writing History, and NEO starts recording the next time you write.')
-        : t('Writing History is off. Turn it on in File → Record Writing History, and NEO starts recording the next time you write.'))
-      : t('Nothing recorded yet. Write in this book and its history shows here.');
+    const say = S.building ? t('Reading the history…') : S.error ? t('The history couldn’t be read.') : t('Nothing recorded yet. Write in this book and its history shows here.');
     paper.innerHTML = `<p class="hs-empty">${escHtml(say)}</p>`;
   }
 
@@ -3250,8 +3247,8 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
   // and removed here by a new line in the session being recorded, so only
   // while this book is open and recording.
   const canTag = () => !!(rec.on && rec.bookId === bookId && book && book.id === bookId);
-  const tagWhy = () => (library.recordWriting === false ? (IS_POCKET ? t('Turn on ⋯ → Record Writing History to tag moments.') : t('Turn on File → Record Writing History to tag moments.'))
-    : t('Open this book to tag its moments.'));
+  // (History is hidden while Writing History is off, so off is no reason here)
+  const tagWhy = () => t('Open this book to tag its moments.');
   // the tags written since the history was read, until it's read again
   let localTags = [];
   function computeTags() {

@@ -21,7 +21,7 @@ const { verifyBook, print } = require('./verify-recording.js');
 const IDLE = 5 * 60 * 1000;
 const DAY = 24 * 3600 * 1000;
 const lib = () => JSON.parse(fs.readFileSync(path.join(neo.LIB, 'library.json'), 'utf8'));
-const level = (v) => neo.menuItem('File', 'Record Writing History', v).click();
+const level = (v) => js(`setHistoryLevel(${JSON.stringify({ Off: 'off', 'Record Only': 'record', 'Record and Timestamp': 'timestamp' }[v])}); 0`); // as Options does
 const sealCount = () => neo.seals().filter((f) => /^\d{6}\.json$/.test(f)).length;
 const stampsOf = (n) => neo.seals().filter((f) => f.startsWith(String(n).padStart(6, '0') + '.') && f.endsWith('.tsr')).map((f) => f.split('.')[1]).sort();
 // in the main process (the seals are written there)
@@ -47,7 +47,8 @@ const confirmShown = async () => {
 };
 // the services dialog
 const tsa = {
-  open: async () => { neo.menuItem('File', 'Record Writing History', 'Timestamp Services…').click(); await waitFor('!!document.querySelector(".tsa-backdrop")'); await tick(200); },
+  // from Options → Writing History, as the writer opens it
+  open: async () => { neo.wc.send('menu', { type: 'options' }); await waitFor('!!document.querySelector(".options-modal [data-opt-act=tsa]")'); await js('document.querySelector(".options-modal [data-opt-act=tsa]").click()'); await waitFor('!!document.querySelector(".tsa-backdrop")'); await tick(200); },
   rows: () => js(`[...document.querySelectorAll('.tsa-list li')].map((li) => ({ id: li.dataset.id, name: li.querySelector('.tsa-name').textContent, on: li.querySelector('input').checked, about: li.querySelector('.tsa-about').textContent }))`),
   warn: () => js(`(() => { const w = document.querySelector('.tsa-warn'); return w.hidden ? '' : w.textContent; })()`),
   click: (id, sel) => js(`document.querySelector('.tsa-list li[data-id="${id}"] ${sel}').click()`),
@@ -75,7 +76,7 @@ test('at Record Only, Record and Timestamp asks first, in plain words; Cancel le
   await tick(400);
   assert.equal(await js('historyLevel()'), 'record');
   assert.notEqual(lib().proveWriting, true);
-  assert.equal(neo.menuItem('File', 'Record Writing History', 'Record Only').checked, true, 'the menu’s tick goes back');
+  assert.equal(await js('historyLevel()'), 'record', 'still Record Only');
   assert.ok(!fs.existsSync(neo.sealsDir()), 'no seals/ folder');
   assert.equal(neo.tsa.digicert.asked + neo.tsa.sectigo.asked + neo.tsa.globalsign.asked, 0, 'nothing sent');
 });
@@ -87,7 +88,7 @@ test('yes: the open book is sealed and stamped by DigiCert and Sectigo at once, 
   await until(() => stampsOf(1).length === 2, 10000, 'seal 1 stamped');
   assert.deepEqual(neo.seals(), ['000001.digicert.tsr', '000001.json', '000001.sectigo.tsr']);
   assert.equal(lib().proveWriting, true);
-  assert.equal(neo.menuItem('File', 'Record Writing History', 'Record and Timestamp').checked, true);
+  assert.equal(await js('historyLevel()'), 'timestamp');
   await neo.openHistory();
   await waitFor('/Last timestamped/.test($("#hint").textContent) && !$("#hint").hidden');
   assert.match(await neo.toastText(), /^Last timestamped today at .+, by DigiCert and Sectigo\.$/);
@@ -367,11 +368,7 @@ test('Off: no seals; Record and Timestamp again asks first', async () => {
 
 /* ---------- Timestamp services… ---------- */
 
-test('Timestamp Services… is under a line after Record and Timestamp, and from History closes History first: the three, ticked, with their addresses', async () => {
-  const items = neo.menuItem('File', 'Record Writing History').submenu.items;
-  const i = items.findIndex((x) => x.label === 'Record and Timestamp');
-  assert.equal(items[i + 1].type, 'separator');
-  assert.equal(items[i + 2].label, 'Timestamp Services…');
+test('Timestamp Services… is in Options, and from History closes History first: the three, ticked, with their addresses', async () => {
   await neo.openHistory();
   await tsa.open();
   assert.equal(await js('!!historyShown'), false, 'History closed first');

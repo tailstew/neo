@@ -41,12 +41,13 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 ## Record Writing History, the setting
 
-- [ ] **(2 computers)** Turn Writing History on in Options on one computer: once the library has synced, the other follows (History back in its footer and menus) without being asked; Off the same way.
-- [x] **(phone)** The ⋯ sheet's **Record Writing History** is an on/off switch, and follows the desktop's choice (Record and timestamp on the desktop shows as ✓ On). A phone joining a library that has chosen isn't asked. *(2026-11-13, ad0e872, OnePlus 9, Android 14, library by Syncthing)*
+- [ ] A new library (and one from before Writing History) records from the start, at Record Only, without asking: History in the footer once a book's written in, on the laptop, the Chromebook and the phone.
+- [ ] **(2 computers)** Turn Writing History off in Options on one computer: once the library has synced, the other follows (History gone from its footer and menus) without being asked; on again the same way.
+- [ ] There's no **Record Writing History** in the File menu, nor in the phone's ⋯ sheet: the setting is only in Options.
 
-- [ ] What's New in NEO… (Help) has Writing History, timestamps and Pocket under the next version, and says it's turned on in Options.
+- [ ] What's New in NEO… (Help) has Writing History, timestamps and Pocket under the next version, and says it's on from the start and turned off in Options.
 - [ ] With Writing History **Off** in Options, there's no History in a book's footer, no Writing History… in File, Export or a book's shelf menu, on the laptop, the Chromebook and the phone (⋯); turned on again, they're back, with what was recorded before.
-- [ ] Options… shows **Writing History**: on a computer a menu of Off, Record Only and Record and Timestamp, the same choice as the File menu's (change one and the other follows), with Timestamp Services… under it; on the phone a tick. Record and Timestamp asks first, and a no leaves it as it was.
+- [ ] Options… shows **Writing History**: on a computer a menu of Off, Record Only and Record and Timestamp, with Timestamp Services… under it; on the phone a tick. Record and Timestamp asks first, and a no leaves it as it was.
 
 ## Writing History, the dialog
 
@@ -194,9 +195,9 @@ The timestamp services in `test:proof`, `test:export` and `test:writing` are `sc
 
 ### The setting, recording and the files on disk
 
-- Options' Record and Timestamp asks first, and yes is the File menu's; the first book written is sealed and stamped. `test:writing`
-- Nothing asks about Writing History, on first run or in a library from before it: it's off, and records nothing, until Options turns it on; Record and Timestamp asks first. Off hides History in the footer, File → Writing History…, Export ▸ Writing History… and the shelf's. `test:recording`, `test:writing`
-- File → Record Writing History ▸ Record and Timestamp asks first, in plain words; Cancel leaves the tick on Record Only, sends nothing and makes no `seals/`. `test:proof`
+- Options' Record and Timestamp asks first; the first book written is sealed and stamped. The File menu has no Record Writing History, and its Writing History… follows Options. `test:writing`, `test:options`, `npm test` (features)
+- Nothing asks about Writing History, on first run or in a library from before it: it records from the start, at Record Only; Record and Timestamp asks first. Off hides History in the footer, File → Writing History…, Export ▸ Writing History… and the shelf's. `test:recording`, `test:writing`
+- Record and Timestamp asks first, in plain words; Cancel leaves the tick on Record Only, sends nothing and makes no `seals/`. `test:proof`
 - Off says nothing already recorded is touched; nothing records while off; Record Only again catches up what changed meanwhile, as a catch-up, not as typing. `test:recording`, `test:writing`
 - History has no level setting of its own. `test:history`
 - File → Writing History… is never greyed out; on the shelf it says "Open a book first". `test:recording`

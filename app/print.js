@@ -2191,8 +2191,6 @@ window.neo.onMenu(async (msg) => {
   if (msg.type === 'import') importBooks();
   if (msg.type === 'importChapters') importChapters();
   if (msg.type === 'stats') openStats();
-  if (msg.type === 'historyLevel') setHistoryLevel(msg.value);
-  if (msg.type === 'tsaServices') openTsaServices();
   // never greyed out: with no book open it says so, as Export does
   if (msg.type === 'history') { if (book && !$('#editor-view').hidden) openHistory(); else toast(t('Open a book first')); }
   if (msg.type === 'chapterStep') gotoChapter(msg.value);

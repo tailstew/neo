@@ -25,7 +25,7 @@ const TITLES = ['Harbour', 'Lamps', 'Tides', 'Gulls', 'Nets'];
 const ID = {};
 const LONG = 'The lamps along the quay came on one by one as the boats came in, and the gulls settled on the posts to wait for scraps. ';
 const idx = (title) => js(`book.chapterOrder.indexOf(${JSON.stringify(ID[title])})`);
-const level = (v) => neo.menuItem('File', 'Record Writing History', v).click();
+const level = (v) => js(`setHistoryLevel(${JSON.stringify({ Off: 'off', 'Record Only': 'record', 'Record and Timestamp': 'timestamp' }[v])}); 0`); // as Options does
 const sealCount = () => neo.seals().filter((f) => /^\d{6}\.json$/.test(f)).length;
 const stampsOf = (n) => neo.seals().filter((f) => f.startsWith(String(n).padStart(6, '0') + '.') && f.endsWith('.tsr')).length;
 async function until(fn, ms = 10000, what = String(fn)) {

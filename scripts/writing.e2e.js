@@ -27,7 +27,7 @@ fs.writeFileSync(path.join(neo.tmp, 'app', 'settings.json'), JSON.stringify({ re
 
 const ID = {};
 const lib = () => JSON.parse(fs.readFileSync(path.join(neo.LIB, 'library.json'), 'utf8'));
-const level = (v) => neo.menuItem('File', 'Record Writing History', v).click();
+const level = (v) => js(`setHistoryLevel(${JSON.stringify({ Off: 'off', 'Record Only': 'record', 'Record and Timestamp': 'timestamp' }[v])}); 0`); // as Options does
 const sessionText = () => js('rec.w.lines.join("\\n") + "\\n"');
 const markersOfToday = async (ch = 'book') => {
   await neo.openHistory();
@@ -63,7 +63,7 @@ async function importScript(name, fountain) {
 
 /* ---------- the setting ---------- */
 
-test('first run asks nothing about Writing History: it’s off, with no way into History, until Options turns it on; Record and Timestamp asks first, and the first book is timestamped', async () => {
+test('first run asks nothing about Writing History: it records from the start (Record Only), its setting only in Options; Record and Timestamp asks first, and the first book is timestamped', async () => {
   await js('backToShelf()');
   await tick(600);
   await js('library.firstRunDone = false; delete library.historyAsked; delete library.recordWriting; delete library.proveWriting; showFirstRun()');
@@ -75,11 +75,11 @@ test('first run asks nothing about Writing History: it’s off, with no way into
   await waitFor('document.getElementById("firstrun").hidden');
   await tick(400);
   assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asked');
-  assert.notEqual(lib().historyAsked, true);
-  assert.equal(await js('recordingWanted()'), false, 'nothing records');
-  assert.equal(neo.menuItem('File', 'Record Writing History', 'Off').checked, true);
-  assert.throws(() => neo.menuItem('File', 'Writing History…'), 'no Writing History… in File');
+  assert.equal(await js('historyLevel()'), 'record', 'Record Only from the start');
+  assert.ok(neo.menuItem('File', 'Writing History…'), 'Writing History… in File');
+  assert.throws(() => neo.menuItem('File', 'Record Writing History'), 'the setting is only in Options');
   // Options: Record and Timestamp asks first, and yes turns it on
+  // (open no book yet: the first one is the one timestamped)
   await js(`openOptions()`);
   await tick(300);
   await js(`(() => { const s = document.querySelector('.options-modal [data-opt="historyLevel"]'); s.value = 'timestamp'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -90,11 +90,9 @@ test('first run asks nothing about Writing History: it’s off, with no way into
   assert.equal(await js(`document.querySelector('.options-modal [data-opt="historyLevel"]').value`), 'timestamp');
   await js(`document.querySelector('.options-modal .m-ok').click()`);
   const l = lib();
-  assert.equal(l.historyAsked, true);
   assert.equal(l.recordWriting, true);
   assert.equal(l.proveWriting, true);
-  assert.equal(neo.menuItem('File', 'Record Writing History', 'Record and Timestamp').checked, true);
-  assert.ok(neo.menuItem('File', 'Writing History…'), 'Writing History… is back in File');
+  assert.equal(await js('historyLevel()'), 'timestamp');
   // the first book written is timestamped
   neo.shorten[5 * 60 * 1000] = 1500;
   const id = await newBook('Lighthouse', [['One', ['The lamp turns.']], ['Two', ['The ship comes.']]]);

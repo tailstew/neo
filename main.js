@@ -3708,7 +3708,7 @@ function buildMenu() {
   // (the window's historyShows), so an empty History never looks like a bug
   // (read once; a library.json still in iCloud never holds up the menu)
   const menuLib = (() => { try { return readJSON(LIBRARY_FILE, {}) || {}; } catch { return {}; } })();
-  const historyOn = menuLib.historyAsked === true && menuLib.recordWriting !== false;
+  const historyOn = menuLib.recordWriting !== false;
   const isWin = process.platform === 'win32';
   // macOS and Windows name faces that ship with the OS. Linux has none of
   // them, so the menu names the faces bundled in fonts/ (see styles.css).
@@ -3801,21 +3801,7 @@ function buildMenu() {
           label: t('Writing History…'),
           click: () => sendToWindow({ type: 'history' })
         }] : []),
-        {
-          // one setting, three levels, kept in library.json as the window
-          // writes them (setHistoryLevel); nothing until the writer's asked
-          label: t('Record Writing History'),
-          submenu: (() => {
-            const lib = menuLib;
-            const level = lib.historyAsked !== true || lib.recordWriting === false ? 'off' : lib.proveWriting === true ? 'timestamp' : 'record';
-            return [...[['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
-              label, type: 'radio', checked: level === value, click: () => sendToWindow({ type: 'historyLevel', value })
-            })),
-            // who stamps the seals (openTsaServices in app.js)
-            { type: 'separator' },
-            { label: t('Timestamp Services…'), click: () => sendToWindow({ type: 'tsaServices' }) }];
-          })()
-        },
+        // (Writing History's setting is in Options)
         { type: 'separator' },
         {
           label: t('Import Manuscripts…'),

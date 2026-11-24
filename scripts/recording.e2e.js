@@ -822,22 +822,19 @@ test('turning the recording off stops it; turning it on catches up', async () =>
   assert.match(lines[i + 1][4], /Unrecorded/);
   replayAll([text]);
   assert.equal(JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8')).recordWriting, true);
-  // the File menu's level follows
-  assert.equal(menuItem('Record Only').checked, true);
+  // File → Writing History… is back with it
+  assert.equal(menuItem('Writing History…').enabled, true);
 });
 
-test('a library from before Writing History is asked nothing, and records nothing until it’s turned on', async () => {
+test('a library from before Writing History is asked nothing, and records from the start (Record Only, no timestamps)', async () => {
   await js('backToShelf()');
   await tick(800);
   // as an older NEO left it: never chosen
-  await js('library.historyAsked = undefined; delete library.recordWriting; writeLibrary(library).then(() => window.neo.recState()); renderShelves(); 0');
+  await js('delete library.historyAsked; delete library.recordWriting; delete library.proveWriting; writeLibrary(library).then(() => window.neo.recState()); renderShelves(); 0');
   await tick(400);
-  assert.equal(await js('recordingWanted()'), false, 'nothing records');
+  assert.equal(await js('historyLevel()'), 'record', 'records');
   assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asks');
-  assert.equal(menuItem('Off').checked, true);
-  // turned on, as Options does
-  await js('setHistoryLevel("record")');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8')).historyAsked, true);
+  assert.equal(menuItem('Writing History…').enabled, true);
   await js(`openBook(${JSON.stringify(BOOK)})`);
   await tick(800);
   assert.equal(await js('rec.on'), true);
