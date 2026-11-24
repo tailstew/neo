@@ -19,7 +19,7 @@ const root = path.join(__dirname, '..');
 const localRequire = createRequire(path.join(root, 'main.js'));
 const source = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
 
-function menuBar(platform, more, { script = false, features = null } = {}) {
+function menuBar(platform, more, { script = false, features = null, history = false } = {}) {
   const listeners = new Map();
   let template = null;
   const electron = {
@@ -44,6 +44,8 @@ function menuBar(platform, more, { script = false, features = null } = {}) {
   const library = fs.mkdtempSync(path.join(os.tmpdir(), 'neo-simple-'));
   context.library = library;
   vm.runInContext('LIBRARY_DIR = library; LIBRARY_FILE = require("path").join(library, "library.json");', context);
+  // (padded: Windows keeps a tiny file inside its index, which looks like iCloud's "no blocks on disk")
+  if (history) fs.writeFileSync(path.join(library, 'library.json'), JSON.stringify({ historyAsked: true }) + ' '.repeat(8192));
   try {
     vm.runInContext('buildMenu()', context);
     listeners.get('features:state')(null, features || Object.fromEntries(KEYS.map((k) => [k, more])));
@@ -140,9 +142,21 @@ describe('the menu bar follows the features', () => {
   test('a script open in simple NEO keeps its own export and elements', () => {
     const template = menuBar('darwin', false, { script: true });
     const exp = Array.from(menu(template, 'File').find((i) => i.label === 'Export').submenu, (i) => i.label);
-    // (and Writing History, which simple NEO keeps: every library is asked whether to record)
-    assert.deepEqual(exp, ['PDF (.pdf)', 'Fountain (.fountain)', 'Final Draft (.fdx)', undefined, 'Writing History…']);
+    assert.deepEqual(exp, ['PDF (.pdf)', 'Fountain (.fountain)', 'Final Draft (.fdx)']);
     assert.ok(labels(menu(template, 'Format')).includes('Scene Heading'));
+    // recording, Writing History is there whatever the features
+    const rec = menuBar('darwin', false, { script: true, history: true });
+    assert.deepEqual(Array.from(menu(rec, 'File').find((i) => i.label === 'Export').submenu, (i) => i.label), ['PDF (.pdf)', 'Fountain (.fountain)', 'Final Draft (.fdx)', undefined, 'Writing History…']);
+  });
+
+  test('Writing History off: no Writing History… in File or in Export; recording, both', () => {
+    for (const more of [false, true]) {
+      for (const [history, n] of [[false, 0], [true, 2]]) {
+        const all = labels(menu(menuBar('win32', more, { history }), 'File'));
+        assert.equal(all.filter((l) => l === 'Writing History…').length, n, `features ${more}, recording ${history}`);
+        assert.ok(all.includes('Record Writing History'), 'the setting itself stays');
+      }
+    }
   });
 });
 

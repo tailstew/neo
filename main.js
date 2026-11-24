@@ -3704,6 +3704,11 @@ function featureTemplate(items, features) {
 
 function buildMenu() {
   const isMac = process.platform === 'darwin';
+  // Writing History off: every way into it goes, as a feature's would
+  // (the window's historyShows), so an empty History never looks like a bug
+  // (read once; a library.json still in iCloud never holds up the menu)
+  const menuLib = (() => { try { return readJSON(LIBRARY_FILE, {}) || {}; } catch { return {}; } })();
+  const historyOn = menuLib.historyAsked === true && menuLib.recordWriting !== false;
   const isWin = process.platform === 'win32';
   // macOS and Windows name faces that ship with the OS. Linux has none of
   // them, so the menu names the faces bundled in fonts/ (see styles.css).
@@ -3759,8 +3764,7 @@ function buildMenu() {
             { label: 'PDF (.pdf)', click: () => sendToWindow({ type: 'export', format: 'pdf' }) },
             { label: 'Fountain (.fountain)', click: () => sendToWindow({ type: 'export', format: 'fountain' }) },
             { label: 'Final Draft (.fdx)', click: () => sendToWindow({ type: 'export', format: 'fdx' }) },
-            { type: 'separator' },
-            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) }
+            ...(historyOn ? [{ type: 'separator' }, { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) }] : [])
           ] : [
             { feature: 'exports', label: t('Plain Text (.txt)'), click: () => sendToWindow({ type: 'export', format: 'txt' }) },
             { feature: 'exports', label: 'Markdown (.md)', click: () => sendToWindow({ type: 'export', format: 'md' }) },
@@ -3769,8 +3773,7 @@ function buildMenu() {
             { label: 'Word (.docx)', click: () => sendToWindow({ type: 'export', format: 'docx' }) },
             { label: 'EPUB (.epub)', click: () => sendToWindow({ type: 'export', format: 'epub' }) },
             { type: 'separator' },
-            { label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) },
-            { type: 'separator' },
+            ...(historyOn ? [{ label: t('Writing History…'), click: () => sendToWindow({ type: 'exportHistory' }) }, { type: 'separator' }] : []),
             { label: t('Paperback for KDP…'), click: () => sendToWindow({ type: 'export', format: 'paperback' }) },
             { feature: 'exports', label: t('Manuscript Format…'), click: () => sendToWindow({ type: 'export', format: 'manuscript' }) }
           ]
@@ -3794,16 +3797,16 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+,',
           click: () => sendToWindow({ type: 'stats' })
         },
-        {
+        ...(historyOn ? [{
           label: t('Writing History…'),
           click: () => sendToWindow({ type: 'history' })
-        },
+        }] : []),
         {
           // one setting, three levels, kept in library.json as the window
           // writes them (setHistoryLevel); nothing until the writer's asked
           label: t('Record Writing History'),
           submenu: (() => {
-            const lib = readJSON(LIBRARY_FILE, {});
+            const lib = menuLib;
             const level = lib.historyAsked !== true || lib.recordWriting === false ? 'off' : lib.proveWriting === true ? 'timestamp' : 'record';
             return [...[['off', t('Off')], ['record', t('Record Only')], ['timestamp', t('Record and Timestamp')]].map(([value, label]) => ({
               label, type: 'radio', checked: level === value, click: () => sendToWindow({ type: 'historyLevel', value })

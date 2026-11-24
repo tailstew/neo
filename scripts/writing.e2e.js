@@ -63,34 +63,44 @@ async function importScript(name, fountain) {
 
 /* ---------- the setting ---------- */
 
-test('first run’s last step: Off, Record only and Record and timestamp as cards, Record only picked; each, chosen, is the File menu’s; Record and timestamp asks nothing more and the first book is timestamped', async () => {
+test('first run asks nothing about Writing History: it’s off, with no way into History, until Options turns it on; Record and Timestamp asks first, and the first book is timestamped', async () => {
   await js('backToShelf()');
   await tick(600);
-  for (const [lvl, menu] of [['off', 'Off'], ['record', 'Record Only'], ['timestamp', 'Record and Timestamp']]) {
-    await js('library.firstRunDone = false; showFirstRun()');
-    await tick(200);
-    await js(`document.querySelector('#fr-step1 .fr-choice').click()`);
-    await tick(200);
-    await js(`document.getElementById('fr-next').click()`);
-    await tick(200);
-    const cards = await js(`({ title: document.querySelector('#fr-step3 h2').textContent, levels: [...document.querySelectorAll('#fr-levels .fr-choice')].map((b) => [b.dataset.level, b.querySelector('strong').textContent, b.classList.contains('sel')]) })`);
-    assert.equal(cards.title, 'Your writing history');
-    assert.deepEqual(cards.levels, [['off', 'Off', false], ['record', 'Record only', true], ['timestamp', 'Record and timestamp', false]]);
-    await js(`document.querySelector('#fr-levels .fr-choice[data-level="${lvl}"]').click(); document.getElementById('fr-done').click()`);
-    await waitFor('document.getElementById("firstrun").hidden');
-    await tick(400);
-    assert.equal(await js('!!document.querySelector(".confirm-modal")'), false, 'nothing more asked');
-    assert.equal(neo.menuItem('File', 'Record Writing History', menu).checked, true, lvl + ' on the menu');
-    const l = lib();
-    assert.equal(l.historyAsked, true);
-    assert.equal(l.recordWriting, lvl !== 'off');
-    assert.equal(l.proveWriting, lvl === 'timestamp');
-  }
+  await js('library.firstRunDone = false; delete library.historyAsked; delete library.recordWriting; delete library.proveWriting; showFirstRun()');
+  await tick(200);
+  await js(`document.querySelector('#fr-step1 .fr-choice').click()`);
+  await tick(200);
+  assert.equal(await js(`!!document.getElementById('fr-step3') || !!document.getElementById('fr-next')`), false, 'no Writing History step');
+  await js(`document.getElementById('fr-done').click()`);
+  await waitFor('document.getElementById("firstrun").hidden');
+  await tick(400);
+  assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asked');
+  assert.notEqual(lib().historyAsked, true);
+  assert.equal(await js('recordingWanted()'), false, 'nothing records');
+  assert.equal(neo.menuItem('File', 'Record Writing History', 'Off').checked, true);
+  assert.throws(() => neo.menuItem('File', 'Writing History…'), 'no Writing History… in File');
+  // Options: Record and Timestamp asks first, and yes turns it on
+  await js(`openOptions()`);
+  await tick(300);
+  await js(`(() => { const s = document.querySelector('.options-modal [data-opt="historyLevel"]'); s.value = 'timestamp'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await waitFor('!!document.querySelector(".confirm-modal")');
+  await js(`document.querySelector('.confirm-modal .m-ok').click()`);
+  await waitFor('!document.querySelector(".confirm-modal")');
+  await tick(400);
+  assert.equal(await js(`document.querySelector('.options-modal [data-opt="historyLevel"]').value`), 'timestamp');
+  await js(`document.querySelector('.options-modal .m-ok').click()`);
+  const l = lib();
+  assert.equal(l.historyAsked, true);
+  assert.equal(l.recordWriting, true);
+  assert.equal(l.proveWriting, true);
+  assert.equal(neo.menuItem('File', 'Record Writing History', 'Record and Timestamp').checked, true);
+  assert.ok(neo.menuItem('File', 'Writing History…'), 'Writing History… is back in File');
   // the first book written is timestamped
   neo.shorten[5 * 60 * 1000] = 1500;
   const id = await newBook('Lighthouse', [['One', ['The lamp turns.']], ['Two', ['The ship comes.']]]);
   await openIt(id);
   neo.book = id;
+  assert.equal(await js(`$('.tab.history-btn').hidden`), false, 'History in the footer');
   for (const ch of await neo.chapterIds()) ID[await js(`book.chapterTitles[${JSON.stringify(ch)}]`)] = ch;
   await caretAt(0, 0, -1);
   await type(' Round and round.');
@@ -103,22 +113,18 @@ test('first run’s last step: Off, Record only and Record and timestamp as card
   await tick(500);
 });
 
-test('a library from before Writing History: the question says what it does, has no close button, and Continue writes the answer', async () => {
-  await js('backToShelf()');
+test('Off hides every way into History, a book’s history or not: the footer, File, Export, the shelf’s menu; on again, they’re back', async () => {
+  level('Off');
   await tick(600);
-  await js('library.historyAsked = undefined; writeLibrary(library); askHistoryLevel(); 0');
-  await waitFor('!!document.querySelector("#history-ask")');
-  const q = await js(`({ title: document.querySelector('#history-ask h2').textContent, text: document.querySelector('#history-ask p').textContent, close: !!document.querySelector('#history-ask .ps-done, #history-ask .m-cancel, #history-ask [aria-label="Close"]') })`);
-  assert.equal(q.title, 'New: your writing history');
-  assert.match(q.text, /watch how any chapter was written and revised, and bring back any earlier version/);
-  assert.match(q.text, /proof that your work was written over time/);
-  assert.match(q.text, /It starts when you turn it on/);
-  assert.equal(q.close, false, 'no close button');
-  await js('document.querySelector("#history-ask .btn-gold").click()');
-  await waitFor('!document.querySelector("#history-ask")');
-  assert.equal(lib().historyAsked, true);
-  assert.equal(lib().recordWriting, true);
-  await openIt(neo.book);
+  assert.equal(await js(`$('.tab.history-btn').hidden`), true, 'not in the footer');
+  assert.throws(() => neo.menuItem('File', 'Writing History…'));
+  assert.ok(!neo.menuItem('File', 'Export').submenu.items.some((i) => i.label === 'Writing History…'), 'not in Export');
+  assert.equal(await js(`(openHistory(), !!document.querySelector('.kind-history'))`), false, 'History doesn’t open');
+  level('Record Only');
+  await tick(600);
+  assert.equal(await js(`$('.tab.history-btn').hidden`), false);
+  assert.ok(neo.menuItem('File', 'Writing History…'));
+  assert.ok(neo.menuItem('File', 'Export').submenu.items.some((i) => i.label === 'Writing History…'));
 });
 
 test('Off says nothing already recorded is touched; Record Only again catches up what changed meanwhile', async () => {

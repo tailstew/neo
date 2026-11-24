@@ -826,36 +826,18 @@ test('turning the recording off stops it; turning it on catches up', async () =>
   assert.equal(menuItem('Record Only').checked, true);
 });
 
-test('a library from before Writing History records nothing until asked, once, on the shelf, and the question can’t be put aside', async () => {
+test('a library from before Writing History is asked nothing, and records nothing until it’s turned on', async () => {
   await js('backToShelf()');
   await tick(800);
-  // as an older NEO left it: never asked
-  await js('library.historyAsked = undefined; delete library.recordWriting; writeLibrary(library); 0');
-  await tick(300);
-  assert.equal(await js('recordingWanted()'), false, 'nothing records until it’s answered');
-  await js('askHistoryLevel(); 0');
-  await tick(200);
-  assert.ok(await js('!!document.querySelector("#history-ask")'));
-  assert.deepEqual(await js('[...document.querySelectorAll("#history-ask .fr-choice")].map((b) => b.dataset.level)'), ['off', 'record', 'timestamp']);
-  assert.equal(await js('document.querySelector("#history-ask .fr-choice.sel").dataset.level'), 'record', 'Record only, to start with');
-  assert.match(await js('document.querySelector("#history-ask .fr-choice[data-level=timestamp] span").textContent'), /from the day they’re turned on/);
-  // neither Esc nor a click outside puts it aside
-  key('Escape');
-  await js('document.querySelector("#history-ask").dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); 0');
-  await tick(200);
-  assert.ok(await js('!!document.querySelector("#history-ask")'));
-  // Off chosen: nothing records, and nothing asks again
-  await js('document.querySelector("#history-ask .fr-choice[data-level=off]").click(); document.querySelector("#history-ask .btn-gold").click(); 0');
-  await waitFor('!document.querySelector("#history-ask")');
-  const lib = JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8'));
-  assert.equal(lib.historyAsked, true);
-  assert.equal(lib.recordWriting, false);
+  // as an older NEO left it: never chosen
+  await js('library.historyAsked = undefined; delete library.recordWriting; writeLibrary(library).then(() => window.neo.recState()); renderShelves(); 0');
+  await tick(400);
+  assert.equal(await js('recordingWanted()'), false, 'nothing records');
+  assert.equal(await js('[...document.querySelectorAll(".modal-backdrop")].some((b) => !b.hidden && b.getClientRects().length > 0)'), false, 'nothing asks');
   assert.equal(menuItem('Off').checked, true);
-  await js('askHistoryLevel(); 0');
-  await tick(200);
-  assert.ok(await js('!document.querySelector("#history-ask")'), 'asked once');
-  // and back to recording, for the tests after this one
+  // turned on, as Options does
   await js('setHistoryLevel("record")');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(LIB, 'library.json'), 'utf8')).historyAsked, true);
   await js(`openBook(${JSON.stringify(BOOK)})`);
   await tick(800);
   assert.equal(await js('rec.on'), true);

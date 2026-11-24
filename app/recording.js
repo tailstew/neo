@@ -24,11 +24,12 @@ const REC_IDLE = 60000;         // no keys or edits this long: an `idle` line
 const REC_WALL = 5 * 60000;     // a wall-clock line this often
 const REC_ROLLUP = 10 * 60000;  // chunks joined into one file this often
 
-// Writing History's one setting (File → Record Writing History) has three
-// levels: 'off', 'record', and 'timestamp' (recorded, then sealed and
-// timestamped: Proof of when I wrote). It's kept as recordWriting and
-// proveWriting, which a NEO from before reads. Nothing is recorded in a
-// library whose writer hasn't been asked yet (historyAsked, askHistoryLevel).
+// Writing History's one setting (Options' Writing History, and File → Record
+// Writing History) has three levels: 'off', 'record', and 'timestamp'
+// (recorded, then sealed and timestamped: Proof of when I wrote). It's kept
+// as recordWriting and proveWriting. Off until the writer turns it on, as a
+// feature is: nothing asks, and nothing records in a library where it was
+// never chosen (historyAsked, set the first time it is).
 const historyCan = () => !!(Rec && window.neo.recStart);
 const recordingWanted = () => !!(historyCan() && library && library.historyAsked === true && library.recordWriting !== false);
 const historyLevel = () => (!recordingWanted() ? 'off' : window.neo.proofSet && library.proveWriting === true ? 'timestamp' : 'record');
@@ -727,6 +728,7 @@ async function setHistoryLevel(level, { asked = false } = {}) {
   await writeLibrary(library);
   if (window.neo.proofSet) await window.neo.proofSet(proofFlags()).catch(() => {});
   if (window.neo.recState) window.neo.recState();
+  paintHistoryShows();
   if (wasRecording && level === 'off') {
     rec.end();
     if (!asked) toast(t('Writing History is off. Nothing already recorded is touched.'), 6000);
@@ -741,76 +743,6 @@ async function setHistoryLevel(level, { asked = false } = {}) {
     window.neo.proofSeal(book.id).catch(() => {});
   }
   return level;
-}
-
-// The three levels as cards to pick from: first run's last step, and the
-// question asked once in a library from before Writing History
-function historyLevelCards(box, picked, onPick, { existing = false } = {}) {
-  const levels = [
-    ['off', t('Off'), t('NEO keeps no history. Snapshots still work.')],
-    ['record', t('Record only'), t('Every keystroke is kept with the book, on this computer, so you can watch how it was written and bring back any earlier version. Nothing is sent anywhere.')],
-    ...(window.neo.proofSet ? [['timestamp', t('Record and timestamp'),
-      t('Every keystroke is recorded, and every hour you write, a unique fingerprint of the recording (never your words) goes to two timestamp services. Their receipts prove your work was written over time.') + ' ' +
-      // (a history can't be timestamped afterwards: what was written before is nobody's proof)
-      (existing ? t('Timestamps can’t be added afterwards: they cover what you write from the day they’re turned on.')
-        : t('Timestamps can’t be added afterwards, so if you might want this proof for a book, turn them on before you start it.'))]] : [])
-  ];
-  const pick = (value) => box.querySelectorAll('.fr-choice').forEach((b) => {
-    b.classList.toggle('sel', b.dataset.level === value);
-    b.setAttribute('aria-pressed', String(b.dataset.level === value));
-  });
-  box.replaceChildren(...levels.map(([value, name, desc]) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'fr-choice';
-    b.dataset.level = value;
-    b.innerHTML = '<strong></strong><span></span>';
-    b.firstChild.textContent = name;
-    b.lastChild.textContent = desc;
-    b.onclick = () => { pick(value); onPick(value); };
-    return b;
-  }));
-  pick(picked);
-}
-
-// A library from before Writing History: asked once, on the shelf, whether to
-// record from now on. Nothing records until it's answered (recordingWanted),
-// and it can't be put aside: the cards and Continue, no Esc, no click outside.
-// One answer serves every device that shares the library.
-function askHistoryLevel() {
-  if (!historyCan() || library.historyAsked === true || $('#history-ask')) return;
-  let picked = 'record';
-  const bd = document.createElement('div');
-  bd.className = 'modal-backdrop';
-  bd.id = 'history-ask';
-  bd.dataset.stay = '1';
-  bd.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:620px">
-    <h2></h2><p></p><div class="fr-choices hl-cards"></div>
-    <p class="hl-error" role="alert" hidden></p>
-    <div style="text-align:right;margin-top:20px"><button class="btn-gold" type="button"></button></div>
-  </div>`;
-  bd.querySelector('h2').textContent = t('New: your writing history');
-  bd.querySelector('p').textContent = t('NEO can now record how you write, keystroke by keystroke, so you can watch how any chapter was written and revised, and bring back any earlier version.') +
-    (window.neo.proofSet ? ' ' + t('With timestamps, you also have proof that your work was written over time.') : '') +
-    ' ' + t('It starts when you turn it on: what you’ve already written is where the history begins.');
-  historyLevelCards(bd.querySelector('.hl-cards'), picked, (v) => { picked = v; }, { existing: true });
-  const go = bd.querySelector('.btn-gold');
-  go.textContent = t('Continue');
-  go.onclick = async () => {
-    go.disabled = true;
-    try {
-      await setHistoryLevel(picked, { asked: true });
-      bd.remove();
-    } catch (err) {
-      window.neo.logError('history ask: ' + ((err && err.message) || err));
-      const note = bd.querySelector('.hl-error');
-      note.textContent = t('NEO couldn’t save your choice. Try again.');
-      note.hidden = false;
-      go.disabled = false;
-    }
-  };
-  document.body.appendChild(bd);
-  go.focus();
 }
 
 // Proof of when I wrote (docs/neo-recording-plan.md, part 2): off unless

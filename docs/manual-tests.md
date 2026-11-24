@@ -41,9 +41,11 @@ The second computer is the Chromebook: its Linux (arm64) runs `dist\linux-arm64-
 
 ## Record Writing History, the setting
 
-- [x] **(2 computers)** Answer the question on one computer: once the library has synced, the other isn't asked (an open question there goes away) and follows the answer. *(2026-11-15, 9ff4657 laptop / 19ff6ea Chromebook: started after the answer, not asked; open, the question went once the library came. A Chromebook's Syncthing sleeps while no Linux app runs, so the library can arrive just after NEO starts: then it asks at the next start)*
+- [ ] **(2 computers)** Turn Writing History on in Options on one computer: once the library has synced, the other follows (History back in its footer and menus) without being asked; Off the same way.
 - [x] **(phone)** The ⋯ sheet's **Record Writing History** is an on/off switch, and follows the desktop's choice (Record and timestamp on the desktop shows as ✓ On). A phone joining a library that has chosen isn't asked. *(2026-11-13, ad0e872, OnePlus 9, Android 14, library by Syncthing)*
 
+- [ ] What's New in NEO… (Help) has Writing History, timestamps and Pocket under the next version, and says it's turned on in Options.
+- [ ] With Writing History **Off** in Options, there's no History in a book's footer, no Writing History… in File, Export or a book's shelf menu, on the laptop, the Chromebook and the phone (⋯); turned on again, they're back, with what was recorded before.
 - [ ] Options… shows **Writing History**: on a computer a menu of Off, Record Only and Record and Timestamp, the same choice as the File menu's (change one and the other follows), with Timestamp Services… under it; on the phone a tick. Record and Timestamp asks first, and a no leaves it as it was.
 
 ## Writing History, the dialog
@@ -192,8 +194,8 @@ The timestamp services in `test:proof`, `test:export` and `test:writing` are `sc
 
 ### The setting, recording and the files on disk
 
-- First run's last step: Off, Record only and Record and timestamp as cards, Record only picked; each, chosen, is the File menu's; Record and timestamp asks nothing more, and the first book written is sealed and stamped. `test:writing`
-- A library from before Writing History records nothing until asked, once, on the shelf: what the history lets the writer do, that timestamps prove when, that it starts when turned on; Record only picked; no close button, and Esc and a click outside leave it; Continue writes `historyAsked` and the level. `test:recording`, `test:writing`
+- Options' Record and Timestamp asks first, and yes is the File menu's; the first book written is sealed and stamped. `test:writing`
+- Nothing asks about Writing History, on first run or in a library from before it: it's off, and records nothing, until Options turns it on; Record and Timestamp asks first. Off hides History in the footer, File → Writing History…, Export ▸ Writing History… and the shelf's. `test:recording`, `test:writing`
 - File → Record Writing History ▸ Record and Timestamp asks first, in plain words; Cancel leaves the tick on Record Only, sends nothing and makes no `seals/`. `test:proof`
 - Off says nothing already recorded is touched; nothing records while off; Record Only again catches up what changed meanwhile, as a catch-up, not as typing. `test:recording`, `test:writing`
 - History has no level setting of its own. `test:history`

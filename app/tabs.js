@@ -23,7 +23,7 @@ $$('.tab[data-tab]').forEach((tab) => {
 
 // History, after the tabs: the Writing History, scrolled to the chapter the caret is in
 const historyBtn = $('.tab.history-btn');
-historyBtn.hidden = !historyCanOpen();
+historyBtn.hidden = true; // until the library says (paintHistoryShows)
 historyBtn.addEventListener('click', () => openHistory());
 
 // Darlings tab is a drop target for selected text

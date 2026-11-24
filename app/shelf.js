@@ -46,11 +46,7 @@ async function loadLibrary() {
   if (window.neo.writingStyleState) window.neo.writingStyleState(library.writingStyle);
   if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
   const existing = !!library.firstRunDone;
-  if (!existing) {
-    showFirstRun();
-  } else if (library.historyAsked !== true) {
-    askHistoryLevel(); // a library from before Writing History, asked once
-  }
+  if (!existing) showFirstRun();
   if (window.neo.recState) window.neo.recState(); // the File menu's level
   renderShelves();
   whatsNewAtLaunch(existing);
@@ -128,23 +124,9 @@ function showFirstRun() {
     preview();
   }
 
-  // Step 3: Writing History, chosen before a word is written. Where it can't
-  // record (an old iOS), there's nothing to choose.
-  let level = 'record';
-  $('#fr-next').onclick = () => {
-    if (!historyCan()) { $('#fr-done').click(); return; }
-    $('#fr-step2').hidden = true;
-    $('#fr-step3').hidden = false;
-    historyLevelCards($('#fr-levels'), level, (v) => { level = v; });
-  };
-
   $('#fr-done').onclick = async () => {
     library.fonts = { body: picked.body, dropcap: picked.dropcap };
     library.firstRunDone = true;
-    // the choice made here is the consent: nothing asks again
-    library.historyAsked = true;
-    library.recordWriting = level !== 'off';
-    library.proveWriting = level === 'timestamp' && !!window.neo.proofSet;
     // the shelf was drawn (and the author record seeded as Anonymous) before
     // the name was typed — carry the name across
     currentAuthor().name = library.authorName || (library.penNames || [])[0] || t('Anonymous');
@@ -1307,7 +1289,7 @@ function bookTile(meta, opts = {}) {
         if (meta.coverImage) options.push({ label: t('Remove cover art'), desc: t('Deletes the image from the book folder. (To just hide it, use the ↻ on the book.)'), danger: true, value: 'uncover' });
       }
       options.push(
-        ...(historyCanOpen() ? [{ label: t('Writing History…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
+        ...(historyShows() ? [{ label: t('Writing History…'), desc: t('Watch this book being written, keystroke by keystroke.'), value: 'history' }] : []),
         { label: t('Remove from bookshelf'), desc: t('Takes it off your shelves. The files stay safe in your NEO Library folder on disk.'), value: 'remove' },
         { label: trashLabel, desc: window.Capacitor ? t('Moves the book folder to Deleted Books in your NEO Library, where you can recover it.') : t('Sends the book folder to your system trash, where you can recover it.'), danger: true, value: 'trash' }
       );
@@ -1319,7 +1301,7 @@ function bookTile(meta, opts = {}) {
       if (startPart) items.push({ label: t('Start a part here'), value: 'part' }, '-');
       items.push({ label: t('Export…'), value: 'export' });
       if (canCopy) items.push({ label: t('Duplicate'), value: 'duplicate' });
-      if (historyCanOpen()) items.push({ label: t('Writing History…'), value: 'history' });
+      if (historyShows()) items.push({ label: t('Writing History…'), value: 'history' });
       if (coverItems.length) items.push({ label: t('Cover') + '  ›', value: 'coverMenu' });
       items.push('-', { label: t('Remove from bookshelf'), value: 'remove' }, { label: trashLabel, value: 'trash', danger: true });
       const x = e.clientX;

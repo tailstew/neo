@@ -741,12 +741,12 @@ test('a restore can be undone from History while the chapter is as it left it; o
   assert.equal(await chHTML(ID.One), before);
 });
 
-test('with recording off, the restore’s toast says the text it replaced is in a snapshot', async () => {
+test('a restore whose tag can’t be written keeps the text in a snapshot, and the toast says so', async () => {
   const before = await chHTML(ID.One);
-  await js('setHistoryLevel("off")');
-  await tick(300);
   try {
     await atDayEnd(0, ID.One);
+    // (Writing History off hides History, so the tag fails here as a full disk would)
+    await js('window.__tag = rec.tag; rec.tag = () => null; 0');
     await js('document.querySelector(".hs-restore").click()');
     await waitFor(`!historyShown && chapterHTML[${JSON.stringify(ID.One)}] !== ${JSON.stringify(before)}`);
     await tick(300);
@@ -755,8 +755,7 @@ test('with recording off, the restore’s toast says the text it replaced is in 
     await tick(300);
     assert.equal(await chHTML(ID.One), before);
   } finally {
-    await js('setHistoryLevel("record")');
-    await tick(500);
+    await js('rec.tag = window.__tag; 0');
   }
 });
 
@@ -1015,23 +1014,7 @@ test('a snapshot’s tag can be named, Watch from Here opens it, and removing it
   await neo.closeHistory();
 });
 
-test('Tag This Moment… is dimmed, and says why, with recording off and with the book not open', async () => {
-  await js('setHistoryLevel("off")');
-  await tick(300);
-  try {
-    await neo.openHistory();
-    await waitFor('!document.querySelector(".hs-tag").hidden');
-    assert.equal(await js('document.querySelector(".hs-tag").classList.contains("hs-off")'), true);
-    assert.equal(await js('document.querySelector(".hs-tag").title'), 'Turn on File → Record Writing History to tag moments.');
-    key('s', [neo.CTRL]);
-    await tick(400);
-    assert.equal(await js(`[...document.querySelectorAll('.modal-backdrop')].some((b) => !b.classList.contains('page-sheet-backdrop') && b.querySelector('input') && !b.hidden && getComputedStyle(b).display !== 'none')`), false, 'nothing asked');
-    assert.equal(await neo.toastText(), 'Turn on File → Record Writing History to tag moments.');
-    await neo.closeHistory();
-  } finally {
-    await js('setHistoryLevel("record")');
-    await tick(500);
-  }
+test('Tag This Moment… is dimmed, and says why, with the book not open', async () => {
   await js('backToShelf()');
   await tick(800);
   await neo.openHistory({ bookId: neo.book });

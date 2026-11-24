@@ -291,6 +291,7 @@ loadLibrary().then(() => {
 // Options turns a feature on or off. A feature that's off takes NEO's
 // defaults and leaves the writer's own choices in the library for its return.
 function applyLook() {
+  paintHistoryShows(); // Writing History's ways in, by its level
   applyFonts(); // the interface size and brightness
   nbspMarksEnabled = !!library.nbspMarks;
   applyNbspMarks();

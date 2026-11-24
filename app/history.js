@@ -23,6 +23,20 @@ const HISTORY_SKIP = 1500;    // a pause longer than this plays this long (▶�
 const HISTORY_INK = { added: '#8fc98a', deleted: '#d9776b', edited: '#c9a86a' };
 const historyPrefs = { speed: 1, skip: true }; // the speed is kept while NEO runs
 const historyCanOpen = () => !!(Rec && window.neo.recList && window.neo.recRead && window.neo.recDays && window.neo.recDayStart);
+// With Writing History off, every way into it is hidden (History in the
+// footer, the menus, the shelf's, Export's, Watch from Here), as a feature's
+// would be: an empty History would look like a bug. Turned on again, what was
+// recorded before is there as it was.
+const historyShows = () => historyCanOpen() && historyLevel() !== 'off';
+let historyShowsWas = null;
+function paintHistoryShows() {
+  const on = historyShows();
+  const b = $('.tab.history-btn');
+  if (b) b.hidden = !on;
+  // the menus follow (main.js reads the level from library.json)
+  if (historyShowsWas !== null && historyShowsWas !== on && window.neo.recState) window.neo.recState();
+  historyShowsWas = on;
+}
 let historyShown = null; // the open dialog's close()
 let historyFindSeq = 0;  // each search's number, so the worker's news reaches the search it's for
 const historyFindOpts = { word: true, cs: false }; // whole words, any case: kept while NEO is open
@@ -365,7 +379,7 @@ function historyChapterLabel(meta, ch, order) {
   return title ? chapterName(ch, m) + ' — ' + title : chapterName(ch, m);
 }
 
-const canExportHistory = () => historyCanOpen() && !!(window.neo.recExport && window.neo.recEvidence);
+const canExportHistory = () => historyShows() && !!(window.neo.recExport && window.neo.recEvidence);
 
 // Export → Writing History… (the menu, and a book's Export on the shelf): the
 // history as one web page anyone can open, that plays and checks itself. The
@@ -965,7 +979,7 @@ const HISTORY_DRAWER = '(max-width: 720px), (max-height: 500px)';
 // A day picked opens the player on it, with its typing timeline, play and
 // speed. Nothing plays until the writer presses Play.
 async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
-  if (!bookId || !historyCanOpen() || historyShown) return;
+  if (!bookId || !historyShows() || historyShown) return;
   const here = !!(book && book.id === bookId && !$('#editor-view').hidden);
   const caret = here ? captureCaret() : null;
   const meta = here ? book : await window.neo.readBookMeta(bookId);

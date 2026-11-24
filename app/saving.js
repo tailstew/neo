@@ -1245,7 +1245,7 @@ async function showSnapshot(name) {
 
 // Whether a book has a Writing History to watch
 async function snapHasHistory(bookId) {
-  if (!historyCanOpen()) return false;
+  if (!historyShows()) return false;
   try { return ((await window.neo.recList(bookId)) || []).some((d) => d.sessions.length); } catch { return false; }
 }
 // Watch from Here: Writing History at the snapshot's tag
@@ -1523,11 +1523,10 @@ async function refreshFromDisk() {
         if (lib && lib.firstRunDone && JSON.stringify(lib) !== JSON.stringify(library)) {
           library = lib;
           libraryBase = libraryCopy(lib);
+          paintHistoryShows(); // Writing History turned off or on there
           // proof, and the timestamp services, as another computer left them
           if (window.neo.proofSet) window.neo.proofSet(proofFlags()).catch(() => {});
           if (window.neo.recState) window.neo.recState();
-          // answered there: the question here goes
-          if (library.historyAsked === true && $('#history-ask')) $('#history-ask').remove();
           const shelf = $('#bookshelf-view');
           const keep = shelf.scrollTop;
           await renderShelves();

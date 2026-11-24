@@ -1,5 +1,13 @@
 [
   {
+    "version": "2.0.1",
+    "items": [
+      "**Writing History.** NEO can record how you write, keystroke by keystroke. History, in a book's footer, plays the writing back day by day; any chapter or paragraph goes back to an earlier moment with one click; and you can tag a moment with a name and a note. It's off until you turn it on: NEO → Options… (File → Options… on Windows and Linux) → Writing History. The history stays with your book, and nothing is sent anywhere.",
+      "**Proof of when you wrote.** Choose Record and Timestamp, and as you write, two independent timestamp services sign a fingerprint of your history (never your words). File → Export → Writing History… makes one web page that anyone can open, offline, to watch the book being written and check the timestamps for themselves.",
+      "**NEO Pocket records too** (⋯ → Options… → Writing History), and plays the history back on your phone."
+    ]
+  },
+  {
     "version": "2.0.0",
     "items": [
       "**NEO Options.** NEO → Options… (File → Options… on Windows and Linux) gathers NEO's features in one place: outline cards, notes pages, poetry, footnotes, pen names, page views, focus, vim keys, more exports and the rest. Turn on what you use; the menus show only what's on.",
