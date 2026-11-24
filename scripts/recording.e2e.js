@@ -290,6 +290,24 @@ test('a placeholder dropped and resolved', async () => {
   assert.doesNotMatch(await html(0), /ph-mark/);
 });
 
+test('a footnote typed in its box is recorded as typing, with its keys, in its chapter', async () => {
+  await caretAt(0, 1, 3);
+  await js('insertFootnote()');
+  await tick(300);
+  await waitFor('document.activeElement && !!document.activeElement.closest(".fn-box")');
+  const from = (await js('rec.w.lines.length')) - 1;
+  await type('Ibid tidx\be.');
+  await tick(300);
+  assert.match(await html(0), /data-note="Ibid tide\."/);
+  const lines = (await lastLines()).slice(from);
+  assert.ok(lines.some((l) => l[1] === 'k' || l[1] === 'r' || l[1] === 'rd'), 'its keys');
+  assert.ok(lines.some((l) => l[1] === 'r' && /Ibid/.test(l[2])), 'typed as a run: ' + JSON.stringify(lines.slice(0, 8)));
+  assert.ok(!lines.some((l) => l[1] === 'x' && l[2] === 'program'), 'not NEO’s own change');
+  assert.ok(!lines.some((l) => l[1] === 'e' && l[6] === 0), 'nothing as typed with no key');
+  key('Escape');
+  await tick(300);
+});
+
 test('an input method composing a word', async () => {
   await caretAt(0, 0, -1);
   await type(' ');
@@ -745,7 +763,7 @@ test('a key typed after an open tidied the chapter is the key, and the tidy its 
   const tidy = [];
   for (let i = x + 1; i < lines.length && lines[i][1] === 'e' && lines[i].length === 5; i++) tidy.push(lines[i]);
   assert.ok(tidy.length >= 1 && tidy.every((l) => l[3] + l[4].length < 200), 'small splices: ' + JSON.stringify(tidy));
-  assert.doesNotMatch(await js(`chapterHTML[${JSON.stringify(meta.chapterOrder[0])}]`), /<span/, 'the spans went');
+  assert.doesNotMatch(await js(`chapterHTML[${JSON.stringify(meta.chapterOrder[0])}]`), /<span style/, 'the spans went');
   // the key: one letter, typed
   const typed = R.compileSession(text).steps.filter((s) => s.k === 'e' && s.cause === 'input');
   const z = typed[typed.length - 1];
@@ -952,6 +970,9 @@ test('History in the footer opens on the whole book as it is, over its days; the
   assert.deepEqual(await js('[...historyShown.player.paper.querySelectorAll(".rp-chapter")].map((s) => s.dataset.ch)'), await chapterIds());
   assert.equal(await js('document.querySelectorAll(".chapter").length'), (await chapterIds()).length, 'the player made no .chapter of its own');
   assert.match(Object.values(await playerHTML()).join(''), /Watched\./, 'the words typed just before it opened');
+  // the footnote typed earlier is numbered on the sheet, as in the editor
+  const fn = await js(`(() => { const f = historyShown.player.paper.querySelector('.rp-body .fn'); return f && getComputedStyle(f, '::after').content; })()`);
+  assert.equal(fn, 'counter(neo-fn)', 'a footnote’s number in History');
   const cache = fs.readdirSync(path.join(tmp, 'app', 'recording-cache', BOOK));
   for (const n of OLD_CACHE) assert.ok(!cache.includes(n), n + ' is still there');
 });

@@ -222,6 +222,7 @@ Each with no change the recorder didn't see, and every write replaying to its fi
 - Styled text pasted from a web page: no styling stays, and NEO's tidy is a change of its own.
 - Two books opened one after the other: only the second is open, and its session holds only its chapters.
 - Stickies changed on another device while the book is open: the stream takes them in as from another device.
+- A footnote typed in its box: its keys are recorded as the chapter's, typed as a run, not NEO's own change or text with no key; History numbers it as the editor does. `test:recording`
 
 ### Writing History, the dialog, and restore
 

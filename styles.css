@@ -2774,9 +2774,10 @@ body.light #notes-outline { color: #6f6b63; }
 /* ---------- footnotes (FOOTNOTES in app.js) ---------- */
 /* the number is the page's own count, one series through the book (as the
    chapter lists and every export number them), never saved */
-#chapters { counter-reset: neo-fn; }
-.chapter-body .fn { counter-increment: neo-fn; cursor: pointer; }
-.chapter-body .fn::after {
+#chapters, .hs-paper { counter-reset: neo-fn; }
+.chapter-body .fn { cursor: pointer; }
+:is(.chapter-body, .rp-body) .fn { counter-increment: neo-fn; }
+:is(.chapter-body, .rp-body) .fn::after {
   content: counter(neo-fn); color: var(--accent);
   font: 600 0.62em/0 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   vertical-align: super; padding: 0 1px 0 0.5px; font-style: normal;

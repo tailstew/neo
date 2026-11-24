@@ -107,9 +107,16 @@ function openFootnote(mark) {
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFootnote(true); }
   });
-  text.addEventListener('input', () => {
+  // typed, as the chapter is: Writing History has the keys (recWhere finds
+  // the box's chapter) and the change as typing, not as NEO's own
+  text.addEventListener('input', (e) => {
     mark.dataset.note = text.textContent.replace(/\s*\n\s*/g, ' ');
-    syncChapter(body, chId);
+    markDialogueOpening(body);
+    setChapterHTML(chId, captureBody(body), 'input', { inputType: e.inputType });
+    wordCache[chId] = null;
+    scheduleChapterSave(chId);
+    updateCounters();
+    scheduleNavRefresh();
     queueFootnoteList(body);
     placeFootnoteBox();
   });

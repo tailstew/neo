@@ -682,6 +682,9 @@ function recWhere(target) {
   const body = recBodyOf(target);
   if (body) return body.closest('.chapter').dataset.id;
   const el = target && (target.nodeType === Node.TEXT_NODE ? target.parentElement : target);
+  // a footnote's box, beside its chapter's text: that chapter's
+  const fb = el && el.closest ? el.closest('.fn-box') : null;
+  if (fb) return typeof fnBox !== 'undefined' && fnBox && fnBox.el === fb ? fnBox.chId : null;
   const notes = el && el.closest ? el.closest('#aux-editor') : null;
   return notes && recIsNotesKind(notes.dataset.kind) ? recNotesId(notes.dataset.kind) : null;
 }
