@@ -1147,6 +1147,9 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
   let pos = 0;            // view entries played
   let clock = 0;
   let chapters = {};      // chapter id -> Rec.ChapterText, as played
+  // a footnote being typed: followed until the caret moves (the steps
+  // between its letters, a key going down, change nothing in it)
+  let fnFollow = null;
   let caretAt = null;     // { ch, at } after an edit, or { ch, a, f } after a caret line
   let playing = false;
   let lastFrame = 0;
@@ -2120,7 +2123,10 @@ async function openHistory({ bookId = book && book.id, snapshot = null } = {}) {
     }
     CSS.highlights.set('neo-replay-sel', hlSel);
     if (follow) {
-      const c = fnLive || paper.querySelector('.rp-caret');
+      const sig = caretAt ? [caretAt.ch, caretAt.at, caretAt.f && caretAt.f.join(',')].join('|') : '';
+      if (fnLive) fnFollow = { row: fnLive, sig };
+      else if (fnFollow && (fnFollow.sig !== sig || !fnFollow.row.isConnected)) fnFollow = null;
+      const c = (fnFollow && fnFollow.row) || paper.querySelector('.rp-caret');
       if (c) {
         const box = scroller.getBoundingClientRect();
         const r = c.getBoundingClientRect();

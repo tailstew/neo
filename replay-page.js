@@ -667,6 +667,7 @@
     let playing = false;
     let last = 0;
     let caret = null;  // { ch, at } of the last edit
+    let fnFollow = null; // a footnote being typed: followed until the caret moves
     let markers = [];
     let stampMap = null; // from the checks: { 'device/id': [{ n, by }] }
     let stampMarks = [];
@@ -1274,7 +1275,10 @@
         fnLive = NeoSheet.footnoteList(body, T('Footnotes')) || fnLive;
       }
       if (follow) {
-        const c = fnLive || sheet.querySelector('.rx-caret');
+        const sig = caret ? caret.ch + '|' + caret.at : '';
+        if (fnLive) fnFollow = { row: fnLive, sig };
+        else if (fnFollow && (fnFollow.sig !== sig || !fnFollow.row.isConnected)) fnFollow = null;
+        const c = (fnFollow && fnFollow.row) || sheet.querySelector('.rx-caret');
         if (c) {
           const r = c.getBoundingClientRect();
           const b = scroll.getBoundingClientRect();
